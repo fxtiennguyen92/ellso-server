@@ -9,6 +9,7 @@ Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:register');
     Route::post('login', [AuthController::class, 'login']); // tự giới hạn theo email + IP trong controller
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:forgot-password');
+    Route::post('resend-temp-password', [AuthController::class, 'resendTempPassword'])->middleware('throttle:forgot-password');
 
     // Token tạm nhận được khi đăng nhập bằng mật khẩu tạm
     Route::post('set-password', [AuthController::class, 'setPassword'])

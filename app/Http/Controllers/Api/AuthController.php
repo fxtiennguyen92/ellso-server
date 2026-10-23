@@ -68,6 +68,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Đăng ký thành công. Mật khẩu tạm đã được gửi tới email của bạn.',
             'email' => $data['email'],
+            'resend_after_seconds' => config('ellso.auth.forgot_password.cooldown_seconds'),
         ], 201);
     }
 
@@ -181,25 +182,36 @@ class AuthController extends Controller
 
         $user = User::query()->where('email', $request->input('email'))->where('is_active', true)->first();
 
-        if (! $user) {
-            return $response;
+        if ($user) {
+            $this->issueThrottled($user, TempPasswordReason::Forgot, $request);
         }
 
-        // Chống spam theo email: khoảng cách tối thiểu giữa 2 lần gửi + tối đa N lần / ngày
-        $dailyKey = 'forgot-password:day:' . $user->getKey();
-        $inCooldown = $user->temp_password_sent_at?->gt(now()->subSeconds($cooldown)) ?? false;
-        $overDaily = RateLimiter::tooManyAttempts($dailyKey, config('ellso.auth.forgot_password.max_per_email_per_day'));
+        return $response;
+    }
 
-        if ($inCooldown || $overDaily) {
-            UserLog::record($user, UserLogEvent::ForgotPasswordThrottled, $request, [
-                'reason' => $inCooldown ? 'cooldown' : 'daily_limit',
-            ]);
+    /**
+     * POST /auth/resend-temp-password — nút "Gửi lại email" ở màn "Kiểm tra hộp thư" sau khi đăng ký.
+     * Chỉ gửi cho tài khoản CHƯA đăng nhập lần đầu (mật khẩu tạm kích hoạt, không hết hạn);
+     * tài khoản đã đặt mật khẩu thì dùng "Quên mật khẩu". Luôn trả cùng một câu trả lời, chung giới hạn chống spam với quên mật khẩu.
+     */
+    public function resendTempPassword(Request $request): JsonResponse
+    {
+        $request->merge(['email' => Str::lower(trim((string) $request->input('email')))]);
+        $request->validate(['email' => ['required', 'email']], [
+            'email.required' => 'Vui lòng nhập email.',
+            'email.email' => 'Email không hợp lệ.',
+        ]);
 
-            return $response;
+        $response = response()->json([
+            'message' => 'Nếu email đã đăng ký và chưa kích hoạt, mật khẩu tạm sẽ được gửi lại trong ít phút.',
+            'resend_after_seconds' => config('ellso.auth.forgot_password.cooldown_seconds'),
+        ]);
+
+        $user = User::query()->where('email', $request->input('email'))->where('is_active', true)->first();
+
+        if ($user && ! $user->hasActivatedPassword()) {
+            $this->issueThrottled($user, TempPasswordReason::RegisterResend, $request);
         }
-
-        RateLimiter::hit($dailyKey, 86400);
-        $this->tempPasswords->issue($user, TempPasswordReason::Forgot, $request);
 
         return $response;
     }
@@ -237,6 +249,27 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'user' => new UserResource($user->load('referrer')),
         ]);
+    }
+
+    /** Gửi mật khẩu tạm, chống spam theo email: khoảng cách tối thiểu giữa 2 lần gửi + tối đa N lần / ngày. */
+    private function issueThrottled(User $user, TempPasswordReason $reason, Request $request): void
+    {
+        $cooldown = config('ellso.auth.forgot_password.cooldown_seconds');
+        $dailyKey = 'forgot-password:day:' . $user->getKey();
+        $inCooldown = $user->temp_password_sent_at?->gt(now()->subSeconds($cooldown)) ?? false;
+        $overDaily = RateLimiter::tooManyAttempts($dailyKey, config('ellso.auth.forgot_password.max_per_email_per_day'));
+
+        if ($inCooldown || $overDaily) {
+            UserLog::record($user, UserLogEvent::ForgotPasswordThrottled, $request, [
+                'reason' => $inCooldown ? 'cooldown' : 'daily_limit',
+                'flow' => $reason->value,
+            ]);
+
+            return;
+        }
+
+        RateLimiter::hit($dailyKey, 86400);
+        $this->tempPasswords->issue($user, $reason, $request);
     }
 
     private function tooManyAttempts(int $seconds): JsonResponse

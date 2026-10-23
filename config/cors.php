@@ -15,7 +15,8 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    // API của app nằm ở /v1/* (không có prefix api/) — bản web của app gọi từ trình duyệt nên cần CORS
+    'paths' => ['v1/*', 'sanctum/csrf-cookie'],
 
     'allowed_methods' => ['*'],
 

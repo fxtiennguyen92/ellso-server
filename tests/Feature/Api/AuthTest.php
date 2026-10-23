@@ -82,9 +82,14 @@ class AuthTest extends TestCase
             'password' => $temp, 'password_confirmation' => $temp,
         ])->assertUnprocessable();
 
+        // Thiếu chữ hoa → không hợp lệ
+        $this->withToken($changeToken)->postJson('/v1/auth/set-password', [
+            'password' => 'matkhau123', 'password_confirmation' => 'matkhau123',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['password']);
+
         $set = $this->withToken($changeToken)->withHeaders(self::DEVICE)->postJson('/v1/auth/set-password', [
-            'password' => 'matkhau123',
-            'password_confirmation' => 'matkhau123',
+            'password' => 'Matkhau123',
+            'password_confirmation' => 'Matkhau123',
         ])->assertOk()->assertJson(['requires_password_change' => false]);
 
         $this->app['auth']->forgetGuards();
@@ -104,7 +109,7 @@ class AuthTest extends TestCase
 
         // Mật khẩu tạm không còn dùng được, mật khẩu mới thì được
         $this->postJson('/v1/auth/login', ['email' => 'a@example.com', 'password' => $temp])->assertUnprocessable();
-        $this->postJson('/v1/auth/login', ['email' => 'a@example.com', 'password' => 'matkhau123'])
+        $this->postJson('/v1/auth/login', ['email' => 'a@example.com', 'password' => 'Matkhau123'])
             ->assertOk()->assertJsonStructure(['token', 'user' => ['referral_code']]);
     }
 
@@ -199,7 +204,54 @@ class AuthTest extends TestCase
         $token = $this->postJson('/v1/auth/login', ['email' => 'g@example.com', 'password' => 'dung12345'])->json('token');
 
         $this->withToken($token)->postJson('/v1/auth/set-password', [
-            'password' => 'moi123456', 'password_confirmation' => 'moi123456',
+            'password' => 'Moi123456', 'password_confirmation' => 'Moi123456',
         ])->assertForbidden();
+    }
+
+    public function test_resend_temp_password_after_register(): void
+    {
+        $this->postJson('/v1/auth/register', ['name' => 'Lê Thu Hoa', 'email' => 'hoa@example.com'])
+            ->assertCreated()
+            ->assertJsonPath('resend_after_seconds', 120);
+        $first = $this->sentTempPassword('hoa@example.com');
+
+        // Trong thời gian chờ: cùng câu trả lời, không gửi thêm
+        $this->postJson('/v1/auth/resend-temp-password', ['email' => 'hoa@example.com'])
+            ->assertOk()->assertJsonPath('resend_after_seconds', 120);
+        Mail::assertSentCount(1);
+
+        // Hết thời gian chờ: gửi mật khẩu tạm kích hoạt mới (không hết hạn), mật khẩu cũ mất hiệu lực
+        $this->travel(121)->seconds();
+        $this->postJson('/v1/auth/resend-temp-password', ['email' => 'hoa@example.com'])->assertOk();
+        Mail::assertSentCount(2);
+        $second = null;
+        Mail::assertSent(TempPasswordMail::class, function (TempPasswordMail $m) use (&$second) {
+            $second = $m->tempPassword;
+
+            return true;
+        });
+        $user = User::where('email', 'hoa@example.com')->firstOrFail();
+        $this->assertNull($user->temp_password_expires_at);
+        $this->postJson('/v1/auth/login', ['email' => 'hoa@example.com', 'password' => $first])->assertUnprocessable();
+        $this->postJson('/v1/auth/login', ['email' => 'hoa@example.com', 'password' => $second])
+            ->assertOk()->assertJson(['requires_password_change' => true]);
+
+        // Tài khoản đã tự đặt mật khẩu / email không tồn tại: không gửi gì (dùng Quên mật khẩu)
+        User::factory()->create(['email' => 'da-kich-hoat@example.com', 'password' => 'Dung12345']);
+        $this->travel(5)->minutes();
+        $this->postJson('/v1/auth/resend-temp-password', ['email' => 'da-kich-hoat@example.com'])->assertOk();
+        $this->postJson('/v1/auth/resend-temp-password', ['email' => 'khongco@example.com'])->assertOk();
+        Mail::assertSentCount(2);
+    }
+
+    public function test_api_lives_only_under_v1_with_cors(): void
+    {
+        $this->getJson('/api/referrals/ZZZZZZZZ')->assertNotFound();
+
+        $this->call('OPTIONS', '/v1/auth/login', [], [], [], [
+            'HTTP_ORIGIN' => 'http://localhost:8081',
+            'HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'POST',
+            'HTTP_ACCESS_CONTROL_REQUEST_HEADERS' => 'content-type, x-device-platform',
+        ])->assertHeader('Access-Control-Allow-Origin', '*');
     }
 }
