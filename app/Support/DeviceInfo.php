@@ -39,6 +39,26 @@ class DeviceInfo
         return $info['device_name'] ?? $info['platform'] ?? 'app';
     }
 
+    /** Mô tả thiết bị gọn cho email: "iPhone 15 Pro · iOS 18.1", hoặc trình duyệt. */
+    public static function summary(Request $request): ?string
+    {
+        $info = self::fromRequest($request);
+
+        $platform = match ($info['platform']) {
+            'ios' => 'iOS',
+            'android' => 'Android',
+            'web' => 'Web',
+            default => null,
+        };
+
+        $parts = array_filter([
+            $info['device_name'],
+            trim(($platform ?? '') . ' ' . ($info['os_version'] ?? '')) ?: null,
+        ]);
+
+        return $parts ? implode(' · ', $parts) : (Str::limit((string) $info['user_agent'], 80) ?: null);
+    }
+
     private static function clean(?string $value, int $max): ?string
     {
         $value = trim((string) $value);

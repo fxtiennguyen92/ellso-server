@@ -7,6 +7,7 @@ use App\Enums\UserLogEvent;
 use App\Mail\TempPasswordMail;
 use App\Models\User;
 use App\Models\UserLog;
+use App\Support\DeviceInfo;
 use App\Support\TempPassword;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +44,15 @@ class TempPasswordService
                 'expires_at' => $expiresAt?->toIso8601String(),
             ], $actor);
 
-            Mail::to($user->email)->send(new TempPasswordMail($user, $plain, $reason, $expiresAt));
+            // Quên mật khẩu do chính user yêu cầu: ghi kèm thời điểm + thiết bị để họ nhận ra yêu cầu lạ
+            $requestInfo = $reason === TempPasswordReason::Forgot && $request
+                ? [
+                    'time' => now()->timezone('Asia/Ho_Chi_Minh')->format('H:i, d/m/Y'),
+                    'device' => DeviceInfo::summary($request),
+                ]
+                : null;
+
+            Mail::to($user->email)->send(new TempPasswordMail($user, $plain, $reason, $expiresAt, $requestInfo));
         });
     }
 }

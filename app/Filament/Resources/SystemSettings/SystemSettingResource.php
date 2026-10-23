@@ -71,6 +71,14 @@ class SystemSettingResource extends Resource
                 ->visible($isType('string'))
                 ->columnSpanFull(),
 
+            TextInput::make('value')
+                ->label(fn (?SystemSetting $record) => $record?->label)
+                ->email()
+                ->required()
+                ->maxLength(255)
+                ->visible($isType('email'))
+                ->columnSpanFull(),
+
             Textarea::make('value')
                 ->label(fn (?SystemSetting $record) => $record?->label)
                 ->rows(6)

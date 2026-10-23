@@ -17,6 +17,12 @@ class SystemSetting extends Model
 
     public const CREDIT_TO_VND_RATE = 'credit_to_vnd_rate';
 
+    public const SUPPORT_EMAIL = 'support_email';
+
+    public const COMPANY_NAME = 'company_name';
+
+    public const COMPANY_ADDRESS = 'company_address';
+
     private const CACHE_KEY = 'system_settings';
 
     protected $fillable = [
@@ -56,6 +62,21 @@ class SystemSetting extends Model
         return (int) static::get(self::CREDIT_TO_VND_RATE, 0);
     }
 
+    public static function supportEmail(): ?string
+    {
+        return static::get(self::SUPPORT_EMAIL) ?: null;
+    }
+
+    public static function companyName(): ?string
+    {
+        return static::get(self::COMPANY_NAME) ?: null;
+    }
+
+    public static function companyAddress(): ?string
+    {
+        return static::get(self::COMPANY_ADDRESS) ?: null;
+    }
+
     public function typedValue(): mixed
     {
         if ($this->value === null) {
@@ -82,6 +103,10 @@ class SystemSetting extends Model
             'json' => json_encode($value, JSON_UNESCAPED_UNICODE),
             default => (string) $value,
         };
+
+        if ($text === '') {
+            return '—';
+        }
 
         return trim($text . ' ' . ($this->unit ?? ''));
     }
