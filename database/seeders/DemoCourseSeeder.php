@@ -35,12 +35,13 @@ class DemoCourseSeeder extends Seeder
                 'role' => UserRole::Instructor,
                 'is_active' => true,
                 'email_verified_at' => now(),
+                'password_changed_at' => now(),
             ],
         );
 
         User::updateOrCreate(
             ['email' => 'hocvien@ellso.test'],
-            ['name' => 'Học viên Demo', 'password' => 'password', 'role' => UserRole::Student, 'is_active' => true],
+            ['name' => 'Học viên Demo', 'password' => 'password', 'role' => UserRole::Student, 'is_active' => true, 'password_changed_at' => now()],
         );
 
         $this->category = Category::firstOrCreate(['name' => 'Kỹ năng & Công nghệ']);

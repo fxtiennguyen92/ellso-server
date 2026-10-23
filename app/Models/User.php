@@ -4,14 +4,18 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\UserRole;
+use App\Support\ReferralCode;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements FilamentUser
@@ -28,10 +32,12 @@ class User extends Authenticatable implements FilamentUser
         'password',
         'role',
         'is_active',
+        'password_changed_at',
     ];
 
     protected $hidden = [
         'password',
+        'temp_password',
         'remember_token',
     ];
 
@@ -40,9 +46,70 @@ class User extends Authenticatable implements FilamentUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'temp_password' => 'hashed',
+            'temp_password_expires_at' => 'datetime',
+            'temp_password_sent_at' => 'datetime',
+            'password_changed_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'role' => UserRole::class,
             'is_active' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (User $user) {
+            $user->referral_code ??= ReferralCode::generateUnique();
+            $user->email = Str::lower(trim((string) $user->email));
+        });
+    }
+
+    /** User đã tự đặt mật khẩu (đã hoàn tất đăng nhập lần đầu). */
+    public function hasActivatedPassword(): bool
+    {
+        return $this->password_changed_at !== null;
+    }
+
+    public function hasValidTempPassword(): bool
+    {
+        return $this->temp_password !== null
+            && ($this->temp_password_expires_at === null || $this->temp_password_expires_at->isFuture());
+    }
+
+    public function checkPassword(string $plain): bool
+    {
+        return $this->hasActivatedPassword() && Hash::check($plain, $this->password);
+    }
+
+    public function checkTempPassword(string $plain): bool
+    {
+        return $this->hasValidTempPassword() && Hash::check($plain, $this->temp_password);
+    }
+
+    /** Đặt mật khẩu mới do chính user chọn, hủy mật khẩu tạm. */
+    public function setOwnPassword(string $plain): void
+    {
+        $this->forceFill([
+            'password' => $plain,
+            'password_changed_at' => now(),
+            'temp_password' => null,
+            'temp_password_expires_at' => null,
+        ])->save();
+    }
+
+    public function referrer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'referred_by_id');
+    }
+
+    public function referrals(): HasMany
+    {
+        return $this->hasMany(User::class, 'referred_by_id');
+    }
+
+    public function logs(): HasMany
+    {
+        return $this->hasMany(UserLog::class);
     }
 
     /** Chỉ admin và giảng viên (đang hoạt động) được vào CMS. Học viên dùng app. */

@@ -1,8 +1,25 @@
 <?php
 
-use Illuminate\Http\Request;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ReferralController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+// ---- Khách (chưa đăng nhập) ----
+Route::prefix('auth')->group(function () {
+    Route::post('register', [AuthController::class, 'register'])->middleware('throttle:register');
+    Route::post('login', [AuthController::class, 'login']); // tự giới hạn theo email + IP trong controller
+    Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:forgot-password');
+
+    // Token tạm nhận được khi đăng nhập bằng mật khẩu tạm
+    Route::post('set-password', [AuthController::class, 'setPassword'])
+        ->middleware(['auth:sanctum', 'abilities:' . AuthController::ABILITY_SET_PASSWORD]);
+});
+
+Route::get('referrals/{code}', [ReferralController::class, 'show'])->middleware('throttle:referral-check');
+
+// ---- Đã đăng nhập (token đầy đủ; token đổi mật khẩu không vào được) ----
+Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
+    Route::get('me', [AuthController::class, 'me']);
+    Route::get('user', [AuthController::class, 'me']); // giữ tương thích, dùng /me
+    Route::post('auth/logout', [AuthController::class, 'logout']);
+});
