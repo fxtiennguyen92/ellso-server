@@ -1,0 +1,40 @@
+<?php
+
+namespace App\Policies;
+
+use App\Models\Category;
+use App\Models\User;
+
+/** Danh mục dùng chung: chỉ admin quản lý. */
+class CategoryPolicy
+{
+    public function viewAny(User $user): bool
+    {
+        return $user->isAdmin();
+    }
+
+    public function view(User $user, Category $model): bool
+    {
+        return $user->isAdmin();
+    }
+
+    public function create(User $user): bool
+    {
+        return $user->isAdmin();
+    }
+
+    public function update(User $user, Category $model): bool
+    {
+        return $user->isAdmin();
+    }
+
+    public function delete(User $user, Category $model): bool
+    {
+        return $user->isAdmin();
+    }
+
+    public function deleteAny(User $user): bool
+    {
+        return $user->isAdmin();
+    }
+}
