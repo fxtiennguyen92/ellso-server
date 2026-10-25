@@ -63,7 +63,7 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->navigationGroups(['Đào tạo', 'Thiết lập', 'Marketing', 'Hệ thống'])
+            ->navigationGroups(['Đào tạo', 'Thiết lập', 'Marketing', 'Thống kê', 'Hệ thống'])
         ;
     }
 }

@@ -180,6 +180,6 @@ class PromoCode extends Model
 
     public static function money(int $amount): string
     {
-        return number_format($amount, 0, ',', '.') . ' ₫';
+        return number_format($amount, 0, ',', '.') . "\u{00A0}₫"; // khoảng trắng không ngắt: ₫ không rớt dòng
     }
 }
