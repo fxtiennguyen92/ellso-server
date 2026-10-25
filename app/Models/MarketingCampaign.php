@@ -17,10 +17,10 @@ class MarketingCampaign extends Model
 {
     use SoftDeletes;
 
-    /** Kích thước banner cố định (px). Tỉ lệ 12:5 khớp thẻ chiến dịch trên Home của app. */
-    public const BANNER_WIDTH = 1200;
+    /** Kích thước banner cố định (px). Tỉ lệ 16:9, thẻ chiến dịch trên Home của app theo đúng tỉ lệ này. */
+    public const BANNER_WIDTH = 1280;
 
-    public const BANNER_HEIGHT = 500;
+    public const BANNER_HEIGHT = 720;
 
     public const CTA_NONE = 'none';
 

@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Chiến dịch marketing: banner trên Home của app (1200 × 500, tỉ lệ 12:5) + trang chi tiết chiến dịch.
+ * Chiến dịch marketing: banner trên Home của app (1280 × 720, tỉ lệ 16:9) + trang chi tiết chiến dịch.
  * Nhiều chiến dịch hiển thị cùng lúc → app hiện dạng trượt, theo sort_order.
  */
 return new class extends Migration
@@ -16,7 +16,7 @@ return new class extends Migration
             $table->id();
             $table->string('title');                          // tiêu đề trang chi tiết, cũng là mô tả ảnh banner
             $table->string('summary', 300)->nullable();        // 1–2 câu dưới tiêu đề
-            $table->string('banner_path');                    // ảnh 1200 × 500 trên disk public
+            $table->string('banner_path');                    // ảnh 1280 × 720 trên disk public
 
             $table->timestamp('starts_at');                   // thời gian hiển thị
             $table->timestamp('ends_at');

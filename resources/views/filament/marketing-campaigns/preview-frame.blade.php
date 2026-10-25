@@ -36,7 +36,7 @@
     .search { margin: 0 16px; height: 44px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-alt);
               display: flex; align-items: center; gap: 8px; padding: 0 14px; color: #94a3b8; font-size: 15px; }
     .card-wrap { padding: 16px 16px 0; }
-    .card { position: relative; border-radius: 24px; overflow: hidden; aspect-ratio: 12 / 5; background: var(--mint-50);
+    .card { position: relative; border-radius: 24px; overflow: hidden; aspect-ratio: 16 / 9; background: var(--mint-50);
             box-shadow: 0 6px 0 rgba(4,120,87,.18); outline: 2px solid var(--emerald-500); outline-offset: 3px; }
     .card img, .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .noimg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--emerald-700);
@@ -49,7 +49,7 @@
     .section-t { margin: 20px 16px 0; font-family: var(--display); font-weight: 600; font-size: 18px; }
 
     /* Chi tiết */
-    .hero { position: relative; aspect-ratio: 12 / 5; background: var(--mint-50); flex: none; }
+    .hero { position: relative; aspect-ratio: 16 / 9; background: var(--mint-50); flex: none; }
     .back { position: absolute; top: 12px; left: 12px; width: 36px; height: 36px; border-radius: 9999px; background: rgba(255,255,255,.92);
             display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(15,23,42,.2); }
     .body { padding: 20px 20px 24px; display: flex; flex-direction: column; gap: 16px; }
@@ -103,7 +103,7 @@
                     @if ($banner)
                         <img src="{{ $banner }}" alt="{{ $title }}">
                     @else
-                        <div class="noimg">Banner 1200 × 500 sẽ hiện ở đây</div>
+                        <div class="noimg">Banner 1280 × 720 sẽ hiện ở đây</div>
                     @endif
                 </div>
             </div>

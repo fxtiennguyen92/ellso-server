@@ -60,8 +60,8 @@ class MarketingCampaignTest extends TestCase
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.id', $first->id)
             ->assertJsonPath('data.1.id', $second->id)
-            ->assertJsonPath('data.0.banner.width', 1200)
-            ->assertJsonPath('data.0.banner.height', 500)
+            ->assertJsonPath('data.0.banner.width', 1280)
+            ->assertJsonPath('data.0.banner.height', 720)
             ->assertJsonPath('data.0.banner.url', Storage::disk('public')->url('campaigns/banners/b.jpg'));
     }
 
@@ -107,7 +107,7 @@ class MarketingCampaignTest extends TestCase
     {
         $this->actingAs($this->admin);
         $this->get(ListMarketingCampaigns::getUrl())->assertOk();
-        $this->get(CreateMarketingCampaign::getUrl())->assertOk()->assertSee('1200 × 500');
+        $this->get(CreateMarketingCampaign::getUrl())->assertOk()->assertSee('1280 × 720');
 
         $undoBuilderFake = Builder::fake();
 
@@ -129,7 +129,7 @@ class MarketingCampaignTest extends TestCase
             ->fillForm([
                 'title' => 'Mừng khai trương',
                 'summary' => 'Tặng 1 tháng',
-                'banner_path' => UploadedFile::fake()->image('banner.jpg', 1200, 500),
+                'banner_path' => UploadedFile::fake()->image('banner.jpg', 1280, 720),
                 'starts_at' => '2026-11-01 00:00',
                 'ends_at' => '2026-11-30 23:59',
                 'is_active' => true,

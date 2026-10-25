@@ -65,7 +65,7 @@ class MarketingCampaignForm
 
             Group::make([
                 Section::make('Banner')
-                    ->description('Kích thước cố định ' . MarketingCampaign::BANNER_WIDTH . ' × ' . MarketingCampaign::BANNER_HEIGHT . ' px (tỉ lệ 12:5).')
+                    ->description('Kích thước cố định ' . MarketingCampaign::BANNER_WIDTH . ' × ' . MarketingCampaign::BANNER_HEIGHT . ' px (tỉ lệ 16:9).')
                     ->schema([
                         FileUpload::make('banner_path')
                             ->hiddenLabel()
@@ -76,16 +76,16 @@ class MarketingCampaignForm
                             ->visibility('public')
                             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                             ->maxSize(3072)
-                            // Cắt + thu về đúng 1200 × 500 ngay trên trình duyệt trước khi tải lên
+                            // Cắt + thu về đúng 1280 × 720 ngay trên trình duyệt trước khi tải lên
                             ->imageEditor()
-                            ->imageEditorAspectRatioOptions(['12:5'])
-                            ->imageCropAspectRatio('12:5')
+                            ->imageEditorAspectRatioOptions(['16:9'])
+                            ->imageCropAspectRatio('16:9')
                             ->imageResizeMode('cover')
                             ->imageResizeTargetWidth((string) MarketingCampaign::BANNER_WIDTH)
                             ->imageResizeTargetHeight((string) MarketingCampaign::BANNER_HEIGHT)
-                            ->rule('dimensions:ratio=12/5')
-                            ->validationMessages(['dimensions' => 'Banner phải có tỉ lệ 12:5 (1200 × 500 px).'])
-                            ->helperText('JPG, PNG hoặc WebP, tối đa 3 MB. Ảnh khác tỉ lệ sẽ được cắt về 12:5. Giữ chữ và logo cách mép ít nhất 60 px vì thẻ trên app bo tròn góc. Nên thiết kế ở 1200 × 500 để ảnh sắc nét.'),
+                            ->rule('dimensions:ratio=16/9')
+                            ->validationMessages(['dimensions' => 'Banner phải có tỉ lệ 16:9 (1280 × 720 px).'])
+                            ->helperText('JPG, PNG hoặc WebP, tối đa 3 MB. Ảnh khác tỉ lệ sẽ được cắt về 16:9. Giữ chữ và logo cách mép ít nhất 60 px vì thẻ trên app bo tròn góc. Nên thiết kế ở 1280 × 720 để ảnh sắc nét.'),
                     ]),
                 Section::make('Thời gian hiển thị')
                     ->description('Giờ Việt Nam. Banner tự hiện và tự ẩn theo khoảng này.')
