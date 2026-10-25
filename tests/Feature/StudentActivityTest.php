@@ -111,6 +111,9 @@ class StudentActivityTest extends TestCase
         $this->assertSame(2, $a['students']);
         $this->assertEqualsWithDelta(15.0, $a['avg_minutes'], 0.01); // (10+30+10+10)/4
         $this->assertSame(['ios' => 2, 'android' => 1, 'web' => 0, 'other' => 1], $a['platforms']);
+        // 3 học viên được tạo lúc 12:00 25/10 (giờ VN); giảng viên không tính
+        $this->assertSame([0, 0, 0, 0, 0, 0, 3], $a['signups']);
+        $this->assertSame(3, $a['signups_total']);
         $this->assertSame([1 => 2, 2 => 1, 3 => 0, 4 => 0, 5 => 0, 6 => 0, 7 => 1], $a['weekdays']);
         $this->assertSame(1, $a['hours'][0]);
         $this->assertSame(1, $a['hours'][20]);
@@ -137,7 +140,7 @@ class StudentActivityTest extends TestCase
             ->assertHasFormErrors(['to']);
 
         Livewire::test(StudentActivityOverview::class)->assertSee('Tỉ lệ có gói học viên')->assertSee('0%');
-        Livewire::test(AppOpensChart::class, ['pageFilters' => $filters])->assertOk()->assertSee('1 lượt từ 1 học viên');
+        Livewire::test(AppOpensChart::class, ['pageFilters' => $filters])->assertOk()->assertSee('1 lượt từ 1 học viên')->assertSee('học viên mới');
         Livewire::test(PlatformShareChart::class, ['pageFilters' => $filters])->assertOk()->assertSee('Tỉ lệ nền tảng');
         Livewire::test(WeekdayOpensChart::class, ['pageFilters' => $filters])->assertOk();
         Livewire::test(HourlyOpensChart::class, ['pageFilters' => $filters])->assertOk();

@@ -34,6 +34,9 @@ class DemoStudentActivitySeeder extends Seeder
             ],
         ));
 
+        // Ngày đăng ký rải trong 120 ngày gần nhất (cho đường "học viên mới")
+        $students->each(fn (User $u) => $u->forceFill(['created_at' => now()->subMinutes(random_int(0, 120 * 24 * 60))])->saveQuietly());
+
         $ids = $students->pluck('id');
         AppSession::whereIn('user_id', $ids)->delete();
         StudentMembership::whereIn('user_id', $ids)->delete();
@@ -51,6 +54,9 @@ class DemoStudentActivitySeeder extends Seeder
 
             for ($daysAgo = 120; $daysAgo >= 0; $daysAgo--) {
                 $day = Carbon::now('Asia/Ho_Chi_Minh')->subDays($daysAgo);
+                if ($day->lt($student->created_at)) {
+                    continue; // chưa đăng ký thì chưa mở app
+                }
                 $chance = $weekdayWeights[$day->isoWeekday()] / 10 * $activity;
 
                 $opens = random_int(1, 100) <= $chance * 100 ? random_int(1, 3) : 0;

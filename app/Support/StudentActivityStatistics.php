@@ -78,7 +78,8 @@ class StudentActivityStatistics
     }
 
     /**
-     * @return array{labels: list<string>, opens: list<int>, total: int, students: int, avg_minutes: float,
+     * @return array{labels: list<string>, opens: list<int>, signups: list<int>, signups_total: int,
+     *               total: int, students: int, avg_minutes: float,
      *               platforms: array<string, int>, weekdays: array<int, int>, hours: array<int, int>}
      */
     public function activity(): array
@@ -133,9 +134,26 @@ class StudentActivityStatistics
                 $total++;
             });
 
+        // Học viên mới: tài khoản học viên được tạo trong khoảng (tự đăng ký + được admin mời)
+        $signups = array_fill_keys(array_keys($buckets), 0);
+        User::query()
+            ->where('role', UserRole::Student)
+            ->whereBetween('created_at', $this->time->utcRange())
+            ->select(['id', 'created_at'])
+            ->lazyById(2000)
+            ->each(function (User $u) use (&$signups) {
+                $key = $this->time->key(CarbonImmutable::instance($u->created_at));
+
+                if (isset($signups[$key])) {
+                    $signups[$key]++;
+                }
+            });
+
         return [
             'labels' => array_values($buckets),
             'opens' => array_values($opens),
+            'signups' => array_values($signups),
+            'signups_total' => array_sum($signups),
             'total' => $total,
             'students' => count($students),
             'avg_minutes' => $total ? $seconds / $total / 60 : 0.0,
