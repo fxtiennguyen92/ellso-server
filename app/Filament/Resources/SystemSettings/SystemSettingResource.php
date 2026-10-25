@@ -93,6 +93,8 @@ class SystemSettingResource extends Resource
         return $table
             ->defaultSort('sort_order')
             ->paginated(false)
+            // Giá gói thành viên chỉnh ở Marketing › Gói thành viên
+            ->modifyQueryUsing(fn ($query) => $query->where('group', '!=', 'membership'))
             ->columns([
                 TextColumn::make('label')
                     ->label('Thông số')

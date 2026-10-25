@@ -23,6 +23,11 @@ class UserResource extends JsonResource
                 'name' => $this->referrer->name,
                 'referral_code' => $this->referrer->referral_code,
             ] : null),
+            // Gói thành viên (1 năm): ends_at = ngày hết hạn xa nhất của các gói còn hạn
+            'membership' => [
+                'active' => ($endsAt = $this->membershipEndsAt()) !== null,
+                'ends_at' => $endsAt?->toIso8601String(),
+            ],
             'last_login_at' => $this->last_login_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
         ];

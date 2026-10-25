@@ -59,6 +59,11 @@ class User extends Authenticatable implements FilamentUser
 
     protected static function booted(): void
     {
+        // Học viên mới tạo trong thời gian chiến dịch tặng gói → tặng gói thành viên 1 năm
+        static::created(function (User $user) {
+            app(\App\Services\MembershipService::class)->grantForSignup($user);
+        });
+
         static::creating(function (User $user) {
             $user->referral_code ??= ReferralCode::generateUnique();
             $user->email = Str::lower(trim((string) $user->email));
@@ -139,6 +144,14 @@ class User extends Authenticatable implements FilamentUser
     public function hasActiveMembership(): bool
     {
         return $this->memberships()->active()->exists();
+    }
+
+    /** Ngày hết hạn xa nhất của các gói còn hạn (gói nối tiếp tính cả), null nếu không có. */
+    public function membershipEndsAt(): ?\Illuminate\Support\Carbon
+    {
+        $end = $this->memberships()->where('ends_at', '>', now())->max('ends_at');
+
+        return $end ? \Illuminate\Support\Carbon::parse($end) : null;
     }
 
     /** Chỉ admin và giảng viên (đang hoạt động) được vào CMS. Học viên dùng app. */

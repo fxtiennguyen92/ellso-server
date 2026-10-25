@@ -8,7 +8,10 @@ use App\Enums\UserRole;
 use App\Filament\Resources\Users\Pages\ManageUserLogs;
 use App\Filament\Resources\Users\Pages\ManageUsers;
 use App\Models\User;
+use App\Enums\MembershipSource;
+use App\Services\MembershipService;
 use App\Services\TempPasswordService;
+use Illuminate\Support\Carbon;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -118,7 +121,9 @@ class UserResource extends Resource
             ->modifyQueryUsing(fn (Builder $query) => $query
                 ->with('referrer')
                 // Phân biệt người tự đăng ký với người được admin mời (nhãn + email gửi lại)
-                ->withExists(['logs as self_registered' => fn (Builder $q) => $q->where('event', UserLogEvent::Registered)]))
+                ->withExists(['logs as self_registered' => fn (Builder $q) => $q->where('event', UserLogEvent::Registered)])
+                // Ngày hết hạn xa nhất của các gói còn hạn (gói nối tiếp tính cả)
+                ->withMax(['memberships as membership_ends_at' => fn (Builder $q) => $q->where('ends_at', '>', now())], 'ends_at'))
             ->columns([
                 TextColumn::make('name')->label('Họ tên')->searchable()->sortable(),
                 TextColumn::make('email')->label('Email')->searchable(),
@@ -134,6 +139,17 @@ class UserResource extends Resource
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('role')->label('Vai trò')->badge(),
+                TextColumn::make('membership_ends_at')
+                    ->label('Gói thành viên')
+                    ->badge()
+                    ->state(fn (User $record) => $record->role === UserRole::Student
+                        ? ($record->membership_ends_at
+                            ? 'Đến ' . Carbon::parse($record->membership_ends_at)->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y')
+                            : 'Chưa có')
+                        : null)
+                    ->color(fn (User $record) => $record->membership_ends_at ? 'success' : 'gray')
+                    ->placeholder('—')
+                    ->sortable(),
                 TextColumn::make('password_changed_at')
                     ->label('Kích hoạt')
                     ->badge()
@@ -195,6 +211,45 @@ class UserResource extends Resource
                         ->modalDescription(fn (User $record) => ($record->wasInvited() ? 'Gửi lại email mời kèm mật khẩu tạm mới' : 'Tạo mật khẩu tạm mới và gửi')
                             . " tới {$record->email}. Mật khẩu tạm gửi trước đó sẽ không dùng được nữa.")
                         ->action(fn (User $record) => self::sendTempPassword($record, TempPasswordReason::AdminResend)),
+                    Action::make('grantMembership')
+                        ->label(fn (User $record) => $record->hasActiveMembership() ? 'Gia hạn gói thành viên' : 'Cấp gói thành viên')
+                        ->icon(Heroicon::Identification)
+                        ->color('success')
+                        ->visible(fn (User $record) => $record->role === UserRole::Student)
+                        ->modalHeading(fn (User $record) => 'Gói thành viên 1 năm cho ' . $record->name)
+                        ->modalDescription(fn (User $record) => ($end = $record->membershipEndsAt())
+                            ? 'Đang có gói đến ' . $end->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y') . '. Gói mới nối tiếp thêm 1 năm, đến '
+                                . $end->copy()->addMonths(MembershipService::MONTHS)->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y') . '.'
+                            : 'Gói có hiệu lực từ hôm nay đến ' . now()->addMonths(MembershipService::MONTHS)->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y') . '.')
+                        ->schema([
+                            TextInput::make('price')
+                                ->label('Số tiền học viên đã trả')
+                                ->helperText('Để 0 nếu tặng miễn phí.')
+                                ->suffix('₫')
+                                ->numeric()
+                                ->integer()
+                                ->minValue(0)
+                                ->default(0),
+                            Textarea::make('note')
+                                ->label('Ghi chú')
+                                ->placeholder('VD: chuyển khoản ngày 25/10, mã giao dịch …')
+                                ->rows(2),
+                        ])
+                        ->modalSubmitActionLabel('Cấp gói')
+                        ->action(function (User $record, array $data) {
+                            $membership = app(MembershipService::class)->grant(
+                                $record,
+                                MembershipSource::Admin,
+                                (int) ($data['price'] ?? 0),
+                                ['note' => $data['note'] ?? null],
+                                auth()->user(),
+                            );
+
+                            Notification::make()
+                                ->title('Đã cấp gói thành viên đến ' . $membership->ends_at->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y'))
+                                ->success()
+                                ->send();
+                        }),
                     Action::make('resetPassword')
                         ->label('Reset mật khẩu')
                         ->icon(Heroicon::Key)
@@ -267,6 +322,9 @@ class UserResource extends Resource
             'Đã giới thiệu: ' . $record->referrals()->count() . ' người',
             $record->hasActivatedPassword() ? null : 'Chưa đăng nhập lần đầu',
             'Đăng nhập cuối: ' . ($record->last_login_at?->timezone($tz)->format('H:i d/m/Y') ?? 'chưa có'),
+            $record->role === UserRole::Student
+                ? 'Gói thành viên: ' . (($end = $record->membershipEndsAt()) ? 'còn hạn đến ' . $end->timezone($tz)->format('d/m/Y') : 'chưa có')
+                : null,
         ]));
     }
 
