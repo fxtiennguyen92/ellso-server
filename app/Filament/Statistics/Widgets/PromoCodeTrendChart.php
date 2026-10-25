@@ -10,7 +10,7 @@ use Filament\Widgets\Concerns\InteractsWithPageFilters;
 
 /**
  * Một biểu đồ theo thời gian: cột = số lần sử dụng (trục trái), đường = doanh thu (trục phải).
- * Lưới ngang chỉ theo trục trái.
+ * Lưới ngang chỉ theo trục trái. Tooltip hiện số tiền đầy đủ, trục phải viết tắt.
  */
 class PromoCodeTrendChart extends ChartWidget
 {
@@ -103,7 +103,7 @@ class PromoCodeTrendChart extends ChartWidget
                             label: (ctx) => {
                                 const v = ctx.parsed.y;
                                 if (ctx.dataset.yAxisID === 'y1') {
-                                    return ' Doanh thu: ' + ({$short})(v) + ' (' + new Intl.NumberFormat('vi-VN').format(v) + ' ₫)';
+                                    return ' Doanh thu: ' + new Intl.NumberFormat('vi-VN').format(v) + ' ₫';
                                 }
                                 return ' Số lần sử dụng: ' + new Intl.NumberFormat('vi-VN').format(v);
                             },
