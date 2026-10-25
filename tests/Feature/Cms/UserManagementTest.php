@@ -8,6 +8,7 @@ use App\Filament\Resources\SystemSettings\Pages\ManageSystemSettings;
 use App\Filament\Resources\Users\Pages\ManageUserLogs;
 use App\Filament\Resources\Users\Pages\ManageUsers;
 use App\Mail\TempPasswordMail;
+use App\Models\EmailTemplate;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Models\UserLog;
@@ -82,6 +83,52 @@ class UserManagementTest extends TestCase
         $this->assertNull($user->password_changed_at);
         $this->assertNotNull($user->referral_code);
         Mail::assertSent(TempPasswordMail::class, fn ($m) => $m->hasTo('moi@example.com'));
+    }
+
+    public function test_invite_creates_student_and_sends_invite_email(): void
+    {
+        User::factory()->create(['email' => 'trung@example.com']);
+
+        Livewire::test(ManageUsers::class)
+            ->callAction('invite', ['name' => 'X', 'email' => 'TRUNG@example.com'])
+            ->assertHasActionErrors(['email']);
+
+        Livewire::test(ManageUsers::class)
+            ->callAction('invite', ['name' => 'Trần Thị Mai', 'email' => 'Mai@Example.com', 'phone' => '+84 912 345 678'])
+            ->assertHasNoActionErrors()
+            ->assertNotified('Đã gửi email mời tới mai@example.com');
+
+        $user = User::where('email', 'mai@example.com')->firstOrFail();
+        $this->assertSame(UserRole::Student, $user->role);
+        $this->assertSame('0912345678', $user->phone);
+        $this->assertFalse($user->hasActivatedPassword());
+        $this->assertNull($user->temp_password_expires_at);
+        $this->assertTrue($user->wasInvited());
+
+        Mail::assertSent(TempPasswordMail::class, fn (TempPasswordMail $m) => $m->hasTo('mai@example.com')
+            && $m->template->key === EmailTemplate::TEMP_PASSWORD_INVITE
+            && $m->envelope()->subject === 'Trần Thị Mai ơi, Ellso đã tạo tài khoản cho bạn'
+            && str_contains($m->render(), 'Mời bạn tham gia cùng cộng đồng Ellso'));
+
+        $this->assertSame('admin_created', $user->logs()->where('event', UserLogEvent::TempPasswordSent)->first()->meta['reason']);
+    }
+
+    public function test_resend_uses_invite_email_only_for_invited_users(): void
+    {
+        $invited = User::factory()->create(['role' => UserRole::Student, 'password_changed_at' => null]);
+        $selfRegistered = User::factory()->create(['role' => UserRole::Student, 'password_changed_at' => null]);
+        UserLog::record($selfRegistered, UserLogEvent::Registered);
+
+        Livewire::test(ManageUsers::class)
+            ->assertActionHasLabel(TestAction::make('resendTempPassword')->table($invited), 'Gửi lại email mời')
+            ->assertActionHasLabel(TestAction::make('resendTempPassword')->table($selfRegistered), 'Gửi lại mật khẩu tạm')
+            ->callAction(TestAction::make('resendTempPassword')->table($invited))
+            ->callAction(TestAction::make('resendTempPassword')->table($selfRegistered));
+
+        Mail::assertSent(TempPasswordMail::class, fn ($m) => $m->hasTo($invited->email)
+            && $m->template->key === EmailTemplate::TEMP_PASSWORD_INVITE);
+        Mail::assertSent(TempPasswordMail::class, fn ($m) => $m->hasTo($selfRegistered->email)
+            && $m->template->key === EmailTemplate::TEMP_PASSWORD_ACTIVATION);
     }
 
     public function test_logs_page_renders(): void

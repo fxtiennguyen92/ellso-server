@@ -31,14 +31,17 @@ class TempPasswordMail extends Mailable
         public ?array $requestInfo = null,
         ?EmailTemplate $template = null,
     ) {
-        $this->template = $template ?? EmailTemplate::forKey(self::templateKey($reason));
+        $this->template = $template ?? EmailTemplate::forKey(self::templateKey($reason, $user));
     }
 
-    public static function templateKey(TempPasswordReason $reason): string
+    public static function templateKey(TempPasswordReason $reason, User $user): string
     {
-        return $reason->isActivation()
-            ? EmailTemplate::TEMP_PASSWORD_ACTIVATION
-            : EmailTemplate::TEMP_PASSWORD_RESET;
+        return match (true) {
+            ! $reason->isActivation() => EmailTemplate::TEMP_PASSWORD_RESET,
+            $reason === TempPasswordReason::AdminCreated,
+            $reason === TempPasswordReason::AdminResend && $user->exists && $user->wasInvited() => EmailTemplate::TEMP_PASSWORD_INVITE,
+            default => EmailTemplate::TEMP_PASSWORD_ACTIVATION,
+        };
     }
 
     /** @return array<string, string> */

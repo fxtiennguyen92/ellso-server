@@ -9,8 +9,8 @@ enum TempPasswordReason: string implements HasLabel
 {
     case Register = 'register';           // user tự đăng ký
     case RegisterResend = 'register_resend'; // user bấm "gửi lại" ở màn đã đăng ký (chưa đăng nhập lần đầu)
-    case AdminCreated = 'admin_created';  // admin tạo tài khoản trên CMS
-    case AdminResend = 'admin_resend';    // admin gửi lại khi user chưa đăng nhập lần đầu
+    case AdminCreated = 'admin_created';  // admin tạo tài khoản + gửi lời mời trên CMS
+    case AdminResend = 'admin_resend';    // admin gửi lại khi user chưa đăng nhập lần đầu (người được mời → email mời)
     case Forgot = 'forgot';               // user bấm quên mật khẩu
     case AdminReset = 'admin_reset';      // admin reset (tương đương quên mật khẩu)
 
@@ -19,7 +19,7 @@ enum TempPasswordReason: string implements HasLabel
         return match ($this) {
             self::Register => 'Đăng ký',
             self::RegisterResend => 'Gửi lại sau đăng ký',
-            self::AdminCreated => 'Admin tạo tài khoản',
+            self::AdminCreated => 'Admin mời tham gia',
             self::AdminResend => 'Admin gửi lại',
             self::Forgot => 'Quên mật khẩu',
             self::AdminReset => 'Admin reset mật khẩu',

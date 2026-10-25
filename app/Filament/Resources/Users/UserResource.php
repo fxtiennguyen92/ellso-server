@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Users;
 
 use App\Enums\TempPasswordReason;
+use App\Enums\UserLogEvent;
 use App\Enums\UserRole;
 use App\Filament\Resources\Users\Pages\ManageUserLogs;
 use App\Filament\Resources\Users\Pages\ManageUsers;
@@ -86,7 +87,7 @@ class UserResource extends Resource
                 ->minLength(8)
                 ->helperText(fn (string $operation, Get $get) => match (true) {
                     $operation === Operation::Edit->value => 'Để trống nếu không đổi mật khẩu.',
-                    self::isStudent($get('role')) => 'Để trống để gửi mật khẩu tạm qua email (học viên đổi mật khẩu ở lần đăng nhập đầu).',
+                    self::isStudent($get('role')) => 'Để trống để gửi email mời kèm mật khẩu tạm (học viên đổi mật khẩu ở lần đăng nhập đầu).',
                     default => null,
                 }),
             Toggle::make('is_active')
@@ -114,7 +115,10 @@ class UserResource extends Resource
     {
         return $table
             ->defaultSort('created_at', 'desc')
-            ->modifyQueryUsing(fn (Builder $query) => $query->with('referrer'))
+            ->modifyQueryUsing(fn (Builder $query) => $query
+                ->with('referrer')
+                // Phân biệt người tự đăng ký với người được admin mời (nhãn + email gửi lại)
+                ->withExists(['logs as self_registered' => fn (Builder $q) => $q->where('event', UserLogEvent::Registered)]))
             ->columns([
                 TextColumn::make('name')->label('Họ tên')->searchable()->sortable(),
                 TextColumn::make('email')->label('Email')->searchable(),
@@ -133,10 +137,15 @@ class UserResource extends Resource
                 TextColumn::make('password_changed_at')
                     ->label('Kích hoạt')
                     ->badge()
-                    ->state(fn (User $record) => $record->hasActivatedPassword() ? 'Đã kích hoạt' : 'Chưa đăng nhập')
+                    ->state(fn (User $record) => match (true) {
+                        $record->hasActivatedPassword() => 'Đã kích hoạt',
+                        $record->wasInvited() => 'Đã mời',
+                        default => 'Chưa đăng nhập',
+                    })
                     ->color(fn (User $record) => $record->hasActivatedPassword() ? 'success' : 'warning')
                     ->tooltip(fn (User $record) => ! $record->hasActivatedPassword() && $record->temp_password_sent_at
-                        ? 'Gửi mật khẩu tạm lúc ' . $record->temp_password_sent_at->timezone('Asia/Ho_Chi_Minh')->format('H:i d/m/Y')
+                        ? ($record->wasInvited() ? 'Gửi lời mời lúc ' : 'Gửi mật khẩu tạm lúc ')
+                            . $record->temp_password_sent_at->timezone('Asia/Ho_Chi_Minh')->format('H:i d/m/Y')
                         : null),
                 IconColumn::make('is_active')->label('Hoạt động')->boolean(),
                 TextColumn::make('last_login_at')
@@ -178,12 +187,13 @@ class UserResource extends Resource
                         ->icon(Heroicon::OutlinedClipboardDocumentList)
                         ->url(fn (User $record) => ManageUserLogs::getUrl(['record' => $record])),
                     Action::make('resendTempPassword')
-                        ->label('Gửi lại mật khẩu tạm')
+                        ->label(fn (User $record) => $record->wasInvited() ? 'Gửi lại email mời' : 'Gửi lại mật khẩu tạm')
                         ->icon(Heroicon::OutlinedEnvelope)
                         ->color('info')
                         ->visible(fn (User $record) => $record->is_active && ! $record->hasActivatedPassword())
                         ->requiresConfirmation()
-                        ->modalDescription(fn (User $record) => "Tạo mật khẩu tạm mới và gửi tới {$record->email}. Mật khẩu tạm gửi trước đó sẽ không dùng được nữa.")
+                        ->modalDescription(fn (User $record) => ($record->wasInvited() ? 'Gửi lại email mời kèm mật khẩu tạm mới' : 'Tạo mật khẩu tạm mới và gửi')
+                            . " tới {$record->email}. Mật khẩu tạm gửi trước đó sẽ không dùng được nữa.")
                         ->action(fn (User $record) => self::sendTempPassword($record, TempPasswordReason::AdminResend)),
                     Action::make('resetPassword')
                         ->label('Reset mật khẩu')
@@ -221,8 +231,11 @@ class UserResource extends Resource
         try {
             app(TempPasswordService::class)->issue($record, $reason, request(), auth()->user());
 
+            $isInvite = $reason === TempPasswordReason::AdminCreated
+                || ($reason === TempPasswordReason::AdminResend && $record->wasInvited());
+
             Notification::make()
-                ->title('Đã gửi mật khẩu tạm tới ' . $record->email)
+                ->title(($isInvite ? 'Đã gửi email mời tới ' : 'Đã gửi mật khẩu tạm tới ') . $record->email)
                 ->success()
                 ->send();
         } catch (Throwable $e) {
@@ -230,7 +243,9 @@ class UserResource extends Resource
 
             Notification::make()
                 ->title('Không gửi được email')
-                ->body('Kiểm tra cấu hình mail (MAIL_*) rồi thử lại.')
+                ->body($reason === TempPasswordReason::AdminCreated
+                    ? 'Tài khoản đã được tạo. Kiểm tra cấu hình mail (MAIL_*) rồi bấm "Gửi lại email mời" trong menu ⋮ của người dùng.'
+                    : 'Kiểm tra cấu hình mail (MAIL_*) rồi thử lại.')
                 ->danger()
                 ->send();
         }

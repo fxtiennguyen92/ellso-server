@@ -18,6 +18,8 @@ class EmailTemplate extends Model
 
     public const TEMP_PASSWORD_RESET = 'temp_password_reset';
 
+    public const TEMP_PASSWORD_INVITE = 'temp_password_invite';
+
     /** Các trường văn bản admin sửa được. */
     public const TEXT_FIELDS = [
         'subject', 'preheader', 'eyebrow', 'heading', 'intro',

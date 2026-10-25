@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\UserLogEvent;
 use App\Enums\UserRole;
 use App\Support\ReferralCode;
 use Database\Factories\UserFactory;
@@ -68,6 +69,19 @@ class User extends Authenticatable implements FilamentUser
     public function hasActivatedPassword(): bool
     {
         return $this->password_changed_at !== null;
+    }
+
+    /**
+     * Tài khoản do admin tạo và mời (không tự đăng ký qua app).
+     * Bảng người dùng nạp sẵn cờ self_registered để khỏi truy vấn từng dòng.
+     */
+    public function wasInvited(): bool
+    {
+        if (array_key_exists('self_registered', $this->attributes)) {
+            return ! $this->attributes['self_registered'];
+        }
+
+        return $this->logs()->where('event', UserLogEvent::Registered)->doesntExist();
     }
 
     public function hasValidTempPassword(): bool

@@ -23,7 +23,11 @@ class EmailTemplatePreview
         return new TempPasswordMail(
             user: $user,
             tempPassword: TempPassword::generate(),
-            reason: $isReset ? TempPasswordReason::Forgot : TempPasswordReason::Register,
+            reason: match ($template->key) {
+                EmailTemplate::TEMP_PASSWORD_RESET => TempPasswordReason::Forgot,
+                EmailTemplate::TEMP_PASSWORD_INVITE => TempPasswordReason::AdminCreated,
+                default => TempPasswordReason::Register,
+            },
             expiresAt: $isReset ? now()->addMinutes((int) config('ellso.auth.temp_password_ttl_minutes')) : null,
             requestInfo: $isReset
                 ? ['time' => now()->timezone('Asia/Ho_Chi_Minh')->format('H:i, d/m/Y'), 'device' => 'iPhone 15 Pro · iOS 18.1']
