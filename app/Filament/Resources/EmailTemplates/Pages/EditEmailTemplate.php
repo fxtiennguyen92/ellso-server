@@ -24,7 +24,7 @@ class EditEmailTemplate extends EditRecord
             // Xem trước nội dung đang gõ (chưa cần lưu)
             Action::make('preview')
                 ->label('Xem trước')
-                ->icon(Heroicon::OutlinedEye)
+                ->icon(Heroicon::Eye)
                 ->color('gray')
                 ->modalHeading(fn () => 'Xem trước: ' . $this->previewTemplate()->text($this->previewTemplate()->subject, $this->previewTemplate()->sampleValues()))
                 ->modalWidth(Width::FourExtraLarge)
@@ -36,7 +36,7 @@ class EditEmailTemplate extends EditRecord
 
             Action::make('sendTest')
                 ->label('Gửi thử cho tôi')
-                ->icon(Heroicon::OutlinedPaperAirplane)
+                ->icon(Heroicon::PaperAirplane)
                 ->color('gray')
                 ->requiresConfirmation()
                 ->modalDescription(fn () => 'Gửi email mẫu (nội dung đang hiển thị, kể cả phần chưa lưu) tới ' . auth()->user()->email . '.')

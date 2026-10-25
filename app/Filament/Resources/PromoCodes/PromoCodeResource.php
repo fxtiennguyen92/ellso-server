@@ -111,7 +111,7 @@ class PromoCodeResource extends Resource
                     EditAction::make(),
                     Action::make('toggleActive')
                         ->label(fn (PromoCode $record) => $record->is_active ? 'Tạm dừng' : 'Bật lại')
-                        ->icon(fn (PromoCode $record) => $record->is_active ? Heroicon::OutlinedPause : Heroicon::OutlinedPlay)
+                        ->icon(fn (PromoCode $record) => $record->is_active ? Heroicon::Pause : Heroicon::Play)
                         ->color(fn (PromoCode $record) => $record->is_active ? 'warning' : 'success')
                         ->requiresConfirmation()
                         ->action(fn (PromoCode $record) => $record->update(['is_active' => ! $record->is_active])),

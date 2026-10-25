@@ -28,7 +28,7 @@ class ManageUsers extends ManageRecords
             // Tạo tài khoản học viên và gửi email mời kèm mật khẩu tạm
             Action::make('invite')
                 ->label('Mời tham gia')
-                ->icon(Heroicon::OutlinedEnvelope)
+                ->icon(Heroicon::Envelope)
                 ->color('success')
                 ->authorize('create', User::class)
                 ->modalHeading('Mời người dùng tham gia Ellso')

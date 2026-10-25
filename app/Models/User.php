@@ -126,6 +126,21 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(UserLog::class);
     }
 
+    public function appSessions(): HasMany
+    {
+        return $this->hasMany(AppSession::class);
+    }
+
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(StudentMembership::class);
+    }
+
+    public function hasActiveMembership(): bool
+    {
+        return $this->memberships()->active()->exists();
+    }
+
     /** Chỉ admin và giảng viên (đang hoạt động) được vào CMS. Học viên dùng app. */
     public function canAccessPanel(Panel $panel): bool
     {

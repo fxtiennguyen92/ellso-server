@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AppSessionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\ReferralController;
@@ -27,4 +28,7 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
 
     // Xem trước mã khuyến mãi khi thanh toán (giới hạn để chống dò mã)
     Route::post('promo-codes/check', [PromoCodeController::class, 'check'])->middleware('throttle:promo-code-check');
+
+    // Lượt mở app (phiên 30 phút): gọi khi mở app, khi quay lại từ nền, và mỗi 60 giây khi đang mở
+    Route::post('app-sessions/ping', [AppSessionController::class, 'ping'])->middleware('throttle:app-session-ping');
 });

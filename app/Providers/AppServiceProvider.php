@@ -55,6 +55,10 @@ class AppServiceProvider extends ServiceProvider
                 ->response($tooMany),
         ]);
 
+        RateLimiter::for('app-session-ping', fn (Request $request) => Limit::perMinute(30)
+            ->by('app-ping:' . ($request->user()?->getKey() ?? $request->ip()))
+            ->response($tooMany));
+
         // Theo người dùng: chống dò mã khuyến mãi
         RateLimiter::for('promo-code-check', fn (Request $request) => Limit::perMinute(10)
             ->by('promo:' . ($request->user()?->getKey() ?? $request->ip()))

@@ -164,8 +164,8 @@ class UserResource extends Resource
                     ->trueLabel('Đã kích hoạt')
                     ->falseLabel('Chưa đăng nhập')
                     ->queries(
-                        true: fn (Builder $q) => $q->whereNotNull('password_changed_at'),
-                        false: fn (Builder $q) => $q->whereNull('password_changed_at'),
+                        true: fn (Builder $query) => $query->whereNotNull('password_changed_at'),
+                        false: fn (Builder $query) => $query->whereNull('password_changed_at'),
                     ),
             ])
             // Bấm vào hàng = sửa; các thao tác khác trong menu ⋮
@@ -184,11 +184,11 @@ class UserResource extends Resource
                         }),
                     Action::make('logs')
                         ->label('Xem nhật ký')
-                        ->icon(Heroicon::OutlinedClipboardDocumentList)
+                        ->icon(Heroicon::ClipboardDocumentList)
                         ->url(fn (User $record) => ManageUserLogs::getUrl(['record' => $record])),
                     Action::make('resendTempPassword')
                         ->label(fn (User $record) => $record->wasInvited() ? 'Gửi lại email mời' : 'Gửi lại mật khẩu tạm')
-                        ->icon(Heroicon::OutlinedEnvelope)
+                        ->icon(Heroicon::Envelope)
                         ->color('info')
                         ->visible(fn (User $record) => $record->is_active && ! $record->hasActivatedPassword())
                         ->requiresConfirmation()
@@ -197,7 +197,7 @@ class UserResource extends Resource
                         ->action(fn (User $record) => self::sendTempPassword($record, TempPasswordReason::AdminResend)),
                     Action::make('resetPassword')
                         ->label('Reset mật khẩu')
-                        ->icon(Heroicon::OutlinedKey)
+                        ->icon(Heroicon::Key)
                         ->color('warning')
                         ->visible(fn (User $record) => $record->is_active
                             && $record->hasActivatedPassword()

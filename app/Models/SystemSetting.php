@@ -23,6 +23,10 @@ class SystemSetting extends Model
 
     public const COMPANY_ADDRESS = 'company_address';
 
+    public const STUDENT_MEMBERSHIP_PRICE = 'student_membership_price';
+
+    public const STUDENT_MEMBERSHIP_MONTHS = 'student_membership_months';
+
     private const CACHE_KEY = 'system_settings';
 
     protected $fillable = [
@@ -75,6 +79,18 @@ class SystemSetting extends Model
     public static function companyAddress(): ?string
     {
         return static::get(self::COMPANY_ADDRESS) ?: null;
+    }
+
+    public static function studentMembershipPrice(): ?int
+    {
+        $price = static::get(self::STUDENT_MEMBERSHIP_PRICE);
+
+        return $price === null ? null : (int) $price;
+    }
+
+    public static function studentMembershipMonths(): int
+    {
+        return (int) static::get(self::STUDENT_MEMBERSHIP_MONTHS, 12) ?: 12;
     }
 
     public function typedValue(): mixed
