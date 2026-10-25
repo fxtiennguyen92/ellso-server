@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AppSessionController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\ReferralController;
 use Illuminate\Support\Facades\Route;
@@ -19,6 +20,10 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::get('referrals/{code}', [ReferralController::class, 'show'])->middleware('throttle:referral-check');
+
+// Chiến dịch marketing: banner trên Home + trang chi tiết
+Route::get('campaigns', [CampaignController::class, 'index']);
+Route::get('campaigns/{id}', [CampaignController::class, 'show'])->whereNumber('id');
 
 // ---- Đã đăng nhập (token đầy đủ; token đổi mật khẩu không vào được) ----
 Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
