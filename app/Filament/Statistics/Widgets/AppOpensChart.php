@@ -56,10 +56,9 @@ class AppOpensChart extends StudentActivityChart
                     'pointBorderColor' => self::SIGNUP_COLOR,
                     'pointHoverBackgroundColor' => self::SIGNUP_COLOR,
                     'borderWidth' => 2,
-                    'cubicInterpolationMode' => 'monotone', // đường cong không vượt quá điểm dữ liệu
-                    'pointRadius' => count($a['labels']) > 45 ? 0 : 3,
-                    'pointHoverRadius' => 5,
-                    'tension' => 0.25,
+                    'pointRadius' => 0,             // đường mượt, không chấm; rê chuột mới hiện điểm
+                    'pointHoverRadius' => 4,
+                    'tension' => 0.4,
                     'order' => 0,
                 ],
             ],
@@ -102,6 +101,7 @@ class AppOpensChart extends StudentActivityChart
                         border: { display: false },
                         grid: { display: false, drawOnChartArea: false },
                         title: { display: true, text: 'Học viên mới' },
+                        min: 0,
                         ticks: { precision: 0 },
                     },
                 },

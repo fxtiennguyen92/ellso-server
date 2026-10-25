@@ -75,10 +75,9 @@ class PromoCodeTrendChart extends ChartWidget
                     'pointBackgroundColor' => self::REVENUE_COLOR,
                     'pointBorderColor' => self::REVENUE_COLOR,
                     'borderWidth' => 2,
-                    'cubicInterpolationMode' => 'monotone',
-                    'pointRadius' => count($series['labels']) > 45 ? 0 : 3,
-                    'pointHoverRadius' => 5,
-                    'tension' => 0.25,
+                    'pointRadius' => 0,             // đường mượt, không chấm; rê chuột mới hiện điểm
+                    'pointHoverRadius' => 4,
+                    'tension' => 0.4,
                     'order' => 0, // vẽ trên cột
                 ],
             ],
@@ -129,6 +128,7 @@ class PromoCodeTrendChart extends ChartWidget
                         border: { display: false },
                         grid: { display: false, drawOnChartArea: false },
                         title: { display: true, text: 'Doanh thu' },
+                        min: 0,
                         ticks: { callback: (v) => ({$short})(v) },
                     },
                 },
