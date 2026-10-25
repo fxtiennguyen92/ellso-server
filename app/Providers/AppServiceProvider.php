@@ -55,6 +55,11 @@ class AppServiceProvider extends ServiceProvider
                 ->response($tooMany),
         ]);
 
+        // Theo người dùng: chống dò mã khuyến mãi
+        RateLimiter::for('promo-code-check', fn (Request $request) => Limit::perMinute(10)
+            ->by('promo:' . ($request->user()?->getKey() ?? $request->ip()))
+            ->response($tooMany));
+
         RateLimiter::for('referral-check', fn (Request $request) => Limit::perMinute(config('ellso.auth.referral_check_max_per_ip_per_minute'))
             ->by('referral:' . $request->ip())
             ->response($tooMany));

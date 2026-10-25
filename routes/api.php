@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\ReferralController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,4 +24,7 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::get('me', [AuthController::class, 'me']);
     Route::get('user', [AuthController::class, 'me']); // giữ tương thích, dùng /me
     Route::post('auth/logout', [AuthController::class, 'logout']);
+
+    // Xem trước mã khuyến mãi khi thanh toán (giới hạn để chống dò mã)
+    Route::post('promo-codes/check', [PromoCodeController::class, 'check'])->middleware('throttle:promo-code-check');
 });
