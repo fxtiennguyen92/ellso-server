@@ -5,13 +5,13 @@ namespace Tests\Feature\Cms;
 use App\Enums\DiscountType;
 use App\Enums\UserRole;
 use App\Filament\Pages\Statistics\PromoCodeStatisticsPage;
-use App\Filament\Statistics\Widgets\PromoCodeRevenueChart;
 use App\Filament\Statistics\Widgets\PromoCodeStatsOverview;
-use App\Filament\Statistics\Widgets\PromoCodeUsageChart;
+use App\Filament\Statistics\Widgets\PromoCodeTrendChart;
 use App\Models\PromoCode;
 use App\Models\PromoCodeRedemption;
 use App\Models\User;
 use App\Support\PromoCodeStatistics;
+use App\Support\Vnd;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
@@ -113,13 +113,28 @@ class PromoCodeStatisticsTest extends TestCase
         $filters = ['codes' => [$this->a->id], 'from' => '2026-10-20', 'to' => '2026-10-22', 'group_by' => 'day'];
 
         Livewire::test(PromoCodeStatsOverview::class, ['pageFilters' => $filters])
-            ->assertSee('Khách dùng mã')
+            ->assertSee('Khách dùng')
             ->assertSee('3')                 // 3 đơn mã A
-            ->assertSee(PromoCode::money(400_000))   // tổng giảm
-            ->assertSee(PromoCode::money(3_600_000)); // doanh thu
+            ->assertSee('400k')       // tổng giảm (viết tắt)
+            ->assertSee('3,6tr')      // doanh thu
+            ->assertSeeHtml('title="3.600.000');
 
-        Livewire::test(PromoCodeUsageChart::class, ['pageFilters' => $filters])->assertOk()->assertSee('Số lần sử dụng mã');
-        Livewire::test(PromoCodeRevenueChart::class, ['pageFilters' => $filters])->assertOk()->assertSee('20/10/2026 – 22/10/2026');
+        Livewire::test(PromoCodeTrendChart::class, ['pageFilters' => $filters])
+            ->assertOk()
+            ->assertSee('Số lần sử dụng và doanh thu')
+            ->assertSee('20/10/2026 – 22/10/2026');
+    }
+
+    public function test_short_vnd_format(): void
+    {
+        $this->assertSame('500k', Vnd::short(500_000));
+        $this->assertSame('228,1k', Vnd::short(228_070));
+        $this->assertSame('9,81tr', Vnd::short(9_807_000));
+        $this->assertSame('88,26tr', Vnd::short(88_263_000));
+        $this->assertSame('1tr', Vnd::short(1_000_000));
+        $this->assertSame("1,25\u{00A0}tỷ", Vnd::short(1_250_000_000));
+        $this->assertSame('800đ', Vnd::short(800));
+        $this->assertSame('0đ', Vnd::short(0));
     }
 
     public function test_only_admin_can_open(): void

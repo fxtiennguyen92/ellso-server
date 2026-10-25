@@ -2,9 +2,8 @@
 
 namespace App\Filament\Pages\Statistics;
 
-use App\Filament\Statistics\Widgets\PromoCodeRevenueChart;
 use App\Filament\Statistics\Widgets\PromoCodeStatsOverview;
-use App\Filament\Statistics\Widgets\PromoCodeUsageChart;
+use App\Filament\Statistics\Widgets\PromoCodeTrendChart;
 use App\Models\PromoCode;
 use App\Support\PromoCodeStatistics;
 use BackedEnum;
@@ -161,8 +160,7 @@ class PromoCodeStatisticsPage extends Page
     {
         return [
             PromoCodeStatsOverview::class,
-            PromoCodeUsageChart::class,
-            PromoCodeRevenueChart::class,
+            PromoCodeTrendChart::class,
         ];
     }
 

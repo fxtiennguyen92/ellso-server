@@ -3,15 +3,16 @@
 namespace App\Filament\Statistics\Widgets;
 
 use App\Support\PromoCodeStatistics;
+use App\Support\Vnd;
 use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 
 /**
- * Cột theo thời gian cho một chỉ số. Số lần dùng và doanh thu là hai biểu đồ riêng
- * cùng trục thời gian (không gộp hai trục dọc vào một biểu đồ để khỏi đọc sai tỉ lệ).
+ * Một biểu đồ theo thời gian: cột = số lần sử dụng (trục trái), đường = doanh thu (trục phải).
+ * Lưới ngang chỉ theo trục trái.
  */
-abstract class PromoCodeTrendChart extends ChartWidget
+class PromoCodeTrendChart extends ChartWidget
 {
     use InteractsWithPageFilters;
 
@@ -21,22 +22,17 @@ abstract class PromoCodeTrendChart extends ChartWidget
 
     protected int | string | array $columnSpan = 'full';
 
-    protected ?string $maxHeight = '260px';
+    protected ?string $maxHeight = '320px';
 
     protected ?string $pollingInterval = null;
 
-    /** 'usage' | 'revenue' */
-    abstract protected function metric(): string;
+    private const USAGE_COLOR = '#10b981';   // emerald-500
 
-    abstract protected function label(): string;
-
-    abstract protected function barColor(): string;
-
-    abstract protected function isMoney(): bool;
+    private const REVENUE_COLOR = '#f59e0b'; // spark-500
 
     public function getHeading(): string
     {
-        return $this->label();
+        return 'Số lần sử dụng và doanh thu';
     }
 
     public function getDescription(): string
@@ -55,45 +51,82 @@ abstract class PromoCodeTrendChart extends ChartWidget
 
         return [
             'labels' => $series['labels'],
-            'datasets' => [[
-                'label' => $this->label(),
-                'data' => $series[$this->metric()],
-                'backgroundColor' => $this->barColor(),
-                'hoverBackgroundColor' => $this->barColor(),
-                'borderWidth' => 0,
-                'borderRadius' => 4,
-                'borderSkipped' => 'start',
-                'maxBarThickness' => 32,
-            ]],
+            'datasets' => [
+                [
+                    'type' => 'bar',
+                    'label' => 'Số lần sử dụng',
+                    'data' => $series['usage'],
+                    'yAxisID' => 'y',
+                    'backgroundColor' => self::USAGE_COLOR,
+                    'hoverBackgroundColor' => self::USAGE_COLOR,
+                    'borderWidth' => 0,
+                    'borderRadius' => 4,
+                    'borderSkipped' => 'start',
+                    'maxBarThickness' => 32,
+                    'order' => 1,
+                ],
+                [
+                    'type' => 'line',
+                    'label' => 'Doanh thu',
+                    'data' => $series['revenue'],
+                    'yAxisID' => 'y1',
+                    'borderColor' => self::REVENUE_COLOR,
+                    'backgroundColor' => self::REVENUE_COLOR,
+                    'borderWidth' => 2,
+                    'pointRadius' => count($series['labels']) > 45 ? 0 : 3,
+                    'pointHoverRadius' => 5,
+                    'tension' => 0.25,
+                    'order' => 0, // vẽ trên cột
+                ],
+            ],
         ];
     }
 
     protected function getOptions(): RawJs
     {
-        $format = $this->isMoney()
-            ? "new Intl.NumberFormat('vi-VN').format(v) + ' ₫'"
-            : "new Intl.NumberFormat('vi-VN').format(v)";
-        $tick = $this->isMoney()
-            ? "v >= 1e9 ? (v / 1e9).toLocaleString('vi-VN') + ' tỷ' : v >= 1e6 ? (v / 1e6).toLocaleString('vi-VN') + ' tr' : v >= 1e3 ? (v / 1e3).toLocaleString('vi-VN') + 'k' : v"
-            : "Number.isInteger(v) ? v : ''";
+        $short = Vnd::shortJs();
 
         return RawJs::make(<<<JS
             {
                 animation: { duration: 250 },
+                interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    legend: { display: false },
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        align: 'end',
+                        labels: { usePointStyle: true, boxWidth: 8, boxHeight: 8, sort: (a, b) => a.datasetIndex - b.datasetIndex },
+                    },
                     tooltip: {
-                        displayColors: false,
-                        callbacks: { label: (ctx) => { const v = ctx.parsed.y; return {$format}; } },
+                        itemSort: (a, b) => a.datasetIndex - b.datasetIndex,
+                        callbacks: {
+                            label: (ctx) => {
+                                const v = ctx.parsed.y;
+                                if (ctx.dataset.yAxisID === 'y1') {
+                                    return ' Doanh thu: ' + ({$short})(v) + ' (' + new Intl.NumberFormat('vi-VN').format(v) + ' ₫)';
+                                }
+                                return ' Số lần sử dụng: ' + new Intl.NumberFormat('vi-VN').format(v);
+                            },
+                        },
                     },
                 },
                 scales: {
                     x: { grid: { display: false }, ticks: { autoSkip: true, maxRotation: 0 } },
                     y: {
+                        position: 'left',
                         beginAtZero: true,
                         border: { display: false },
                         grid: { color: 'rgba(148, 163, 184, 0.18)' },
-                        ticks: { precision: 0, callback: (v) => {$tick} },
+                        title: { display: true, text: 'Số lần sử dụng' },
+                        ticks: { precision: 0 },
+                    },
+                    y1: {
+                        position: 'right',
+                        beginAtZero: true,
+                        border: { display: false },
+                        grid: { display: false, drawOnChartArea: false },
+                        title: { display: true, text: 'Doanh thu' },
+                        ticks: { callback: (v) => ({$short})(v) },
                     },
                 },
             }
