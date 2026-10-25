@@ -50,7 +50,7 @@ abstract class StudentActivityChart extends ChartWidget
     }
 
     /** Tuỳ chọn chung cho biểu đồ cột một chuỗi số lượt. */
-    protected function barOptions(string $tooltipTitle = ''): RawJs
+    protected function barOptions(string $tooltipTitle = '', string $unit = 'lượt mở app'): RawJs
     {
         $title = $tooltipTitle !== '' ? "title: (items) => {$tooltipTitle}," : '';
 
@@ -63,7 +63,7 @@ abstract class StudentActivityChart extends ChartWidget
                         displayColors: false,
                         callbacks: {
                             {$title}
-                            label: (ctx) => ' ' + new Intl.NumberFormat('vi-VN').format(ctx.parsed.y) + ' lượt mở app',
+                            label: (ctx) => ' ' + new Intl.NumberFormat('vi-VN').format(ctx.parsed.y) + ' {$unit}',
                         },
                     },
                 },

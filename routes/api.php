@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AppSessionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CampaignController;
+use App\Http\Controllers\Api\PlacementTestController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\ReferralController;
 use Illuminate\Support\Facades\Route;
@@ -36,4 +37,9 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
 
     // Lượt mở app (phiên 30 phút): gọi khi mở app, khi quay lại từ nền, và mỗi 60 giây khi đang mở
     Route::post('app-sessions/ping', [AppSessionController::class, 'ping'])->middleware('throttle:app-session-ping');
+
+    // Bài kiểm tra đầu vào: đề đang dùng, nộp bài (chấm tự động), kết quả gần nhất
+    Route::get('placement-test', [PlacementTestController::class, 'show']);
+    Route::post('placement-test/attempts', [PlacementTestController::class, 'submit'])->middleware('throttle:10,1');
+    Route::get('placement-test/result', [PlacementTestController::class, 'result']);
 });

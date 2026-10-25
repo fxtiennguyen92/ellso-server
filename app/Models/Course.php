@@ -106,6 +106,12 @@ class Course extends Model
         return $this->hasOne(LearningPath::class)->where('is_default', true);
     }
 
+    /** Các mức của bài kiểm tra đầu vào gợi ý khoá này. */
+    public function placementLevels(): BelongsToMany
+    {
+        return $this->belongsToMany(PlacementLevel::class, 'placement_level_courses');
+    }
+
     /** Các phân loại khóa dùng để chia lộ trình, theo thứ tự câu hỏi. */
     public function classifications(): BelongsToMany
     {
