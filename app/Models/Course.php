@@ -114,6 +114,11 @@ class Course extends Model
         return $this->hasOne(LearningPath::class)->where('is_default', true);
     }
 
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(CourseEnrollment::class);
+    }
+
     /** Các mức của bài kiểm tra đầu vào gợi ý khoá này. */
     public function placementLevels(): BelongsToMany
     {

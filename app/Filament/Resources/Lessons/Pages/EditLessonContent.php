@@ -101,6 +101,18 @@ class EditLessonContent extends Page
                     return;
                 }
 
+                // Câu hỏi trắc nghiệm phải hợp lệ thì mới chấm được → chặn xuất bản
+                if ($problems = LessonContent::quizProblems($lesson->content_draft)) {
+                    Notification::make()
+                        ->title('Chưa xuất bản: câu hỏi chưa hoàn chỉnh')
+                        ->body(implode("\n", $problems))
+                        ->danger()
+                        ->persistent()
+                        ->send();
+
+                    return;
+                }
+
                 $lesson->publish();
                 Notification::make()->title('Đã xuất bản nội dung')->success()->send();
             });

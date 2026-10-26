@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\AppSessionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CampaignController;
+use App\Http\Controllers\Api\LessonController;
+use App\Http\Controllers\Api\MyCourseController;
 use App\Http\Controllers\Api\PlacementTestController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\ReferralController;
@@ -42,6 +44,16 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
 
     // Lượt mở app (phiên 30 phút): gọi khi mở app, khi quay lại từ nền, và mỗi 60 giây khi đang mở
     Route::post('app-sessions/ping', [AppSessionController::class, 'ping'])->middleware('throttle:app-session-ping');
+
+    // Khoá học của tôi + chọn lộ trình
+    Route::get('my/courses', [MyCourseController::class, 'index']);
+    Route::get('my/courses/{courseId}', [MyCourseController::class, 'show'])->whereNumber('courseId');
+    Route::post('my/courses/{courseId}/path', [MyCourseController::class, 'choosePath'])->whereNumber('courseId');
+
+    // Học bài: nội dung, đã đọc hết, trả lời câu hỏi (server chấm)
+    Route::get('lessons/{id}', [LessonController::class, 'show'])->whereNumber('id');
+    Route::post('lessons/{id}/read', [LessonController::class, 'read'])->whereNumber('id');
+    Route::post('lessons/{id}/quiz', [LessonController::class, 'answer'])->whereNumber('id')->middleware('throttle:60,1');
 
     // Bài kiểm tra đầu vào: đề đang dùng, nộp bài (chấm tự động), kết quả gần nhất
     Route::get('placement-test', [PlacementTestController::class, 'show']);
