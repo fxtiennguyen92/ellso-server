@@ -92,7 +92,7 @@ class PlacementTestResource extends Resource
                     ->formatStateUsing(fn (bool $state) => $state ? 'Đang dùng' : 'Không dùng')
                     ->color(fn (bool $state) => $state ? 'success' : 'gray'),
                 TextColumn::make('questions_count')->label('Câu hỏi')->numeric()->alignCenter(),
-                TextColumn::make('dimensions_count')->label('Phân loại')->numeric()->alignCenter(),
+                TextColumn::make('dimensions_count')->label('Năng lực')->numeric()->alignCenter(),
                 TextColumn::make('attempts_count')->label('Bài làm')->numeric()->alignCenter(),
                 TextColumn::make('updated_at')
                     ->label('Cập nhật')
@@ -117,7 +117,7 @@ class PlacementTestResource extends Resource
                         ->label('Nhân bản')
                         ->icon(Heroicon::DocumentDuplicate)
                         ->requiresConfirmation()
-                        ->modalDescription('Tạo bản sao đầy đủ (phân loại, mức độ, câu hỏi, điểm) ở trạng thái chưa dùng — để sửa đề mà không ảnh hưởng bài đang chạy.')
+                        ->modalDescription('Tạo bản sao đầy đủ (năng lực, mức độ, câu hỏi, điểm) ở trạng thái chưa dùng — để sửa đề mà không ảnh hưởng bài đang chạy.')
                         ->authorize('replicate')
                         ->action(function (PlacementTest $record, $livewire) {
                             $copy = $record->duplicate();
@@ -125,7 +125,7 @@ class PlacementTestResource extends Resource
                             $livewire->redirect(ManagePlacementQuestions::getUrl(['record' => $copy]));
                         }),
                     DeleteAction::make()
-                        ->modalDescription('Xoá bài kiểm tra cùng toàn bộ câu hỏi và phân loại.'),
+                        ->modalDescription('Xoá bài kiểm tra cùng toàn bộ câu hỏi và năng lực.'),
                 ]),
             ]);
     }

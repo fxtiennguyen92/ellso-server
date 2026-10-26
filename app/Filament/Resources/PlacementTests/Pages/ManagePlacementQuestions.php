@@ -93,12 +93,12 @@ class ManagePlacementQuestions extends ManageRelatedRecords
                     ]),
 
                 $dimensions->isEmpty()
-                    ? Callout::make('Chưa có phân loại nào')
-                        ->description('Tạo phân loại ở tab "Phân loại & mức độ" trước, rồi quay lại đặt điểm cho từng đáp án.')
+                    ? Callout::make('Chưa có năng lực nào')
+                        ->description('Tạo năng lực ở tab "Năng lực & mức độ" trước, rồi quay lại đặt điểm cho từng đáp án.')
                         ->warning()
                     : Callout::make(fn (Get $get) => $this->isOrdering($get)
                         ? 'Điểm của mỗi mục sẽ được nhân với trọng số của vị trí học viên xếp mục đó.'
-                        : 'Học viên chọn đáp án nào thì cộng điểm của đáp án đó vào từng phân loại.')
+                        : 'Học viên chọn đáp án nào thì cộng điểm của đáp án đó vào từng năng lực.')
                         ->description('Để trống = 0 điểm. Có thể nhập số âm để trừ điểm.')
                         ->info(),
 
@@ -159,7 +159,7 @@ class ManagePlacementQuestions extends ManageRelatedRecords
             ->defaultSort('sort_order')
             ->modifyQueryUsing(fn ($query) => $query->with('options'))
             ->emptyStateHeading('Chưa có câu hỏi')
-            ->emptyStateDescription('Thêm câu hỏi chọn 1, chọn nhiều hoặc sắp xếp. Mỗi đáp án cộng điểm cho các phân loại.')
+            ->emptyStateDescription('Thêm câu hỏi chọn 1, chọn nhiều hoặc sắp xếp. Mỗi đáp án cộng điểm cho các năng lực.')
             ->columns([
                 TextColumn::make('number')
                     ->label('#')

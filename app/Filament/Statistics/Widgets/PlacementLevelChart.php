@@ -23,7 +23,7 @@ class PlacementLevelChart extends StudentActivityChart
 
     public function getHeading(): string
     {
-        return PlacementDimension::find($this->dimensionId)?->name ?? 'Phân loại';
+        return PlacementDimension::find($this->dimensionId)?->name ?? 'Năng lực';
     }
 
     public function getDescription(): string

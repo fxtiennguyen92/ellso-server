@@ -49,7 +49,7 @@
             @endif
         </div>
     @empty
-        <div style="opacity:.7">Bài kiểm tra chưa có phân loại nào.</div>
+        <div style="opacity:.7">Bài kiểm tra chưa có năng lực nào.</div>
     @endforelse
 
     @if ($courses)

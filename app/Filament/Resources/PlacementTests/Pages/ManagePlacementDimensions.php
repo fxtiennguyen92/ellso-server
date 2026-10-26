@@ -39,22 +39,22 @@ class ManagePlacementDimensions extends ManageRelatedRecords
 
     protected static string $relationship = 'dimensions';
 
-    protected static ?string $navigationLabel = 'Phân loại & mức độ';
+    protected static ?string $navigationLabel = 'Năng lực & mức độ';
 
     protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedSquares2x2;
 
-    protected static ?string $title = 'Phân loại & mức độ';
+    protected static ?string $title = 'Năng lực & mức độ';
 
-    protected static ?string $breadcrumb = 'Phân loại & mức độ';
+    protected static ?string $breadcrumb = 'Năng lực & mức độ';
 
-    protected static ?string $modelLabel = 'phân loại';
+    protected static ?string $modelLabel = 'năng lực';
 
     /** @var array<int, array{0:int,1:int}>|null */
     private ?array $rangeCache = null;
 
     public function getSubheading(): ?string
     {
-        return $this->test()->title . ' — mỗi phân loại có nhiều mức độ; học viên đạt mức có "điểm từ" cao nhất mà tổng điểm của họ chạm tới.';
+        return $this->test()->title . ' — mỗi năng lực có nhiều mức độ; học viên đạt mức có "điểm từ" cao nhất mà tổng điểm của họ chạm tới.';
     }
 
     protected function getHeaderActions(): array
@@ -67,14 +67,14 @@ class ManagePlacementDimensions extends ManageRelatedRecords
         return $schema->components([
             Grid::make(1)->columnSpanFull()->schema([
                 TextInput::make('name')
-                    ->label('Tên phân loại')
+                    ->label('Tên năng lực')
                     ->placeholder('VD: Khả năng tiếp thu')
                     ->required()
                     ->maxLength(120),
                 Textarea::make('description')
                     ->label('Mô tả')
                     ->rows(2)
-                    ->helperText('Hiện dưới tên phân loại ở màn kết quả trên app.'),
+                    ->helperText('Hiện dưới tên năng lực ở màn kết quả trên app.'),
                 Callout::make(fn (?PlacementDimension $record) => $this->rangeText($record))
                     ->description('Đặt "Điểm từ" của các mức trong khoảng này. Điểm thấp hơn mọi mức → học viên nhận mức thấp nhất.')
                     ->info(),
@@ -127,11 +127,11 @@ class ManagePlacementDimensions extends ManageRelatedRecords
             ->reorderable('sort_order')
             ->defaultSort('sort_order')
             ->modifyQueryUsing(fn ($query) => $query->with('levels.courses'))
-            ->emptyStateHeading('Chưa có phân loại')
-            ->emptyStateDescription('Tạo phân loại trước (VD: Khả năng tiếp thu), sau đó đặt điểm cho từng đáp án ở tab Câu hỏi.')
+            ->emptyStateHeading('Chưa có năng lực')
+            ->emptyStateDescription('Tạo năng lực trước (VD: Khả năng tiếp thu), sau đó đặt điểm cho từng đáp án ở tab Câu hỏi.')
             ->columns([
                 TextColumn::make('name')
-                    ->label('Phân loại')
+                    ->label('Năng lực')
                     ->weight('medium')
                     ->description(fn (PlacementDimension $record) => $record->description)
                     ->wrap(),
@@ -149,7 +149,7 @@ class ManagePlacementDimensions extends ManageRelatedRecords
                     ->color(fn (string $state) => str_starts_with($state, 'Chưa') ? 'warning' : null)
                     ->alignCenter(),
                 TextColumn::make('used_in')
-                    ->label('Năng lực trong lộ trình')
+                    ->label('Dùng trong lộ trình')
                     ->state(fn (PlacementDimension $record) => ($n = $this->coursesUsing($record)) ? "Dùng ở {$n} khoá" : 'Chưa khoá nào dùng')
                     ->color(fn (string $state) => str_starts_with($state, 'Dùng') ? 'success' : 'gray')
                     ->tooltip('Chọn ở Khoá học › Phân loại lộ trình (tên "Năng lực · …"), rồi đặt mức cho từng lộ trình.')
@@ -157,7 +157,7 @@ class ManagePlacementDimensions extends ManageRelatedRecords
             ])
             ->headerActions([
                 CreateAction::make()
-                    ->label('Thêm phân loại')
+                    ->label('Thêm năng lực')
                     ->icon(Heroicon::Plus)
                     ->color('primary')
                     ->modalWidth('3xl')
@@ -171,7 +171,7 @@ class ManagePlacementDimensions extends ManageRelatedRecords
                 ActionGroup::make([
                     EditAction::make()->modalWidth('3xl'),
                     DeleteAction::make()
-                        ->modalDescription(fn (PlacementDimension $record) => 'Xoá phân loại và các mức độ của nó. Điểm đã đặt cho phân loại này ở các đáp án sẽ không còn tác dụng. Bài làm cũ vẫn giữ kết quả.'
+                        ->modalDescription(fn (PlacementDimension $record) => 'Xoá năng lực và các mức độ của nó. Điểm đã đặt cho năng lực này ở các đáp án sẽ không còn tác dụng. Bài làm cũ vẫn giữ kết quả.'
                             . (($n = $this->coursesUsing($record)) ? " Năng lực này đang là điều kiện lộ trình ở {$n} khoá — điều kiện đó sẽ không còn khớp với học viên làm bài sau này." : '')),
                 ]),
             ]);
@@ -202,13 +202,13 @@ class ManagePlacementDimensions extends ManageRelatedRecords
     private function rangeText(?PlacementDimension $record): string
     {
         if (! $record) {
-            return 'Lưu phân loại rồi đặt điểm cho đáp án ở tab Câu hỏi — khoảng điểm có thể đạt sẽ hiện tại đây.';
+            return 'Lưu năng lực rồi đặt điểm cho đáp án ở tab Câu hỏi — khoảng điểm có thể đạt sẽ hiện tại đây.';
         }
         [$min, $max] = $this->ranges()[$record->id] ?? [0, 0];
 
         return $min === 0 && $max === 0
-            ? 'Chưa có đáp án nào cộng điểm cho phân loại này.'
-            : "Với các câu hỏi hiện tại, điểm của phân loại này nằm trong khoảng {$min} → {$max}.";
+            ? 'Chưa có đáp án nào cộng điểm cho năng lực này.'
+            : "Với các câu hỏi hiện tại, điểm của năng lực này nằm trong khoảng {$min} → {$max}.";
     }
 
     /** Các mức dạng chip, cảnh báo mức không thể đạt. */

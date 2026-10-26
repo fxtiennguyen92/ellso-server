@@ -13,7 +13,7 @@ class ListPlacementTests extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Học viên làm bài sau khi đăng ký. Mỗi câu trả lời cộng điểm vào các phân loại (VD: Khả năng tiếp thu); tổng điểm quyết định mức độ (VD: Xuất sắc, Tốt…).';
+        return 'Học viên làm bài sau khi đăng ký. Mỗi câu trả lời cộng điểm vào các năng lực (VD: Khả năng tiếp thu); tổng điểm quyết định mức độ (VD: Xuất sắc, Tốt…).';
     }
 
     protected function getHeaderActions(): array
