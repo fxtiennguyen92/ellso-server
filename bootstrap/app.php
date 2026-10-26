@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\UseRequestHostForPublicFiles;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -23,6 +24,9 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Link ảnh /storage theo domain đang gọi (CMS hay API), tránh lỗi khác origin
+        $middleware->prepend(UseRequestHostForPublicFiles::class);
+
         $middleware->alias([
             'abilities' => CheckAbilities::class,
             'ability' => CheckForAnyAbility::class,

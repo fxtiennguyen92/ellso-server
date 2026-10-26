@@ -198,6 +198,17 @@ class TrainingCourseTest extends TestCase
         $this->getJson("/v1/trainings/{$draft->id}")->assertNotFound();
     }
 
+    /** Link ảnh theo domain + cổng đang gọi (không theo APP_URL) — tránh ô ảnh CMS kẹt "Loading" khi khác origin. */
+    public function test_public_file_urls_follow_request_host(): void
+    {
+        config(['app.url' => 'http://localhost']);
+        $this->addSession($this->course(), $this->cafeA, now('Asia/Ho_Chi_Minh')->addDays(5)->toDateString(), 10);
+
+        $this->getJson('http://192.168.1.20:8000/v1/trainings')
+            ->assertOk()
+            ->assertJsonPath('data.0.banner.url', 'http://192.168.1.20:8000/storage/trainings/banners/x.png');
+    }
+
     public function test_instructor_forbidden(): void
     {
         $this->actingAs(User::factory()->create(['role' => UserRole::Instructor, 'is_active' => true]));
