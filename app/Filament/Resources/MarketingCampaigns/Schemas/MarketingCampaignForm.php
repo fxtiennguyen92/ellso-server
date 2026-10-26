@@ -2,35 +2,28 @@
 
 namespace App\Filament\Resources\MarketingCampaigns\Schemas;
 
+use App\Filament\Support\ContentBlocks;
 use App\Models\Course;
 use App\Models\MarketingCampaign;
-use App\Models\PromoCode;
 use App\Support\CampaignContent;
 use Closure;
 use Filament\Forms\Components\Builder;
-use Filament\Forms\Components\Builder\Block;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
-use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 
 class MarketingCampaignForm
 {
     private const TZ = 'Asia/Ho_Chi_Minh';
-
-    private const TEXT_HELP = 'Viết **chữ** để in đậm. Xuống dòng để tách đoạn.';
 
     public static function configure(Schema $schema): Schema
     {
@@ -59,7 +52,7 @@ class MarketingCampaignForm
                             ->collapsible()
                             ->cloneable()
                             ->blockNumbers(false)
-                            ->blocks(self::blocks()),
+                            ->blocks(ContentBlocks::make('campaigns/content', withPromoCode: true)),
                     ]),
             ])->columnSpan(['lg' => 2]),
 
@@ -136,92 +129,6 @@ class MarketingCampaignForm
                     ]),
             ])->columnSpan(['lg' => 1]),
         ]);
-    }
-
-    /** @return list<Block> */
-    private static function blocks(): array
-    {
-        $excerpt = fn (string $label, ?string $text) => filled($text) ? $label . ': ' . Str::limit(strip_tags($text), 60) : $label;
-
-        return [
-            Block::make('paragraph')
-                ->label(fn (?array $state) => $excerpt('Đoạn văn', $state['text'] ?? null))
-                ->icon(Heroicon::Bars3BottomLeft)
-                ->schema([
-                    Textarea::make('text')->hiddenLabel()->rows(3)->autosize()->maxLength(3000)->helperText(self::TEXT_HELP),
-                ]),
-            Block::make('heading')
-                ->label(fn (?array $state) => $excerpt('Tiêu đề mục', $state['text'] ?? null))
-                ->icon(Heroicon::H2)
-                ->schema([
-                    TextInput::make('text')->hiddenLabel()->maxLength(120),
-                ]),
-            Block::make('steps')
-                ->label(fn (?array $state) => $excerpt('Các bước', $state['title'] ?? null))
-                ->icon(Heroicon::NumberedList)
-                ->schema([
-                    TextInput::make('title')->label('Tiêu đề')->placeholder('Cách áp dụng')->maxLength(120),
-                    Repeater::make('items')
-                        ->label('Các bước (đánh số tự động)')
-                        ->simple(TextInput::make('item')->maxLength(300))
-                        ->addActionLabel('Thêm bước')
-                        ->defaultItems(0),
-                ]),
-            Block::make('bullets')
-                ->label(fn (?array $state) => $excerpt('Danh sách', $state['title'] ?? null))
-                ->icon(Heroicon::ListBullet)
-                ->schema([
-                    TextInput::make('title')->label('Tiêu đề')->placeholder('Điều kiện áp dụng / Quyền lợi')->maxLength(120),
-                    Repeater::make('items')
-                        ->label('Các ý')
-                        ->simple(TextInput::make('item')->maxLength(300))
-                        ->addActionLabel('Thêm ý')
-                        ->defaultItems(0),
-                ]),
-            Block::make('promo_code')
-                ->label(fn (?array $state) => 'Mã khuyến mãi' . (filled($state['promo_code_id'] ?? null) ? ': ' . PromoCode::find($state['promo_code_id'])?->code : ''))
-                ->icon(Heroicon::Ticket)
-                ->schema([
-                    Select::make('promo_code_id')
-                        ->label('Mã')
-                        ->helperText('App hiện ô mã kèm nút Sao chép và mức giảm.')
-                        ->options(fn () => PromoCode::query()->latest('id')->get()
-                            ->mapWithKeys(fn (PromoCode $p) => [$p->id => $p->code . ' · ' . $p->discountSummary()])->all())
-                        ->searchable()
-                        ->required(),
-                    TextInput::make('note')->label('Ghi chú dưới mã')->placeholder('VD: Nhập mã ở bước thanh toán')->maxLength(200),
-                ]),
-            Block::make('image')
-                ->label(fn (?array $state) => $excerpt('Ảnh', $state['caption'] ?? null))
-                ->icon(Heroicon::Photo)
-                ->schema([
-                    FileUpload::make('image')
-                        ->hiddenLabel()
-                        ->image()
-                        ->imageEditor()
-                        ->disk('public')
-                        ->directory('campaigns/content')
-                        ->visibility('public')
-                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                        ->maxSize(3072)
-                        ->required(),
-                    TextInput::make('caption')->label('Chú thích')->maxLength(200),
-                ]),
-            Block::make('callout')
-                ->label(fn (?array $state) => $excerpt('Khung lưu ý', $state['title'] ?? $state['text'] ?? null))
-                ->icon(Heroicon::InformationCircle)
-                ->schema([
-                    Grid::make(['default' => 1, 'md' => 3])->schema([
-                        ToggleButtons::make('tone')
-                            ->label('Kiểu')
-                            ->options(['info' => 'Thông tin', 'warning' => 'Chú ý'])
-                            ->default('info')
-                            ->grouped(),
-                        TextInput::make('title')->label('Tiêu đề')->maxLength(120)->columnSpan(['md' => 2]),
-                    ]),
-                    Textarea::make('text')->label('Nội dung')->rows(2)->autosize()->maxLength(1000)->helperText(self::TEXT_HELP),
-                ]),
-        ];
     }
 
     private static function dateTime(string $name, string $label): DateTimePicker

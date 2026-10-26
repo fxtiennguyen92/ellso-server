@@ -41,7 +41,7 @@ class PlacementTestResource extends Resource
 
     protected static string | UnitEnum | null $navigationGroup = 'Đào tạo';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $navigationLabel = 'Bài kiểm tra đầu vào';
 

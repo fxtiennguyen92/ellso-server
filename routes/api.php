@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Api\PlacementTestController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\ReferralController;
+use App\Http\Controllers\Api\TrainingController;
 use Illuminate\Support\Facades\Route;
 
 // ---- Khách (chưa đăng nhập) ----
@@ -25,6 +26,10 @@ Route::get('referrals/{code}', [ReferralController::class, 'show'])->middleware(
 // Chiến dịch marketing: banner trên Home + trang chi tiết
 Route::get('campaigns', [CampaignController::class, 'index']);
 Route::get('campaigns/{id}', [CampaignController::class, 'show'])->whereNumber('id');
+
+// Khoá huấn luyện offline: danh sách + chi tiết (lịch, địa điểm)
+Route::get('trainings', [TrainingController::class, 'index']);
+Route::get('trainings/{id}', [TrainingController::class, 'show'])->whereNumber('id');
 
 // ---- Đã đăng nhập (token đầy đủ; token đổi mật khẩu không vào được) ----
 Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
