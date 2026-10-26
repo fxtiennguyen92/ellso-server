@@ -35,7 +35,7 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogo(fn () => asset('images/ellso-logo.svg'))
             ->brandLogoHeight('2rem')
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Emerald, // đồng bộ màu thương hiệu Ellso (#10B981)
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
