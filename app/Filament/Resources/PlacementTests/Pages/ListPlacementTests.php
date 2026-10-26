@@ -22,7 +22,7 @@ class ListPlacementTests extends ListRecords
             CreateAction::make()
                 ->label('Tạo bài kiểm tra')
                 ->icon(Heroicon::Plus)
-                ->color('success'),
+                ->color('primary'),
         ];
     }
 }

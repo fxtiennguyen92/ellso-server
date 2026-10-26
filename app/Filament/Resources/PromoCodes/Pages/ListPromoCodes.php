@@ -17,7 +17,7 @@ class ListPromoCodes extends ListRecords
             CreateAction::make()
                 ->label('Tạo mã khuyến mãi')
                 ->icon(Heroicon::Plus)
-                ->color('success'),
+                ->color('primary'),
         ];
     }
 }

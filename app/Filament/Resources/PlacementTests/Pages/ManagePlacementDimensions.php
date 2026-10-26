@@ -152,7 +152,7 @@ class ManagePlacementDimensions extends ManageRelatedRecords
                 CreateAction::make()
                     ->label('Thêm phân loại')
                     ->icon(Heroicon::Plus)
-                    ->color('success')
+                    ->color('primary')
                     ->modalWidth('3xl')
                     ->mutateDataUsing(function (array $data) {
                         $data['sort_order'] = (int) $this->test()->dimensions()->max('sort_order') + 1;

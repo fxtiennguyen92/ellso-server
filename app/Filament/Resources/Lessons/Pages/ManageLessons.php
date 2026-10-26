@@ -17,7 +17,7 @@ class ManageLessons extends ManageRecords
             CreateAction::make()
                 ->label('Thêm bài học')
                 ->icon(Heroicon::Plus)
-                ->color('success')
+                ->color('primary')
                 ->modalHeading('Thêm bài học'),
         ];
     }

@@ -182,7 +182,7 @@ class ManagePlacementQuestions extends ManageRelatedRecords
                 CreateAction::make()
                     ->label('Thêm câu hỏi')
                     ->icon(Heroicon::Plus)
-                    ->color('success')
+                    ->color('primary')
                     ->modalWidth('4xl')
                     ->mutateDataUsing(function (array $data) {
                         $data['sort_order'] = (int) $this->test()->questions()->max('sort_order') + 1;

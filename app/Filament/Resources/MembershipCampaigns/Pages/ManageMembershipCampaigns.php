@@ -24,7 +24,7 @@ class ManageMembershipCampaigns extends ManageRecords
             CreateAction::make()
                 ->label('Tạo chiến dịch')
                 ->icon(Heroicon::Plus)
-                ->color('success')
+                ->color('primary')
                 ->mutateDataUsing(fn (array $data) => [...$data, 'created_by_id' => auth()->id()]),
         ];
     }

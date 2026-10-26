@@ -88,7 +88,7 @@ class ClassificationForm
                             ->minItems(1)
                             ->defaultItems(2)
                             ->addActionLabel('Thêm giá trị')
-                            ->addAction(fn (Action $action) => $action->color('success')->icon(Heroicon::Plus))
+                            ->addAction(fn (Action $action) => $action->color('primary')->icon(Heroicon::Plus))
                             ->schema([
                                 TextInput::make('name')
                                     ->placeholder('VD: Marketing')

@@ -94,7 +94,7 @@ class CourseForm
                                 ->relationship()
                                 ->orderColumn('sort_order')
                                 ->addActionLabel('Thêm phân loại')
-                                ->addAction(fn (Action $action) => $action->color('success')->icon(Heroicon::Plus))
+                                ->addAction(fn (Action $action) => $action->color('primary')->icon(Heroicon::Plus))
                                 ->defaultItems(0)
                                 ->schema([
                                     Select::make('classification_id')

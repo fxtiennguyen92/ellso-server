@@ -39,7 +39,7 @@ class ManageCourseLearningPaths extends ManageRelatedRecords
                 CreateAction::make()
                     ->label('Thêm lộ trình')
                     ->icon(Heroicon::Plus)
-                    ->color('success')
+                    ->color('primary')
                     ->visible(fn () => $this->course()->type === CourseType::MultiPath),
             ]);
     }

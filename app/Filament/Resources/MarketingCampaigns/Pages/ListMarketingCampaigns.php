@@ -22,7 +22,7 @@ class ListMarketingCampaigns extends ListRecords
             CreateAction::make()
                 ->label('Tạo chiến dịch')
                 ->icon(Heroicon::Plus)
-                ->color('success'),
+                ->color('primary'),
         ];
     }
 }
