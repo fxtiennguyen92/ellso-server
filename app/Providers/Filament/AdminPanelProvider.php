@@ -30,6 +30,10 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->domain(config('app.cms_domain'))
             ->login()
+            // Logo Ellso thay chữ ở trang đăng nhập và góc trên bên trái (SVG, nét ở mọi kích thước)
+            ->brandName('Ellso')
+            ->brandLogo(fn () => asset('images/ellso-logo.svg'))
+            ->brandLogoHeight('2rem')
             ->colors([
                 'primary' => Color::Amber,
             ])
