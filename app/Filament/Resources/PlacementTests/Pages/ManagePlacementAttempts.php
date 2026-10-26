@@ -2,16 +2,14 @@
 
 namespace App\Filament\Resources\PlacementTests\Pages;
 
+use App\Filament\Resources\PlacementAttempts\PlacementAttemptResource;
+use App\Filament\Resources\PlacementAttempts\PlacementAttemptsTable;
 use App\Filament\Resources\PlacementTests\PlacementTestResource;
-use App\Models\PlacementAttempt;
+use App\Support\SeenMarker;
 use BackedEnum;
-use Filament\Actions\Action;
-use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\ManageRelatedRecords;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Support\HtmlString;
 
 /** Tab "Bài làm": kết quả từng lần làm bài của học viên (bản chụp lúc nộp). */
 class ManagePlacementAttempts extends ManageRelatedRecords
@@ -35,56 +33,27 @@ class ManagePlacementAttempts extends ManageRelatedRecords
         return $this->getOwnerRecord()->title . ' — học viên có thể làm lại; kết quả mới nhất được dùng để gợi ý.';
     }
 
-    public function table(Table $table): Table
+    public static function getNavigationBadge(): ?string
     {
-        return $table
-            ->defaultSort('completed_at', 'desc')
-            ->modifyQueryUsing(fn ($query) => $query->with('user:id,name,email'))
-            ->emptyStateHeading('Chưa có học viên làm bài')
-            ->columns([
-                TextColumn::make('user.name')
-                    ->label('Học viên')
-                    ->description(fn (PlacementAttempt $record) => $record->user?->email)
-                    ->searchable(['name', 'email']),
-                TextColumn::make('results')
-                    ->label('Kết quả')
-                    ->state(fn (PlacementAttempt $record) => self::resultChips($record))
-                    ->html()
-                    ->wrap(),
-                TextColumn::make('completed_at')
-                    ->label('Thời gian nộp')
-                    ->dateTime('H:i d/m/Y', 'Asia/Ho_Chi_Minh')
-                    ->sortable(),
-            ])
-            ->recordActions([
-                Action::make('view')
-                    ->label('Xem bài làm')
-                    ->icon(Heroicon::Eye)
-                    ->iconButton()
-                    ->tooltip('Xem bài làm')
-                    ->modalHeading(fn (PlacementAttempt $record) => 'Bài làm của ' . ($record->user?->name ?? 'học viên'))
-                    ->modalDescription(fn (PlacementAttempt $record) => 'Nộp lúc ' . $record->completed_at->timezone('Asia/Ho_Chi_Minh')->format('H:i d/m/Y'))
-                    ->modalWidth('3xl')
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel('Đóng')
-                    ->modalContent(fn (PlacementAttempt $record) => view('filament.placement-tests.attempt', [
-                        'results' => $record->results ?? [],
-                        'answers' => $record->answers ?? [],
-                    ])),
-                DeleteAction::make()->iconButton(),
-            ]);
+        return PlacementAttemptResource::getNavigationBadge();
     }
 
-    public static function resultChips(PlacementAttempt $record): HtmlString
+    public static function getNavigationBadgeColor(): string
     {
-        return new HtmlString('<div style="display:flex;flex-wrap:wrap">' . collect($record->results ?? [])->map(function (array $r) {
-            $top = ($r['rank'] ?? null) === 1;
-            $style = $top
-                ? 'background:color-mix(in oklab, var(--success-500) 14%, transparent);color:var(--success-700)'
-                : 'background:color-mix(in oklab, var(--gray-500) 12%, transparent);color:var(--gray-700)';
+        return 'danger';
+    }
 
-            return '<span style="display:inline-block;padding:1px 8px;margin:2px 4px 2px 0;border-radius:999px;font-size:12px;' . $style . '">'
-                . e($r['name']) . ': <b>' . e($r['level'] ?? '—') . '</b></span>';
-        })->join('') . '</div>');
+    /** Mốc đã xem trước khi mở tab (mở tab cũng tính là đã xem bài làm mới). */
+    public ?string $newSince = null;
+
+    public function mount(int | string $record): void
+    {
+        parent::mount($record);
+        $this->newSince = SeenMarker::touch(auth()->user(), SeenMarker::PLACEMENT_ATTEMPTS)?->toIso8601String();
+    }
+
+    public function table(Table $table): Table
+    {
+        return PlacementAttemptsTable::configure($table, $this->newSince, showTest: false);
     }
 }

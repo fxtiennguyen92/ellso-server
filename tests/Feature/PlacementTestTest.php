@@ -6,6 +6,8 @@ use App\Enums\CourseStatus;
 use App\Enums\PlacementQuestionType;
 use App\Enums\UserRole;
 use App\Filament\Pages\Statistics\PlacementTestStatisticsPage;
+use App\Filament\Resources\PlacementAttempts\Pages\ListPlacementAttempts;
+use App\Filament\Resources\PlacementAttempts\PlacementAttemptResource;
 use App\Filament\Resources\PlacementTests\Pages\EditPlacementTest;
 use App\Filament\Resources\PlacementTests\Pages\ListPlacementTests;
 use App\Filament\Resources\PlacementTests\Pages\ManagePlacementAttempts;
@@ -17,6 +19,7 @@ use App\Models\PlacementQuestion;
 use App\Models\PlacementTest;
 use App\Models\User;
 use App\Services\PlacementScoring;
+use App\Support\SeenMarker;
 use Filament\Actions\Testing\TestAction;
 use Filament\Forms\Components\Repeater;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -343,5 +346,48 @@ class PlacementTestTest extends TestCase
         Livewire::test(ListPlacementTests::class)
             ->assertActionHidden(TestAction::make('delete')->table($this->test))
             ->assertActionVisible(TestAction::make('delete')->table($copy));
+    }
+
+    public function test_new_attempts_badge_and_dots_per_admin(): void
+    {
+        $scoring = app(PlacementScoring::class);
+        $submit = fn () => $scoring->submit($this->student, $this->test, $this->answers(['A'], ['M1'], ['O1', 'O2', 'O3']));
+        $otherAdmin = User::factory()->create(['role' => UserRole::Admin, 'is_active' => true]);
+        $this->actingAs($this->admin);
+
+        $this->travelTo(now()->subHour());
+        $submit();
+        $submit();
+        $this->travelBack();
+
+        // Chưa xem lần nào → mọi bài làm đều mới
+        $this->assertSame('2', PlacementAttemptResource::getNavigationBadge());
+        $this->assertSame('danger', PlacementAttemptResource::getNavigationBadgeColor());
+
+        // Mở danh sách: lần này vẫn chấm đỏ cả 2, sau đó hết số đỏ
+        $this->get(ListPlacementAttempts::getUrl())->assertOk()->assertSee('title="Bài làm mới"', false);
+        $this->assertNull(PlacementAttemptResource::getNavigationBadge());
+        $this->get(ListPlacementAttempts::getUrl())->assertOk()->assertDontSee('title="Bài làm mới"', false);
+
+        // Bài làm mới sau lần xem → số đỏ 1, chỉ dòng đó có chấm; lọc "Chỉ bài làm mới"
+        $this->travel(5)->minutes();
+        $new = $submit();
+        $this->assertSame('1', PlacementAttemptResource::getNavigationBadge());
+        Livewire::test(ListPlacementAttempts::class)
+            ->assertCanSeeTableRecords(PlacementAttempt::all())
+            ->filterTable('new')
+            ->assertCanSeeTableRecords([$new])
+            ->assertCountTableRecords(1);
+        $this->assertNull(PlacementAttemptResource::getNavigationBadge());
+
+        // Admin khác có mốc riêng; mở tab "Bài làm" của bài cũng tính là đã xem
+        $this->actingAs($otherAdmin);
+        $this->assertSame('3', PlacementAttemptResource::getNavigationBadge());
+        $this->get(ManagePlacementAttempts::getUrl(['record' => $this->test]))->assertOk();
+        $this->assertNull(PlacementAttemptResource::getNavigationBadge());
+        $this->assertNotNull(SeenMarker::get($otherAdmin, SeenMarker::PLACEMENT_ATTEMPTS));
+
+        $this->actingAs(User::factory()->create(['role' => UserRole::Instructor, 'is_active' => true]));
+        $this->get(ListPlacementAttempts::getUrl())->assertForbidden();
     }
 }
