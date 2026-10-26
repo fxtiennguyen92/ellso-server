@@ -27,6 +27,7 @@ class ManageUsers extends ManageRecords
         return [
             // Tạo tài khoản học viên và gửi email mời kèm mật khẩu tạm
             Action::make('invite')
+                ->visible(fn () => in_array(UserRole::Student, static::getResource()::roleList(), true))
                 ->label('Mời tham gia')
                 ->icon(Heroicon::Envelope)
                 ->color('primary')
@@ -63,6 +64,7 @@ class ManageUsers extends ManageRecords
                 ])
                 ->modalSubmitActionLabel('Tạo và gửi email mời')
                 ->action(function (array $data) {
+                    $resource = static::getResource();
                     $user = DB::transaction(function () use ($data) {
                         $user = new User([
                             'name' => trim($data['name']),
@@ -78,13 +80,13 @@ class ManageUsers extends ManageRecords
                         return $user;
                     });
 
-                    UserResource::sendTempPassword($user, TempPasswordReason::AdminCreated);
+                    $resource::sendTempPassword($user, TempPasswordReason::AdminCreated);
                 }),
 
             CreateAction::make()
                 ->label('Tạo tài khoản')
                 ->icon(Heroicon::Plus)
-                ->color('gray')
+                ->color(fn () => in_array(UserRole::Student, static::getResource()::roleList(), true) ? 'gray' : 'primary')
                 ->mutateDataUsing(function (array $data): array {
                     if (filled($data['password'] ?? null)) {
                         $data['password_changed_at'] = now();
@@ -106,9 +108,14 @@ class ManageUsers extends ManageRecords
 
     public function getTabs(): array
     {
+        $roles = static::getResource()::roleList();
+        if (count($roles) < 2) {
+            return [];
+        }
+
         $tabs = ['all' => Tab::make('Tất cả')];
 
-        foreach (UserRole::cases() as $role) {
+        foreach ($roles as $role) {
             $tabs[$role->value] = Tab::make($role->getLabel())
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('role', $role->value));
         }

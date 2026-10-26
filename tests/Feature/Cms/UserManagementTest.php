@@ -4,9 +4,9 @@ namespace Tests\Feature\Cms;
 
 use App\Enums\UserLogEvent;
 use App\Enums\UserRole;
-use App\Filament\Resources\SystemSettings\Pages\ManageSystemSettings;
-use App\Filament\Resources\Users\Pages\ManageUserLogs;
-use App\Filament\Resources\Users\Pages\ManageUsers;
+use App\Filament\Resources\Students\Pages\ManageStudentLogs as ManageUserLogs;
+use App\Filament\Resources\Students\Pages\ManageStudents as ManageUsers;
+use App\Filament\Resources\SystemSettings\Pages\ManageSystemSettings; // học viên quản lý ở Tài khoản › Học viên
 use App\Mail\TempPasswordMail;
 use App\Models\EmailTemplate;
 use App\Models\SystemSetting;
@@ -175,6 +175,8 @@ class UserManagementTest extends TestCase
         $this->actingAs($instructor);
 
         $this->get(ManageSystemSettings::getUrl())->assertForbidden();
-        $this->get(ManageUserLogs::getUrl(['record' => $this->admin]))->assertForbidden();
+        $student = User::factory()->create(['role' => UserRole::Student]);
+        $this->get(ManageUserLogs::getUrl(['record' => $student]))->assertForbidden();
+        $this->get(\App\Filament\Resources\Students\StudentResource::getUrl('profile', ['record' => $student]))->assertForbidden();
     }
 }

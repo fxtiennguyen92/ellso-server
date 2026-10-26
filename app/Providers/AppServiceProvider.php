@@ -25,6 +25,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // "3 ngày trước" thay vì "3 days ago" (cột since(), diffForHumans())
+        \Illuminate\Support\Carbon::setLocale('vi');
+
         // Alpine component nạp bất đồng bộ cho CMS (build bằng: node bin/build.js, rồi php artisan filament:assets)
         FilamentAsset::register([
             AlpineComponent::make('lesson-editor', __DIR__ . '/../../resources/js/dist/components/lesson-editor.js'),

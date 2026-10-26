@@ -23,7 +23,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
 {
-    public const NAV_GROUPS = ['Đào tạo', 'Thiết lập', 'Marketing', 'Thống kê', 'Hệ thống'];
+    public const NAV_GROUPS = ['Tài khoản', 'Đào tạo', 'Thiết lập', 'Marketing', 'Thống kê', 'Hệ thống'];
 
     public function panel(Panel $panel): Panel
     {
@@ -72,7 +72,6 @@ class AdminPanelProvider extends PanelProvider
             ])
             // Nhóm menu mặc định đóng; nhóm chứa trang đang xem luôn mở (xem view filament.navigation-groups)
             ->navigationGroups(collect(self::NAV_GROUPS)->map(fn (string $label) => NavigationGroup::make($label)->collapsed())->all())
-            ->renderHook(PanelsRenderHook::HEAD_END, fn () => view('filament.navigation-groups', ['groups' => self::NAV_GROUPS]))
-        ;
+            ->renderHook(PanelsRenderHook::HEAD_END, fn () => view('filament.navigation-groups', ['groups' => self::NAV_GROUPS]));
     }
 }

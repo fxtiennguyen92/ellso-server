@@ -2,16 +2,15 @@
 
 namespace App\Filament\Resources\Users;
 
+use App\Enums\MembershipSource;
 use App\Enums\TempPasswordReason;
 use App\Enums\UserLogEvent;
 use App\Enums\UserRole;
 use App\Filament\Resources\Users\Pages\ManageUserLogs;
 use App\Filament\Resources\Users\Pages\ManageUsers;
 use App\Models\User;
-use App\Enums\MembershipSource;
 use App\Services\MembershipService;
 use App\Services\TempPasswordService;
-use Illuminate\Support\Carbon;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -34,6 +33,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 use UnitEnum;
@@ -54,6 +54,31 @@ class UserResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+    /**
+     * Vai trò hiển thị ở màn này. Hệ thống › Người dùng: Admin + Giảng viên.
+     * Học viên quản lý ở Tài khoản › Học viên (StudentResource kế thừa màn này).
+     *
+     * @var list<UserRole>
+     */
+    protected static array $roles = [UserRole::Admin, UserRole::Instructor];
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->whereIn('role', array_map(fn (UserRole $r) => $r->value, static::$roles));
+    }
+
+    /** @return list<UserRole> */
+    public static function roleList(): array
+    {
+        return static::$roles;
+    }
+
+    /** @return array<string, string> */
+    public static function roleOptions(): array
+    {
+        return collect(static::$roles)->mapWithKeys(fn (UserRole $r) => [$r->value => $r->getLabel()])->all();
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
@@ -72,8 +97,9 @@ class UserResource extends Resource
                 ->maxLength(20),
             Select::make('role')
                 ->label('Vai trò')
-                ->options(UserRole::class)
-                ->default(UserRole::Student)
+                // Admin vẫn đổi được vai trò (VD: học viên → giảng viên); tạo mới thì theo màn đang mở
+                ->options(fn (string $operation) => $operation === Operation::Create->value ? static::roleOptions() : UserRole::class)
+                ->default(static::$roles[0])
                 ->required()
                 ->live()
                 // Không cho admin tự hạ quyền của chính mình
@@ -138,10 +164,11 @@ class UserResource extends Resource
                     ->label('Người giới thiệu')
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('role')->label('Vai trò')->badge(),
+                TextColumn::make('role')->label('Vai trò')->badge()->visible(count(static::$roles) > 1),
                 TextColumn::make('membership_ends_at')
                     ->label('Gói thành viên')
                     ->badge()
+                    ->visible(in_array(UserRole::Student, static::$roles, true))
                     ->state(fn (User $record) => $record->role === UserRole::Student
                         ? ($record->membership_ends_at
                             ? 'Đến ' . Carbon::parse($record->membership_ends_at)->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y')
@@ -173,7 +200,7 @@ class UserResource extends Resource
                 TextColumn::make('created_at')->label('Ngày tạo')->dateTime('d/m/Y')->sortable(),
             ])
             ->filters([
-                SelectFilter::make('role')->label('Vai trò')->options(UserRole::class),
+                SelectFilter::make('role')->label('Vai trò')->options(static::roleOptions())->visible(count(static::$roles) > 1),
                 TernaryFilter::make('is_active')->label('Hoạt động'),
                 TernaryFilter::make('activated')
                     ->label('Kích hoạt')
@@ -198,87 +225,107 @@ class UserResource extends Resource
                                 ])->save();
                             }
                         }),
+                    ...static::extraRecordActions(),
                     Action::make('logs')
                         ->label('Xem nhật ký')
                         ->icon(Heroicon::ClipboardDocumentList)
-                        ->url(fn (User $record) => ManageUserLogs::getUrl(['record' => $record])),
-                    Action::make('resendTempPassword')
-                        ->label(fn (User $record) => $record->wasInvited() ? 'Gửi lại email mời' : 'Gửi lại mật khẩu tạm')
-                        ->icon(Heroicon::Envelope)
-                        ->color('info')
-                        ->visible(fn (User $record) => $record->is_active && ! $record->hasActivatedPassword())
-                        ->requiresConfirmation()
-                        ->modalDescription(fn (User $record) => ($record->wasInvited() ? 'Gửi lại email mời kèm mật khẩu tạm mới' : 'Tạo mật khẩu tạm mới và gửi')
-                            . " tới {$record->email}. Mật khẩu tạm gửi trước đó sẽ không dùng được nữa.")
-                        ->action(fn (User $record) => self::sendTempPassword($record, TempPasswordReason::AdminResend)),
-                    Action::make('grantMembership')
-                        ->label(fn (User $record) => $record->hasActiveMembership() ? 'Gia hạn gói thành viên' : 'Cấp gói thành viên')
-                        ->icon(Heroicon::Identification)
-                        ->color('success')
-                        ->visible(fn (User $record) => $record->role === UserRole::Student)
-                        ->modalHeading(fn (User $record) => 'Gói thành viên 1 năm cho ' . $record->name)
-                        ->modalDescription(fn (User $record) => ($end = $record->membershipEndsAt())
-                            ? 'Đang có gói đến ' . $end->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y') . '. Gói mới nối tiếp thêm 1 năm, đến '
-                                . $end->copy()->addMonths(MembershipService::MONTHS)->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y') . '.'
-                            : 'Gói có hiệu lực từ hôm nay đến ' . now()->addMonths(MembershipService::MONTHS)->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y') . '.')
-                        ->schema([
-                            TextInput::make('price')
-                                ->label('Số tiền học viên đã trả')
-                                ->helperText('Để 0 nếu tặng miễn phí.')
-                                ->suffix('₫')
-                                ->numeric()
-                                ->integer()
-                                ->minValue(0)
-                                ->default(0),
-                            Textarea::make('note')
-                                ->label('Ghi chú')
-                                ->placeholder('VD: chuyển khoản ngày 25/10, mã giao dịch …')
-                                ->rows(2),
-                        ])
-                        ->modalSubmitActionLabel('Cấp gói')
-                        ->action(function (User $record, array $data) {
-                            $membership = app(MembershipService::class)->grant(
-                                $record,
-                                MembershipSource::Admin,
-                                (int) ($data['price'] ?? 0),
-                                ['note' => $data['note'] ?? null],
-                                auth()->user(),
-                            );
-
-                            Notification::make()
-                                ->title('Đã cấp gói thành viên đến ' . $membership->ends_at->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y'))
-                                ->success()
-                                ->send();
-                        }),
-                    Action::make('resetPassword')
-                        ->label('Reset mật khẩu')
-                        ->icon(Heroicon::Key)
-                        ->color('warning')
-                        ->visible(fn (User $record) => $record->is_active
-                            && $record->hasActivatedPassword()
-                            && $record->role === UserRole::Student)
-                        ->requiresConfirmation()
-                        ->modalDescription(fn (User $record) => "Gửi mật khẩu tạm (hiệu lực "
-                            . config('ellso.auth.temp_password_ttl_minutes')
-                            . " phút) tới {$record->email}, giống chức năng Quên mật khẩu. Mật khẩu hiện tại của học viên vẫn dùng được.")
-                        ->action(fn (User $record) => self::sendTempPassword($record, TempPasswordReason::AdminReset)),
-                    Action::make('toggleActive')
-                        ->label(fn (User $record) => $record->is_active ? 'Khóa' : 'Mở khóa')
-                        ->icon(fn (User $record) => $record->is_active ? Heroicon::LockClosed : Heroicon::LockOpen)
-                        ->color(fn (User $record) => $record->is_active ? 'danger' : 'success')
-                        ->requiresConfirmation()
-                        ->hidden(fn (User $record) => $record->is(auth()->user()))
-                        ->action(function (User $record) {
-                            $record->update(['is_active' => ! $record->is_active]);
-
-                            // Khóa tài khoản → thu hồi token API của app
-                            if (! $record->is_active) {
-                                $record->tokens()->delete();
-                            }
-                        }),
+                        ->url(fn (User $record) => static::getUrl('logs', ['record' => $record])),
+                    ...static::accountActions(),
                     DeleteAction::make(),
                 ]),
             ]);
+    }
+
+    /**
+     * Thao tác với tài khoản (dùng ở danh sách và trang Học bạ): gửi lại email mời / mật khẩu tạm,
+     * cấp gói thành viên, reset mật khẩu, khoá / mở khoá.
+     *
+     * @return list<Action>
+     */
+    public static function accountActions(): array
+    {
+        return [
+            Action::make('resendTempPassword')
+                ->label(fn (User $record) => $record->wasInvited() ? 'Gửi lại email mời' : 'Gửi lại mật khẩu tạm')
+                ->icon(Heroicon::Envelope)
+                ->color('info')
+                ->visible(fn (User $record) => $record->is_active && ! $record->hasActivatedPassword())
+                ->requiresConfirmation()
+                ->modalDescription(fn (User $record) => ($record->wasInvited() ? 'Gửi lại email mời kèm mật khẩu tạm mới' : 'Tạo mật khẩu tạm mới và gửi')
+                    . " tới {$record->email}. Mật khẩu tạm gửi trước đó sẽ không dùng được nữa.")
+                ->action(fn (User $record) => self::sendTempPassword($record, TempPasswordReason::AdminResend)),
+            Action::make('grantMembership')
+                ->label(fn (User $record) => $record->hasActiveMembership() ? 'Gia hạn gói thành viên' : 'Cấp gói thành viên')
+                ->icon(Heroicon::Identification)
+                ->color('success')
+                ->visible(fn (User $record) => $record->role === UserRole::Student)
+                ->modalHeading(fn (User $record) => 'Gói thành viên 1 năm cho ' . $record->name)
+                ->modalDescription(fn (User $record) => ($end = $record->membershipEndsAt())
+                    ? 'Đang có gói đến ' . $end->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y') . '. Gói mới nối tiếp thêm 1 năm, đến '
+                        . $end->copy()->addMonths(MembershipService::MONTHS)->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y') . '.'
+                    : 'Gói có hiệu lực từ hôm nay đến ' . now()->addMonths(MembershipService::MONTHS)->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y') . '.')
+                ->schema([
+                    TextInput::make('price')
+                        ->label('Số tiền học viên đã trả')
+                        ->helperText('Để 0 nếu tặng miễn phí.')
+                        ->suffix('₫')
+                        ->numeric()
+                        ->integer()
+                        ->minValue(0)
+                        ->default(0),
+                    Textarea::make('note')
+                        ->label('Ghi chú')
+                        ->placeholder('VD: chuyển khoản ngày 25/10, mã giao dịch …')
+                        ->rows(2),
+                ])
+                ->modalSubmitActionLabel('Cấp gói')
+                ->action(function (User $record, array $data) {
+                    $membership = app(MembershipService::class)->grant(
+                        $record,
+                        MembershipSource::Admin,
+                        (int) ($data['price'] ?? 0),
+                        ['note' => $data['note'] ?? null],
+                        auth()->user(),
+                    );
+
+                    Notification::make()
+                        ->title('Đã cấp gói thành viên đến ' . $membership->ends_at->timezone('Asia/Ho_Chi_Minh')->format('d/m/Y'))
+                        ->success()
+                        ->send();
+                }),
+            Action::make('resetPassword')
+                ->label('Reset mật khẩu')
+                ->icon(Heroicon::Key)
+                ->color('warning')
+                ->visible(fn (User $record) => $record->is_active
+                    && $record->hasActivatedPassword()
+                    && $record->role === UserRole::Student)
+                ->requiresConfirmation()
+                ->modalDescription(fn (User $record) => 'Gửi mật khẩu tạm (hiệu lực '
+                    . config('ellso.auth.temp_password_ttl_minutes')
+                    . " phút) tới {$record->email}, giống chức năng Quên mật khẩu. Mật khẩu hiện tại của học viên vẫn dùng được.")
+                ->action(fn (User $record) => self::sendTempPassword($record, TempPasswordReason::AdminReset)),
+            Action::make('toggleActive')
+                ->label(fn (User $record) => $record->is_active ? 'Khóa' : 'Mở khóa')
+                ->icon(fn (User $record) => $record->is_active ? Heroicon::LockClosed : Heroicon::LockOpen)
+                ->color(fn (User $record) => $record->is_active ? 'danger' : 'success')
+                ->requiresConfirmation()
+                ->hidden(fn (User $record) => $record->is(auth()->user()))
+                ->action(function (User $record) {
+                    $record->update(['is_active' => ! $record->is_active]);
+
+                    // Khóa tài khoản → thu hồi token API của app
+                    if (! $record->is_active) {
+                        $record->tokens()->delete();
+                    }
+                }),
+        ];
+    }
+
+    /** Thao tác thêm trên mỗi dòng (màn con bổ sung, VD: Học bạ). */
+    protected static function extraRecordActions(): array
+    {
+        return [];
     }
 
     public static function sendTempPassword(User $record, TempPasswordReason $reason): void

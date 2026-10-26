@@ -61,7 +61,7 @@ class ManageUserLogs extends ManageRelatedRecords
             ]);
     }
 
-    private static function detail(UserLog $log): ?string
+    public static function detail(UserLog $log): ?string
     {
         $meta = $log->meta ?? [];
         $parts = [];

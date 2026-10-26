@@ -8,7 +8,7 @@ use App\Enums\UserLogEvent;
 use App\Enums\UserRole;
 use App\Filament\Pages\Marketing\MembershipSettingsPage;
 use App\Filament\Resources\MembershipCampaigns\Pages\ManageMembershipCampaigns;
-use App\Filament\Resources\Users\Pages\ManageUsers;
+use App\Filament\Resources\Students\Pages\ManageStudents as ManageUsers; // học viên quản lý ở Tài khoản › Học viên
 use App\Models\Course;
 use App\Models\MembershipBundleItem;
 use App\Models\MembershipCampaign;
