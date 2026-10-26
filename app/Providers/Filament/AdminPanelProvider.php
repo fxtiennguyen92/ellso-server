@@ -37,6 +37,8 @@ class AdminPanelProvider extends PanelProvider
             ->brandName('Ellso')
             ->brandLogo(fn () => asset('images/ellso-logo.svg'))
             ->brandLogoHeight('2rem')
+            // Favicon: nền đen, chữ "e" trắng (SVG; kèm favicon.ico + apple-touch-icon cho trình duyệt cũ / iOS)
+            ->favicon(fn () => asset('images/favicon.svg'))
             ->colors([
                 'primary' => Color::Emerald, // đồng bộ màu thương hiệu Ellso (#10B981)
             ])
@@ -72,6 +74,10 @@ class AdminPanelProvider extends PanelProvider
             ])
             // Nhóm menu mặc định đóng; nhóm chứa trang đang xem luôn mở (xem view filament.navigation-groups)
             ->navigationGroups(collect(self::NAV_GROUPS)->map(fn (string $label) => NavigationGroup::make($label)->collapsed())->all())
-            ->renderHook(PanelsRenderHook::HEAD_END, fn () => view('filament.navigation-groups', ['groups' => self::NAV_GROUPS]));
+            ->renderHook(PanelsRenderHook::HEAD_END, fn () => view('filament.navigation-groups', ['groups' => self::NAV_GROUPS]))
+            ->renderHook(PanelsRenderHook::HEAD_END, fn () => new \Illuminate\Support\HtmlString(
+                '<link rel="alternate icon" href="' . asset('favicon.ico') . '" sizes="48x48">'
+                . '<link rel="apple-touch-icon" href="' . asset('images/apple-touch-icon.png') . '">'
+            ));
     }
 }
