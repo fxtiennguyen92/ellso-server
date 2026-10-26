@@ -7,6 +7,7 @@ use App\Filament\Resources\Students\Pages\ManageStudentLogs;
 use App\Filament\Resources\Students\Pages\ManageStudents;
 use App\Filament\Resources\Students\Pages\StudentProfile;
 use App\Filament\Resources\Students\RelationManagers\AppSessionsRelationManager;
+use App\Filament\Resources\Students\RelationManagers\BookPurchasesRelationManager;
 use App\Filament\Resources\Students\RelationManagers\EnrollmentsRelationManager;
 use App\Filament\Resources\Students\RelationManagers\LogsRelationManager;
 use App\Filament\Resources\Students\RelationManagers\MembershipsRelationManager;
@@ -64,6 +65,7 @@ class StudentResource extends UserResource
             EnrollmentsRelationManager::class,
             PlacementAttemptsRelationManager::class,
             MembershipsRelationManager::class,
+            BookPurchasesRelationManager::class,
             AppSessionsRelationManager::class,
             LogsRelationManager::class,
         ];

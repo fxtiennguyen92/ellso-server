@@ -157,6 +157,16 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(LessonQuizAnswer::class);
     }
 
+    public function documentPurchases(): HasMany
+    {
+        return $this->hasMany(DocumentPurchase::class);
+    }
+
+    public function savedDocuments(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Document::class, 'document_saves')->withPivot('created_at');
+    }
+
     /** Khoá huấn luyện mà giáo viên này hướng dẫn. */
     public function trainingCourses(): HasMany
     {

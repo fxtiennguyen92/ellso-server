@@ -41,8 +41,20 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/') . '/storage',
             'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
+        // Tài liệu (video HLS, PDF, sách) — riêng tư, chỉ mở bằng link tạm có chữ ký.
+        // Dev / test: ổ này (storage/app/private/documents, link /private-docs/... có chữ ký).
+        // Production: DOCUMENTS_DISK=s3 (link tạm = presigned URL của S3).
+        'documents_local' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/documents'),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/') . '/private-docs',
+            'serve' => true,
             'throw' => false,
             'report' => false,
         ],

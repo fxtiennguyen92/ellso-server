@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\AppSessionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CampaignController;
+use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\HlsController;
 use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\MyCourseController;
 use App\Http\Controllers\Api\PlacementTestController;
@@ -33,6 +35,13 @@ Route::get('campaigns/{id}', [CampaignController::class, 'show'])->whereNumber('
 Route::get('trainings', [TrainingController::class, 'index']);
 Route::get('trainings/{id}', [TrainingController::class, 'show'])->whereNumber('id');
 
+// Phát video tài liệu (HLS): link có chữ ký + hạn dùng, không cần header đăng nhập (xem HlsController)
+Route::middleware('signed')->prefix('hls/{document}')->whereNumber('document')->group(function () {
+    Route::get('master.m3u8', [HlsController::class, 'master'])->name('hls.master');
+    Route::get('{height}/index.m3u8', [HlsController::class, 'variant'])->whereNumber('height')->name('hls.variant');
+    Route::get('key', [HlsController::class, 'key'])->name('hls.key');
+});
+
 // ---- Đã đăng nhập (token đầy đủ; token đổi mật khẩu không vào được) ----
 Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::get('me', [AuthController::class, 'me']);
@@ -54,6 +63,16 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::get('lessons/{id}', [LessonController::class, 'show'])->whereNumber('id');
     Route::post('lessons/{id}/read', [LessonController::class, 'read'])->whereNumber('id');
     Route::post('lessons/{id}/quiz', [LessonController::class, 'answer'])->whereNumber('id')->middleware('throttle:60,1');
+
+    // Tài liệu: Video (HLS), PDF, Sách
+    Route::get('documents', [DocumentController::class, 'index']);
+    Route::get('documents/topics', [DocumentController::class, 'topics']);
+    Route::get('documents/{id}', [DocumentController::class, 'show'])->whereNumber('id');
+    Route::post('documents/{id}/play', [DocumentController::class, 'play'])->whereNumber('id')->middleware('throttle:30,1');
+    Route::post('documents/{id}/open', [DocumentController::class, 'open'])->whereNumber('id')->middleware('throttle:30,1');
+    Route::post('documents/{id}/save', [DocumentController::class, 'save'])->whereNumber('id');
+    Route::delete('documents/{id}/save', [DocumentController::class, 'unsave'])->whereNumber('id');
+    Route::get('my/documents', [DocumentController::class, 'mine']);
 
     // Bài kiểm tra đầu vào: đề đang dùng, nộp bài (chấm tự động), kết quả gần nhất
     Route::get('placement-test', [PlacementTestController::class, 'show']);

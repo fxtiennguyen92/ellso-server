@@ -24,4 +24,18 @@ return [
         'referral_check_max_per_ip_per_minute' => 20,
     ],
 
+    // Tài liệu: ổ lưu file (documents_local | s3), thời hạn link, video HLS
+    'documents' => [
+        'disk' => env('DOCUMENTS_DISK', 'documents_local'),
+        'link_ttl_minutes' => 5,          // link mở PDF / sách / bắt đầu phát video
+        'video_max_upload_mb' => (int) env('DOCUMENTS_VIDEO_MAX_MB', 2048),
+        'file_max_upload_mb' => (int) env('DOCUMENTS_FILE_MAX_MB', 200),
+        'hls_variants' => [               // chiều cao => [chiều rộng, bitrate video, bitrate audio]
+            480 => [854, '1000k', '96k'],
+            720 => [1280, '2500k', '128k'],
+        ],
+        'hls_segment_seconds' => 6,
+        'ffmpeg' => env('FFMPEG_BINARY', 'ffmpeg'),
+        'ffprobe' => env('FFPROBE_BINARY', 'ffprobe'),
+    ],
 ];
