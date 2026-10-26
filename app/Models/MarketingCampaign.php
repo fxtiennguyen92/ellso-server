@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\CleansUpFiles;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,7 +16,14 @@ use Illuminate\Support\Facades\Storage;
  */
 class MarketingCampaign extends Model
 {
-    use SoftDeletes;
+    use CleansUpFiles, SoftDeletes;
+
+    /** Ảnh banner / ảnh trong nội dung: xoá file khi bỏ ảnh hoặc xoá chiến dịch (không có thùng rác). */
+    protected array $fileAttributes = ['banner_path'];
+
+    protected array $contentFileAttributes = ['content'];
+
+    protected bool $purgeFilesOnSoftDelete = true;
 
     /** Kích thước banner cố định (px). Tỉ lệ 16:9, thẻ chiến dịch trên Home của app theo đúng tỉ lệ này. */
     public const BANNER_WIDTH = 1280;

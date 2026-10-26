@@ -3,10 +3,12 @@
 namespace App\Filament\Resources\TrainingCourses\Schemas;
 
 use App\Enums\TrainingCourseStatus;
+use App\Enums\UserRole;
 use App\Filament\Support\ContentBlocks;
 use App\Models\TrainingCourse;
 use Filament\Forms\Components\Builder;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
@@ -44,10 +46,15 @@ class TrainingCourseForm
                             ->default(0)
                             ->helperText('Giá theo khoá, ngày nào cũng như nhau. 0 = miễn phí.')
                             ->required(),
-                        TextInput::make('trainer_name')
+                        Select::make('trainer_id')
                             ->label('Người hướng dẫn')
-                            ->placeholder('VD: ThS. Nguyễn Văn A')
-                            ->maxLength(120),
+                            ->relationship('trainer', 'name', fn ($query) => $query
+                                ->where('role', UserRole::Instructor)
+                                ->where('is_active', true))
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->helperText('Tài khoản Giảng viên. Giáo viên đăng nhập CMS sẽ thấy khoá mình phụ trách.'),
                     ]),
                 Section::make('Nội dung chi tiết')
                     ->description('Trang chi tiết khoá trên app. Thêm, sắp xếp các khối: đoạn văn, nội dung buổi học, đối tượng phù hợp, ảnh, lưu ý…')

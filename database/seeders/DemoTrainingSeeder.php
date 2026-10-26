@@ -3,9 +3,11 @@
 namespace Database\Seeders;
 
 use App\Enums\TrainingCourseStatus;
+use App\Enums\UserRole;
 use App\Models\TrainingCourse;
 use App\Models\TrainingLocation;
 use App\Models\TrainingSession;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
@@ -41,7 +43,7 @@ class DemoTrainingSeeder extends Seeder
             'summary' => 'Buổi huấn luyện 3 giờ giúp trưởng nhóm mới giao việc, theo dõi và phản hồi hiệu quả.',
             'banner_path' => $this->banner(),
             'price' => 200_000,
-            'trainer_name' => 'ThS. Nguyễn Minh Anh',
+            'trainer_id' => User::where('role', UserRole::Instructor)->value('id'),
             'status' => TrainingCourseStatus::Published,
             'content' => [
                 ['type' => 'paragraph', 'data' => ['text' => 'Dành cho người vừa lên vị trí quản lý hoặc chuẩn bị dẫn dắt nhóm **3–10 người**. Học qua tình huống thực tế, thực hành theo cặp.']],

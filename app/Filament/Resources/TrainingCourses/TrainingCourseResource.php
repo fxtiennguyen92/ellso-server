@@ -24,6 +24,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 /**
@@ -63,7 +64,11 @@ class TrainingCourseResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->modifyQueryUsing(fn ($query) => $query
                 ->withCount(['upcomingSessions'])
-                ->with(['upcomingSessions' => fn ($q) => $q->with('location')->limit(100)]))
+                ->with(['trainer:id,name', 'upcomingSessions' => fn ($q) => $q->with('location')->limit(100)]))
+            // Giáo viên bấm vào khoá → xem lịch tổ chức (không sửa thông tin khoá)
+            ->recordUrl(fn (TrainingCourse $record) => auth()->user()?->can('update', $record)
+                ? EditTrainingCourse::getUrl(['record' => $record])
+                : ManageTrainingSessions::getUrl(['record' => $record]))
             ->columns([
                 ImageColumn::make('banner_path')
                     ->label('Banner')
@@ -74,7 +79,7 @@ class TrainingCourseResource extends Resource
                 TextColumn::make('title')
                     ->label('Khoá huấn luyện')
                     ->weight('medium')
-                    ->description(fn (TrainingCourse $record) => $record->trainer_name ? 'Hướng dẫn: ' . $record->trainer_name : $record->summary)
+                    ->description(fn (TrainingCourse $record) => $record->trainer ? 'Hướng dẫn: ' . $record->trainer->name : $record->summary)
                     ->searchable()
                     ->wrap(),
                 TextColumn::make('price')
@@ -115,6 +120,15 @@ class TrainingCourseResource extends Resource
                         ->modalDescription('Xoá khoá huấn luyện cùng toàn bộ lịch tổ chức.'),
                 ]),
             ]);
+    }
+
+    /** Giáo viên chỉ thấy khoá mình hướng dẫn. */
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+        $user = auth()->user();
+
+        return $user?->isAdmin() ? $query : $query->where('trainer_id', $user?->id);
     }
 
     public static function getRecordSubNavigation(Page $page): array

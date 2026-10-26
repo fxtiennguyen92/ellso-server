@@ -21,7 +21,7 @@ class TrainingController extends Controller
     {
         $courses = TrainingCourse::query()
             ->listed()
-            ->with(['upcomingSessions.location'])
+            ->with(['trainer:id,name', 'upcomingSessions.location'])
             ->get()
             ->sortBy(fn (TrainingCourse $c) => $c->upcomingSessions->first()?->starts_at)
             ->values();
@@ -39,7 +39,7 @@ class TrainingController extends Controller
     {
         $course = TrainingCourse::query()
             ->where('status', TrainingCourseStatus::Published)
-            ->with(['upcomingSessions.location'])
+            ->with(['trainer:id,name', 'upcomingSessions.location'])
             ->find($id);
 
         if (! $course) {
@@ -61,7 +61,7 @@ class TrainingController extends Controller
             'id' => $c->id,
             'title' => $c->title,
             'summary' => $c->summary,
-            'trainer_name' => $c->trainer_name,
+            'trainer' => $c->trainer ? ['id' => $c->trainer->id, 'name' => $c->trainer->name] : null,
             'price' => $c->price,
             'banner' => [
                 'url' => $c->bannerUrl(),

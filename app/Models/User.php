@@ -141,6 +141,12 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(StudentMembership::class);
     }
 
+    /** Khoá huấn luyện mà giáo viên này hướng dẫn. */
+    public function trainingCourses(): HasMany
+    {
+        return $this->hasMany(TrainingCourse::class, 'trainer_id');
+    }
+
     /** Các lần làm bài kiểm tra đầu vào. */
     public function placementAttempts(): HasMany
     {

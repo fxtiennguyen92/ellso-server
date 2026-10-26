@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\CourseStatus;
 use App\Enums\CourseType;
+use App\Models\Concerns\CleansUpFiles;
 use App\Models\Concerns\HasUniqueSlug;
 use App\Support\AbilityClassifications;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,7 +17,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Course extends Model
 {
-    use HasUniqueSlug, SoftDeletes;
+    use CleansUpFiles, HasUniqueSlug, SoftDeletes;
+
+    /** Ảnh bìa: xoá file khi bỏ / thay ảnh, hoặc khi xoá vĩnh viễn khỏi thùng rác. */
+    protected array $fileAttributes = ['cover_image'];
 
     protected string $slugSource = 'title';
 

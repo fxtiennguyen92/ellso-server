@@ -54,7 +54,8 @@ class ManageTrainingSessions extends ManageRelatedRecords
     {
         $course = $this->course();
 
-        return $course->title . ' · ' . ($course->price ? Vnd::full($course->price) . ' / người' : 'Miễn phí');
+        return $course->title . ' · ' . ($course->price ? Vnd::full($course->price) . ' / người' : 'Miễn phí')
+            . ($course->trainer ? ' · Hướng dẫn: ' . $course->trainer->name : '');
     }
 
     public function form(Schema $schema): Schema
@@ -170,6 +171,7 @@ class ManageTrainingSessions extends ManageRelatedRecords
                         ->mutateRecordDataUsing(fn (array $data, TrainingSession $record) => [...$data, ...self::toForm($record)])
                         ->mutateDataUsing(fn (array $data) => self::toRecord($data)),
                     Action::make('repeat')
+                        ->authorize('create', TrainingSession::class)
                         ->label('Thêm ngày tương tự')
                         ->icon(Heroicon::DocumentDuplicate)
                         ->modalHeading('Thêm ngày tương tự')
@@ -185,6 +187,7 @@ class ManageTrainingSessions extends ManageRelatedRecords
                             Notification::make()->title('Đã thêm ngày ' . $copy->dateLabel())->success()->send();
                         }),
                     Action::make('cancel')
+                        ->authorize('update')
                         ->label(fn (TrainingSession $record) => $record->isCancelled() ? 'Mở lại ngày này' : 'Huỷ ngày này')
                         ->icon(fn (TrainingSession $record) => $record->isCancelled() ? Heroicon::ArrowUturnLeft : Heroicon::XCircle)
                         ->color(fn (TrainingSession $record) => $record->isCancelled() ? 'gray' : 'danger')

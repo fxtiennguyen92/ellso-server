@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ContentStatus;
+use App\Models\Concerns\CleansUpFiles;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -18,7 +19,10 @@ use Illuminate\Support\Facades\Storage;
  */
 class Lesson extends Model
 {
-    use SoftDeletes;
+    use CleansUpFiles, SoftDeletes;
+
+    /** Icon: xoá file khi bỏ / thay icon, hoặc khi xoá vĩnh viễn. */
+    protected array $fileAttributes = ['icon'];
 
     protected $fillable = [
         'owner_id',

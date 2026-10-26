@@ -28,6 +28,8 @@ class TrainingCourseTest extends TestCase
 
     private User $admin;
 
+    private User $teacher;
+
     private TrainingLocation $cafeA;
 
     private TrainingLocation $cafeB;
@@ -37,6 +39,7 @@ class TrainingCourseTest extends TestCase
         parent::setUp();
         Storage::fake('public');
         $this->admin = User::factory()->create(['role' => UserRole::Admin, 'is_active' => true]);
+        $this->teacher = User::factory()->create(['role' => UserRole::Instructor, 'is_active' => true, 'name' => 'Cô Lan']);
         $this->cafeA = TrainingLocation::create(['label' => 'Cafe A', 'address' => '12 Nguyễn Huệ, Q.1']);
         $this->cafeB = TrainingLocation::create(['label' => 'Cafe B', 'address' => '88 XVNT, Bình Thạnh', 'map_url' => 'https://maps.google.com/?q=b']);
     }
@@ -81,7 +84,7 @@ class TrainingCourseTest extends TestCase
                 'title' => 'Quản lý đội nhóm',
                 'summary' => 'Buổi 3 giờ',
                 'price' => 200000,
-                'trainer_name' => 'Chị A',
+                'trainer_id' => $this->teacher->id,
                 'status' => TrainingCourseStatus::Published->value,
                 'banner_path' => UploadedFile::fake()->image('banner.png', 1280, 720),
                 'content' => [['type' => 'bullets', 'data' => ['title' => 'Bạn sẽ học được', 'items' => ['Giao việc']]]],
@@ -93,6 +96,7 @@ class TrainingCourseTest extends TestCase
         $course = TrainingCourse::sole();
         $this->assertSame(200_000, $course->price);
         $this->assertTrue($course->createdBy->is($this->admin));
+        $this->assertTrue($course->trainer->is($this->teacher));
         Storage::disk('public')->assertExists($course->banner_path);
 
         // Ngày 15/11 ở Cafe A tối đa 10; 20/11 ở Cafe B tối đa 20
@@ -209,10 +213,83 @@ class TrainingCourseTest extends TestCase
             ->assertJsonPath('data.0.banner.url', 'http://192.168.1.20:8000/storage/trainings/banners/x.png');
     }
 
-    public function test_instructor_forbidden(): void
+    public function test_instructor_sees_only_own_courses_read_only(): void
     {
-        $this->actingAs(User::factory()->create(['role' => UserRole::Instructor, 'is_active' => true]));
-        $this->get(ListTrainingCourses::getUrl())->assertForbidden();
+        $mine = $this->course(['title' => 'Khoá của tôi', 'trainer_id' => $this->teacher->id]);
+        $session = $this->addSession($mine, $this->cafeA, now('Asia/Ho_Chi_Minh')->addDays(3)->toDateString(), 10);
+        $other = $this->course(['title' => 'Khoá người khác']);
+
+        $this->actingAs($this->teacher);
+        Livewire::test(ListTrainingCourses::class)
+            ->assertCanSeeTableRecords([$mine])
+            ->assertCanNotSeeTableRecords([$other])
+            ->assertActionHidden('create');
+
+        $this->get(EditTrainingCourse::getUrl(['record' => $mine]))->assertForbidden();
+        $this->get(ManageTrainingSessions::getUrl(['record' => $other]))->assertNotFound(); // ngoài phạm vi của giáo viên
+        Livewire::test(ManageTrainingSessions::class, ['record' => $mine->getRouteKey()])
+            ->assertCanSeeTableRecords([$session])
+            ->assertActionHidden(TestAction::make('create')->table())
+            ->assertActionHidden(TestAction::make('edit')->table($session))
+            ->assertActionHidden(TestAction::make('repeat')->table($session))
+            ->assertActionHidden(TestAction::make('cancel')->table($session))
+            ->assertActionHidden(TestAction::make('delete')->table($session));
+
         $this->get(ManageTrainingLocations::getUrl())->assertForbidden();
+
+        // API trả thông tin người hướng dẫn
+        $this->getJson("/v1/trainings/{$mine->id}")->assertJsonPath('data.trainer', ['id' => $this->teacher->id, 'name' => 'Cô Lan']);
+    }
+
+    /** Bỏ / thay ảnh rồi lưu, hoặc xoá khoá → file trên storage bị xoá (trừ khi bản ghi khác còn dùng). */
+    public function test_removed_images_are_deleted_from_storage(): void
+    {
+        $disk = Storage::disk('public');
+        foreach (['trainings/banners/a.png', 'trainings/banners/b.png', 'trainings/content/c.png', 'trainings/content/d.png'] as $path) {
+            $disk->put($path, 'x');
+        }
+
+        $course = $this->course([
+            'banner_path' => 'trainings/banners/a.png',
+            'content' => [
+                ['type' => 'image', 'data' => ['image' => 'trainings/content/c.png']],
+                ['type' => 'image', 'data' => ['image' => ['uuid-1' => 'trainings/content/d.png']]],
+            ],
+        ]);
+
+        // Thay banner → xoá banner cũ; bỏ khối ảnh c → xoá c
+        $course->update([
+            'banner_path' => 'trainings/banners/b.png',
+            'content' => [['type' => 'image', 'data' => ['image' => ['uuid-1' => 'trainings/content/d.png']]]],
+        ]);
+        $disk->assertMissing('trainings/banners/a.png');
+        $disk->assertMissing('trainings/content/c.png');
+        $disk->assertExists('trainings/banners/b.png');
+        $disk->assertExists('trainings/content/d.png');
+
+        // Bản nhân bản dùng chung banner + ảnh → xoá bản gốc vẫn giữ file
+        $copy = $course->replicate();
+        $copy->save();
+        $course->delete();
+        $disk->assertExists('trainings/banners/b.png');
+        $disk->assertExists('trainings/content/d.png');
+
+        // Xoá nốt bản còn lại → xoá file
+        $copy->delete();
+        $disk->assertMissing('trainings/banners/b.png');
+        $disk->assertMissing('trainings/content/d.png');
+    }
+
+    /** Khoá học có thùng rác: xoá tạm vẫn giữ ảnh bìa (để khôi phục), xoá vĩnh viễn mới xoá file. */
+    public function test_course_cover_kept_in_trash_deleted_on_force_delete(): void
+    {
+        Storage::disk('public')->put('courses/covers/a.png', 'x');
+        $course = \App\Models\Course::create(['title' => 'Khoá', 'instructor_id' => $this->admin->id, 'price' => 0, 'cover_image' => 'courses/covers/a.png']);
+
+        $course->delete();
+        Storage::disk('public')->assertExists('courses/covers/a.png');
+
+        $course->forceDelete();
+        Storage::disk('public')->assertMissing('courses/covers/a.png');
     }
 }
