@@ -14,7 +14,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Classification extends Model
 {
-    protected $fillable = ['course_id', 'name', 'question', 'description', 'sort_order', 'is_active'];
+    /** Hỏi học viên trên app (chọn giá trị). */
+    public const TYPE_QUESTION = 'question';
+
+    /** Năng lực: tự đồng bộ từ phân loại của bài kiểm tra đầu vào, giá trị = mức độ, lấy từ kết quả bài làm. */
+    public const TYPE_ABILITY = 'ability';
+
+    protected $fillable = ['course_id', 'type', 'placement_dimension_key', 'name', 'question', 'description', 'sort_order', 'is_active'];
 
     protected function casts(): array
     {
@@ -32,6 +38,21 @@ class Classification extends Model
                 ]);
             }
         });
+    }
+
+    public function isAbility(): bool
+    {
+        return $this->type === self::TYPE_ABILITY;
+    }
+
+    /** Tên hiển thị trong ô chọn: "Năng lực · Khả năng tiếp thu", "Mục tiêu học (riêng)". */
+    public function displayName(): string
+    {
+        if ($this->isAbility()) {
+            return 'Năng lực · ' . $this->name;
+        }
+
+        return $this->name . ($this->isShared() ? '' : ' (riêng)');
     }
 
     public function isShared(): bool

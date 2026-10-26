@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\AbilityClassifications;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,12 @@ class PlacementTest extends Model
             if ($test->is_active) {
                 static::query()->whereKeyNot($test->getKey())->where('is_active', true)->update(['is_active' => false]);
             }
+            // Đổi bài đang dùng → tên / mức của phân loại Năng lực theo bài mới
+            if ($test->wasChanged('is_active') || $test->wasRecentlyCreated) {
+                AbilityClassifications::syncSoon();
+            }
         });
+        static::deleted(fn () => AbilityClassifications::syncSoon());
     }
 
     public static function current(): ?self
@@ -57,7 +63,7 @@ class PlacementTest extends Model
     {
         $this->loadStructure();
 
-        return DB::transaction(function () {
+        return AbilityClassifications::batch(fn () => DB::transaction(function () {
             $copy = static::create([
                 'title' => $this->title . ' (bản sao)',
                 'intro' => $this->intro,
@@ -66,11 +72,11 @@ class PlacementTest extends Model
 
             $dimensionMap = [];
             foreach ($this->dimensions as $dimension) {
-                $newDimension = $copy->dimensions()->create($dimension->only(['name', 'description', 'sort_order']));
+                $newDimension = $copy->dimensions()->create($dimension->only(['key', 'name', 'description', 'sort_order']));
                 $dimensionMap[$dimension->id] = $newDimension->id;
 
                 foreach ($dimension->levels as $level) {
-                    $newLevel = $newDimension->levels()->create($level->only(['name', 'min_score', 'description', 'sort_order']));
+                    $newLevel = $newDimension->levels()->create($level->only(['key', 'name', 'min_score', 'description', 'sort_order']));
                     $newLevel->courses()->sync($level->courses->pluck('id'));
                 }
             }
@@ -96,7 +102,7 @@ class PlacementTest extends Model
             }
 
             return $copy;
-        });
+        }));
     }
 
     /** Nạp đủ đề + cách chấm để chấm điểm / hiển thị. */

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PlacementTests\Pages;
 
 use App\Filament\Resources\PlacementTests\Pages\Concerns\SimulatesPlacementTest;
 use App\Filament\Resources\PlacementTests\PlacementTestResource;
+use App\Models\Classification;
 use App\Models\PlacementDimension;
 use App\Models\PlacementLevel;
 use App\Models\PlacementTest;
@@ -147,6 +148,12 @@ class ManagePlacementDimensions extends ManageRelatedRecords
                     })
                     ->color(fn (string $state) => str_starts_with($state, 'Chưa') ? 'warning' : null)
                     ->alignCenter(),
+                TextColumn::make('used_in')
+                    ->label('Năng lực trong lộ trình')
+                    ->state(fn (PlacementDimension $record) => ($n = $this->coursesUsing($record)) ? "Dùng ở {$n} khoá" : 'Chưa khoá nào dùng')
+                    ->color(fn (string $state) => str_starts_with($state, 'Dùng') ? 'success' : 'gray')
+                    ->tooltip('Chọn ở Khoá học › Phân loại lộ trình (tên "Năng lực · …"), rồi đặt mức cho từng lộ trình.')
+                    ->alignCenter(),
             ])
             ->headerActions([
                 CreateAction::make()
@@ -164,9 +171,20 @@ class ManagePlacementDimensions extends ManageRelatedRecords
                 ActionGroup::make([
                     EditAction::make()->modalWidth('3xl'),
                     DeleteAction::make()
-                        ->modalDescription('Xoá phân loại và các mức độ của nó. Điểm đã đặt cho phân loại này ở các đáp án sẽ không còn tác dụng. Bài làm cũ vẫn giữ kết quả.'),
+                        ->modalDescription(fn (PlacementDimension $record) => 'Xoá phân loại và các mức độ của nó. Điểm đã đặt cho phân loại này ở các đáp án sẽ không còn tác dụng. Bài làm cũ vẫn giữ kết quả.'
+                            . (($n = $this->coursesUsing($record)) ? " Năng lực này đang là điều kiện lộ trình ở {$n} khoá — điều kiện đó sẽ không còn khớp với học viên làm bài sau này." : '')),
                 ]),
             ]);
+    }
+
+    /** Số khoá đang chọn năng lực này làm phân loại lộ trình. */
+    private function coursesUsing(PlacementDimension $record): int
+    {
+        return Classification::query()
+            ->where('type', Classification::TYPE_ABILITY)
+            ->where('placement_dimension_key', $record->key)
+            ->withCount('courses')
+            ->first()?->courses_count ?? 0;
     }
 
     private function test(): PlacementTest

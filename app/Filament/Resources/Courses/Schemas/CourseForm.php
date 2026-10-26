@@ -16,6 +16,7 @@ use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Group;
@@ -81,7 +82,7 @@ class CourseForm
                         ]),
 
                     Section::make('Phân loại lộ trình')
-                        ->description('Khóa chia lộ trình theo những phân loại nào. Thứ tự ở đây là thứ tự câu hỏi trên app.')
+                        ->description('Khóa chia lộ trình theo những phân loại nào. Thứ tự ở đây là thứ tự câu hỏi trên app. Phân loại "Năng lực · …" không hỏi trên app mà lấy từ kết quả bài kiểm tra đầu vào.')
                         ->visible(fn (Get $get) => self::isMultiPath($get('type')))
                         ->schema([
                             // Dạng bảng: mỗi phân loại 1 hàng, nút kéo thả / xóa nằm cùng hàng
@@ -108,8 +109,9 @@ class CourseForm
                                             ->orderBy('sort_order')
                                             ->get()
                                             ->mapWithKeys(fn (Classification $c) => [
-                                                $c->id => $c->name . ($c->isShared() ? '' : ' (riêng của khóa)'),
+                                                $c->id => $c->isAbility() ? $c->displayName() : $c->name . ($c->isShared() ? '' : ' (riêng của khóa)'),
                                             ]))
+                                        ->live()
                                         ->required()
                                         ->distinct()
                                         ->searchable(),
@@ -161,6 +163,17 @@ class CourseForm
                                 ->helperText('0 = miễn phí')
                                 ->required(),
                         ]),
+                    Section::make('Bài kiểm tra đầu vào')
+                        ->schema([
+                            Toggle::make('requires_placement_test')
+                                ->label('Bắt buộc làm trước khi học')
+                                ->helperText(fn (Get $get) => $get('requires_placement_test')
+                                    ? 'Học viên chưa làm bài kiểm tra đầu vào phải làm trước khi bắt đầu bài học đầu tiên.'
+                                    : (self::usesAbility($get)
+                                        ? 'Không bắt buộc: học viên chưa làm bài thì điều kiện Năng lực của lộ trình không khớp → thường vào lộ trình mặc định.'
+                                        : 'Không bắt buộc: học viên học ngay, không cần làm bài kiểm tra.'))
+                                ->live(),
+                        ]),
                     Section::make('Ảnh bìa')
                         ->schema([
                             FileUpload::make('cover_image')
@@ -181,6 +194,15 @@ class CourseForm
         $record = $livewire->record ?? null;
 
         return $record instanceof Course ? $record : null;
+    }
+
+    /** Khoá đang chọn phân loại Năng lực nào không (theo dữ liệu đang nhập). */
+    private static function usesAbility(Get $get): bool
+    {
+        $ids = collect($get('courseClassifications') ?? [])->pluck('classification_id')->filter();
+
+        return $ids->isNotEmpty() && self::isMultiPath($get('type'))
+            && Classification::whereKey($ids->all())->where('type', Classification::TYPE_ABILITY)->exists();
     }
 
     private static function isMultiPath(mixed $type): bool

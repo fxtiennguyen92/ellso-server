@@ -152,12 +152,14 @@ class PlacementScoring
 
             return [
                 'dimension_id' => $dimension->id,
+                'dimension_key' => $dimension->key,
                 'name' => $dimension->name,
                 'description' => $dimension->description,
                 'score' => $score,
                 'min' => $ranges[$dimension->id][0],
                 'max' => $ranges[$dimension->id][1],
                 'level_id' => $level?->id,
+                'level_key' => $level?->key,
                 'level' => $level?->name,
                 'level_description' => $level?->description,
                 'rank' => $level ? $levels->search(fn ($l) => $l->id === $level->id) + 1 : null, // 1 = mức cao nhất

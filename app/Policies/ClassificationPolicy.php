@@ -8,6 +8,7 @@ use App\Models\User;
 /**
  * Admin: tạo / sửa mọi phân loại (dùng chung và riêng), đổi phạm vi.
  * Giảng viên: chỉ phân loại riêng của khóa mình.
+ * Phân loại Năng lực không sửa / xoá ở đây (đồng bộ từ Bài kiểm tra đầu vào).
  */
 class ClassificationPolicy
 {
@@ -28,6 +29,11 @@ class ClassificationPolicy
 
     public function update(User $user, Classification $classification): bool
     {
+        // Năng lực: tự đồng bộ từ bài kiểm tra đầu vào, sửa ở đó
+        if ($classification->isAbility()) {
+            return false;
+        }
+
         if ($user->isAdmin()) {
             return true;
         }

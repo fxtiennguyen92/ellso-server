@@ -2,11 +2,16 @@
 
 namespace App\Filament\Resources\Classifications\Tables;
 
+use App\Filament\Resources\Classifications\ClassificationResource;
+use App\Filament\Resources\PlacementTests\Pages\ManagePlacementDimensions;
 use App\Models\Classification;
+use App\Support\AbilityClassifications;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,7 +27,19 @@ class ClassificationsTable
                 TextColumn::make('name')
                     ->label('Phân loại')
                     ->searchable()
-                    ->description(fn (Classification $record) => $record->question),
+                    ->weight('medium')
+                    ->description(fn (Classification $record) => $record->isAbility()
+                        ? 'Lấy tự động từ kết quả bài kiểm tra đầu vào'
+                        : $record->question),
+                TextColumn::make('type')
+                    ->label('Loại')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state) => $state === Classification::TYPE_ABILITY ? 'Năng lực' : 'Câu hỏi')
+                    ->icon(fn (string $state) => $state === Classification::TYPE_ABILITY ? Heroicon::ClipboardDocumentCheck : Heroicon::ChatBubbleLeftRight)
+                    ->color(fn (string $state) => $state === Classification::TYPE_ABILITY ? 'warning' : 'info')
+                    ->tooltip(fn (string $state) => $state === Classification::TYPE_ABILITY
+                        ? 'Giá trị = mức độ trong bài kiểm tra đầu vào; app không hỏi, lấy từ bài làm của học viên'
+                        : 'App hỏi học viên câu hỏi này khi bắt đầu khoá'),
                 TextColumn::make('scope')
                     ->label('Phạm vi')
                     ->state(fn (Classification $record) => $record->course?->title ?? 'Dùng chung')
@@ -35,7 +52,18 @@ class ClassificationsTable
                 TextColumn::make('courses_count')->label('Số khóa dùng')->counts('courses'),
                 IconColumn::make('is_active')->label('Đang dùng')->boolean(),
             ])
+            ->recordUrl(function (Classification $record) {
+                if (! $record->isAbility()) {
+                    return auth()->user()?->can('update', $record) ? ClassificationResource::getUrl('edit', ['record' => $record]) : null;
+                }
+                $test = auth()->user()?->isAdmin() ? AbilityClassifications::testFor($record) : null;
+
+                return $test ? ManagePlacementDimensions::getUrl(['record' => $test]) : null;
+            })
             ->filters([
+                SelectFilter::make('type')
+                    ->label('Loại')
+                    ->options([Classification::TYPE_QUESTION => 'Câu hỏi', Classification::TYPE_ABILITY => 'Năng lực']),
                 TernaryFilter::make('shared')
                     ->label('Phạm vi')
                     ->trueLabel('Dùng chung')
