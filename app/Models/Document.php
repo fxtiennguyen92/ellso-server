@@ -29,7 +29,7 @@ class Document extends Model
     protected bool $purgeFilesOnSoftDelete = true;
 
     protected $fillable = [
-        'type', 'title', 'author', 'description', 'document_topic_id', 'cover_color', 'cover_image',
+        'type', 'title', 'author', 'author_id', 'description', 'document_topic_id', 'cover_color', 'cover_image',
         'is_free', 'requires_membership', 'price', 'allow_download',
         'file_path', 'file_name', 'file_format', 'file_size',
         'video_source_path', 'video_status', 'video_error', 'hls_path', 'hls_key', 'hls_variants', 'duration_seconds',
@@ -62,6 +62,10 @@ class Document extends Model
             if ($doc->status === 'published' && ! $doc->published_at) {
                 $doc->published_at = now();
             }
+            // Tác giả là giảng viên → tên lấy theo tài khoản (đổi tên giảng viên thì tài liệu tự đổi theo)
+            if ($doc->author_id) {
+                $doc->author = null;
+            }
             // Chỉ Sách được bán riêng / tải về
             if ($doc->type !== DocumentType::Book) {
                 $doc->price = null;
@@ -80,6 +84,25 @@ class Document extends Model
         static::deleted(function (Document $doc) {
             DocumentStorage::deleteFor($doc);
         });
+    }
+
+    /** Tác giả là giảng viên trong hệ thống (null = tác giả ngoài, chỉ có tên ở cột `author`). */
+    public function authorUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'author_id');
+    }
+
+    /** Tên tác giả hiển thị: tên giảng viên hoặc tên tác giả ngoài. */
+    public function authorName(): ?string
+    {
+        return $this->author_id ? $this->authorUser?->name : $this->author;
+    }
+
+    /** Lọc theo tên tác giả (cả giảng viên lẫn tác giả ngoài). */
+    public function scopeWhereAuthorLike($query, string $term)
+    {
+        return $query->where(fn ($w) => $w->where('author', 'like', "%{$term}%")
+            ->orWhereHas('authorUser', fn ($u) => $u->where('name', 'like', "%{$term}%")));
     }
 
     public function topic(): BelongsTo

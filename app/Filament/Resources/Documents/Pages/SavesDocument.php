@@ -24,6 +24,14 @@ trait SavesDocument
         }
         unset($data['sell']);
 
+        // Tác giả: giảng viên (author_id) hoặc tác giả ngoài (tên) — chỉ giữ một
+        $kind = $this->data['author_kind'] ?? 'teacher';
+        if ($kind === 'external') {
+            $data['author_id'] = null;
+        } else {
+            $data['author'] = null;
+        }
+
         return $data;
     }
 

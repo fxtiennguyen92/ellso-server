@@ -65,7 +65,7 @@ class DocumentResource extends Resource
 
         return $table
             ->defaultSort('created_at', 'desc')
-            ->modifyQueryUsing(fn ($query) => $query->with(['topic', 'links.course', 'links.lesson'])->withCount(['purchases', 'savedBy']))
+            ->modifyQueryUsing(fn ($query) => $query->with(['topic', 'authorUser:id,name', 'links.course', 'links.lesson'])->withCount(['purchases', 'savedBy']))
             ->columns([
                 TextColumn::make('cover')
                     ->label('')
@@ -74,8 +74,11 @@ class DocumentResource extends Resource
                 TextColumn::make('title')
                     ->label('Tài liệu')
                     ->weight('medium')
-                    ->description(fn (Document $record) => implode(' · ', array_filter([$record->author, $record->topic?->name])))
-                    ->searchable(['title', 'author'])
+                    ->description(fn (Document $record) => implode(' · ', array_filter([
+                        $record->author_id ? '🎓 ' . $record->authorUser?->name : $record->author,
+                        $record->topic?->name,
+                    ])))
+                    ->searchable(query: fn ($query, string $search) => $query->where(fn ($w) => $w->where('title', 'like', "%{$search}%")->orWhere(fn ($a) => $a->whereAuthorLike($search))))
                     ->wrap(),
                 TextColumn::make('type')->label('Loại')->badge(),
                 TextColumn::make('access')
@@ -109,6 +112,7 @@ class DocumentResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('document_topic_id')->label('Chủ đề')->relationship('topic', 'name'),
+                SelectFilter::make('author_id')->label('Giảng viên')->relationship('authorUser', 'name', fn ($query) => $query->whereIn('role', ['instructor', 'admin']))->searchable()->preload(),
                 SelectFilter::make('status')->label('Trạng thái')->options(['draft' => 'Nháp', 'published' => 'Đã xuất bản']),
             ])
             ->recordActions([

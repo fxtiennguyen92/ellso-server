@@ -214,6 +214,12 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(Course::class, 'instructor_id');
     }
 
+    /** Tài liệu giảng viên là tác giả (trang hồ sơ giảng viên). */
+    public function authoredDocuments(): HasMany
+    {
+        return $this->hasMany(Document::class, 'author_id');
+    }
+
     /**
      * Câu trả lời phân loại gần nhất của học viên (VD: Nghề nghiệp = Marketing).
      * App luôn hỏi lại khi đăng ký khóa mới, dùng giá trị này làm lựa chọn chọn sẵn.

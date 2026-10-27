@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Documents\Schemas;
 
 use App\Enums\ChapterColor;
 use App\Enums\DocumentType;
+use App\Enums\UserRole;
 use App\Enums\VideoStatus;
 use App\Models\Document;
 use App\Models\DocumentTopic;
@@ -21,6 +22,8 @@ use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 
 class DocumentForm
@@ -42,7 +45,30 @@ class DocumentForm
                             ->disabledOn('edit')
                             ->columnSpanFull(),
                         TextInput::make('title')->label('Tên tài liệu')->required()->maxLength(200)->columnSpanFull(),
-                        TextInput::make('author')->label('Tác giả')->maxLength(120),
+                        ToggleButtons::make('author_kind')
+                            ->label('Tác giả')
+                            ->options(['teacher' => 'Giảng viên Ellso', 'external' => 'Tác giả ngoài'])
+                            ->icons(['teacher' => Heroicon::OutlinedAcademicCap, 'external' => Heroicon::OutlinedUser])
+                            ->default('teacher')
+                            ->inline()
+                            ->live()
+                            ->dehydrated(false)
+                            ->afterStateHydrated(fn (ToggleButtons $component, ?Document $record) => $record && $component->state($record->author_id || ! $record->author ? 'teacher' : 'external'))
+                            ->columnSpanFull(),
+                        Select::make('author_id')
+                            ->label('Giảng viên')
+                            ->relationship('authorUser', 'name', fn (Builder $query) => $query
+                                ->whereIn('role', [UserRole::Instructor->value, UserRole::Admin->value])
+                                ->orderBy('name'))
+                            ->searchable()
+                            ->preload()
+                            ->helperText('Tài liệu sẽ hiện trong hồ sơ của giảng viên này.')
+                            ->visible(fn (Get $get) => $get('author_kind') !== 'external'),
+                        TextInput::make('author')
+                            ->label('Tên tác giả')
+                            ->maxLength(120)
+                            ->placeholder('VD: Yuval Noah Harari')
+                            ->visible(fn (Get $get) => $get('author_kind') === 'external'),
                         Select::make('document_topic_id')
                             ->label('Chủ đề')
                             ->relationship('topic', 'name', fn ($query) => $query->orderBy('sort_order'))

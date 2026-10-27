@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
 
 /**
  * Tài liệu cho app (đăng nhập). Server tính sẵn `unlocked` cho học viên; app chỉ hiển thị.
- * - GET    /documents?type=video|pdf|book&topic_id=&q=   danh sách (mới nhất trước)
+ * - GET    /documents?type=video|pdf|book&topic_id=&teacher_id=&q=   danh sách (mới nhất trước)
  * - GET    /documents/topics                           chủ đề để lọc
  * - GET    /documents/{id}                             chi tiết + điều kiện mở
  * - POST   /documents/{id}/play                        video: link HLS (5 phút)
@@ -33,6 +33,7 @@ class DocumentController extends Controller
         $data = $request->validate([
             'type' => ['nullable', 'in:video,pdf,book'],
             'topic_id' => ['nullable', 'integer'],
+            'teacher_id' => ['nullable', 'integer'],
             'q' => ['nullable', 'string', 'max:100'],
         ]);
 
@@ -40,9 +41,10 @@ class DocumentController extends Controller
             ->published()
             ->when($data['type'] ?? null, fn ($q, $type) => $q->where('type', $type))
             ->when($data['topic_id'] ?? null, fn ($q, $topic) => $q->where('document_topic_id', $topic))
-            ->when($data['q'] ?? null, fn ($q, $term) => $q->where(fn ($w) => $w->where('title', 'like', "%{$term}%")->orWhere('author', 'like', "%{$term}%")))
+            ->when($data['teacher_id'] ?? null, fn ($q, $teacher) => $q->where('author_id', $teacher))
+            ->when($data['q'] ?? null, fn ($q, $term) => $q->where(fn ($w) => $w->where('title', 'like', "%{$term}%")->orWhere(fn ($a) => $a->whereAuthorLike($term))))
             ->latest('published_at')
-            ->with(['links.course', 'links.lesson'])
+            ->with(['authorUser', 'links.course', 'links.lesson'])
             ->limit(200)
             ->get();
 
@@ -120,10 +122,10 @@ class DocumentController extends Controller
     public function mine(Request $request): JsonResponse
     {
         $user = $request->user();
-        $saved = $user->savedDocuments()->published()->with(['links.course', 'links.lesson'])->orderByPivot('created_at', 'desc')->get();
+        $saved = $user->savedDocuments()->published()->with(['authorUser', 'links.course', 'links.lesson'])->orderByPivot('created_at', 'desc')->get();
         $bought = Document::query()->published()
             ->whereHas('purchases', fn ($q) => $q->where('user_id', $user->id))
-            ->with(['links.course', 'links.lesson'])
+            ->with(['authorUser', 'links.course', 'links.lesson'])
             ->get();
 
         return response()->json(['data' => [
@@ -134,7 +136,7 @@ class DocumentController extends Controller
 
     private function find(int $id): Document
     {
-        $doc = Document::query()->published()->with(['links.course', 'links.lesson', 'topic'])->find($id);
+        $doc = Document::query()->published()->with(['authorUser', 'links.course', 'links.lesson', 'topic'])->find($id);
         abort_unless($doc, 404, 'Tài liệu không tồn tại.');
 
         return $doc;
@@ -158,7 +160,13 @@ class DocumentController extends Controller
             'id' => $d->id,
             'type' => $d->type->value,
             'title' => $d->title,
-            'author' => $d->author,
+            'author' => $d->authorName(),
+            // Tác giả là giảng viên → có thông tin để mở hồ sơ giảng viên; tác giả ngoài → null
+            'teacher' => $d->author_id && $d->authorUser ? [
+                'id' => $d->authorUser->id,
+                'name' => $d->authorUser->name,
+                'avatar' => $d->authorUser->avatar,
+            ] : null,
             'topic_id' => $d->document_topic_id,
             'cover' => $d->cover_color?->value,
             'cover_url' => $d->coverUrl(),

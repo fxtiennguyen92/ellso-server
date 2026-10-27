@@ -193,6 +193,44 @@ class DocumentTest extends TestCase
         $this->assertTrue($this->api()->getJson("/v1/documents/{$book->id}")->json('data.unlocked'));
     }
 
+    public function test_author_is_teacher_or_external(): void
+    {
+        Queue::fake();
+        $this->actingAs($this->admin);
+        $teacher = User::factory()->create(['role' => UserRole::Instructor, 'is_active' => true, 'name' => 'Cô Lan']);
+
+        Livewire::test(CreateDocument::class)
+            ->fillForm(['type' => 'pdf', 'title' => 'Của giảng viên', 'is_free' => true, 'status' => 'published', 'author_kind' => 'teacher', 'author_id' => $teacher->id,
+                'file_path' => UploadedFile::fake()->createWithContent('a.pdf', '%PDF')])
+            ->call('create')->assertHasNoFormErrors();
+        Livewire::test(CreateDocument::class)
+            ->fillForm(['type' => 'pdf', 'title' => 'Sách ngoài', 'is_free' => true, 'status' => 'published', 'author_kind' => 'external', 'author' => 'Tác giả X',
+                'file_path' => UploadedFile::fake()->createWithContent('b.pdf', '%PDF')])
+            ->call('create')->assertHasNoFormErrors();
+
+        $own = Document::where('title', 'Của giảng viên')->sole();
+        $this->assertSame($teacher->id, $own->author_id);
+        $this->assertNull($own->author);
+        $this->assertSame([$own->id], $teacher->authoredDocuments()->pluck('id')->all());
+
+        // Đổi sang tác giả ngoài → bỏ liên kết giảng viên
+        Livewire::test(EditDocument::class, ['record' => $own->getRouteKey()])
+            ->assertSchemaStateSet(['author_kind' => 'teacher'])
+            ->fillForm(['author_kind' => 'external', 'author' => 'Người khác'])
+            ->call('save')->assertHasNoFormErrors();
+        $this->assertNull($own->fresh()->author_id);
+        $own->fresh()->update(['author_id' => $teacher->id]);
+
+        $list = collect($this->api()->getJson('/v1/documents')->json('data'))->keyBy('title');
+        $this->assertSame('Cô Lan', $list['Của giảng viên']['author']);
+        $this->assertSame($teacher->id, $list['Của giảng viên']['teacher']['id']);
+        $this->assertSame('Tác giả X', $list['Sách ngoài']['author']);
+        $this->assertNull($list['Sách ngoài']['teacher']);
+
+        $this->assertSame(['Của giảng viên'], array_column($this->api()->getJson("/v1/documents?teacher_id={$teacher->id}")->json('data'), 'title'));
+        $this->assertSame(['Của giảng viên'], array_column($this->api()->getJson('/v1/documents?q=Lan')->json('data'), 'title'));
+    }
+
     public function test_instructor_cannot_access_documents(): void
     {
         $this->actingAs(User::factory()->create(['role' => UserRole::Instructor, 'is_active' => true]));
