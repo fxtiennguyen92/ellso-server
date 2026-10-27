@@ -11,8 +11,8 @@ use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use App\Support\MediaStorage;
 
 /**
  * Soạn nội dung bài học bằng Editor.js.
@@ -72,10 +72,10 @@ class EditLessonContent extends Page
             'editorImage.max' => 'Ảnh tối đa 5 MB.',
         ]);
 
-        $path = $this->editorImage->store('lessons/content/' . $this->lesson()->id, 'public');
+        $path = $this->editorImage->store('lessons/content/' . $this->lesson()->id, MediaStorage::diskName());
         $this->editorImage = null;
 
-        return $path ? Storage::disk('public')->url($path) : null;
+        return $path ? MediaStorage::disk()->url($path) : null;
     }
 
     // ── Actions ──────────────────────────────────────────────
@@ -97,6 +97,18 @@ class EditLessonContent extends Page
 
                 if (! $lesson->hasDraftContent()) {
                     Notification::make()->title('Bài chưa có nội dung')->warning()->send();
+
+                    return;
+                }
+
+                // Câu hỏi trắc nghiệm phải hợp lệ thì mới chấm được → chặn xuất bản
+                if ($problems = LessonContent::quizProblems($lesson->content_draft)) {
+                    Notification::make()
+                        ->title('Chưa xuất bản: câu hỏi chưa hoàn chỉnh')
+                        ->body(implode("\n", $problems))
+                        ->danger()
+                        ->persistent()
+                        ->send();
 
                     return;
                 }
@@ -125,10 +137,10 @@ class EditLessonContent extends Page
         return $this->getRecord();
     }
 
-    /** Chỉ nhận ảnh nằm trên public disk của hệ thống. */
+    /** Chỉ nhận ảnh nằm trên ổ ảnh của hệ thống (MediaStorage). */
     private function imageUrlPrefix(): string
     {
-        return rtrim(Storage::disk('public')->url(''), '/') . '/';
+        return MediaStorage::baseUrl();
     }
 
     private function authorizeEdit(): void

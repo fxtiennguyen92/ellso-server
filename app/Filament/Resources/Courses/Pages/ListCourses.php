@@ -19,7 +19,7 @@ class ListCourses extends ListRecords
         return [
             CreateAction::make()
                 ->icon(Heroicon::Plus)
-                ->color('success'),
+                ->color('primary'),
         ];
     }
 

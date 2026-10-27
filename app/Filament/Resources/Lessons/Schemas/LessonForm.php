@@ -6,6 +6,7 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use App\Support\MediaStorage;
 
 /** Thông tin bài học (tên, icon, tóm tắt). Dùng ở thư viện bài học và hộp thoại "Tạo bài mới". */
 class LessonForm
@@ -36,7 +37,7 @@ class LessonForm
         return FileUpload::make('icon')
             ->label('Icon')
             ->helperText('SVG hoặc PNG nền trong suốt, hình vuông, nên là màu trắng (nền icon là màu của chương). Tối đa 1 MB.')
-            ->disk('public')
+            ->disk(MediaStorage::diskName())
             ->directory('lessons/icons')
             ->acceptedFileTypes(['image/svg+xml', 'image/png', 'image/webp'])
             ->maxSize(1024)

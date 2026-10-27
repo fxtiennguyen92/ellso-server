@@ -3,15 +3,20 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\UserLogEvent;
 use App\Enums\UserRole;
+use App\Support\ReferralCode;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements FilamentUser
@@ -28,10 +33,12 @@ class User extends Authenticatable implements FilamentUser
         'password',
         'role',
         'is_active',
+        'password_changed_at',
     ];
 
     protected $hidden = [
         'password',
+        'temp_password',
         'remember_token',
     ];
 
@@ -40,9 +47,149 @@ class User extends Authenticatable implements FilamentUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'temp_password' => 'hashed',
+            'temp_password_expires_at' => 'datetime',
+            'temp_password_sent_at' => 'datetime',
+            'password_changed_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'role' => UserRole::class,
             'is_active' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Học viên mới tạo trong thời gian chiến dịch tặng gói → tặng gói thành viên 1 năm
+        static::created(function (User $user) {
+            app(\App\Services\MembershipService::class)->grantForSignup($user);
+        });
+
+        static::creating(function (User $user) {
+            $user->referral_code ??= ReferralCode::generateUnique();
+            $user->email = Str::lower(trim((string) $user->email));
+        });
+    }
+
+    /** User đã tự đặt mật khẩu (đã hoàn tất đăng nhập lần đầu). */
+    public function hasActivatedPassword(): bool
+    {
+        return $this->password_changed_at !== null;
+    }
+
+    /**
+     * Tài khoản do admin tạo và mời (không tự đăng ký qua app).
+     * Bảng người dùng nạp sẵn cờ self_registered để khỏi truy vấn từng dòng.
+     */
+    public function wasInvited(): bool
+    {
+        if (array_key_exists('self_registered', $this->attributes)) {
+            return ! $this->attributes['self_registered'];
+        }
+
+        return $this->logs()->where('event', UserLogEvent::Registered)->doesntExist();
+    }
+
+    public function hasValidTempPassword(): bool
+    {
+        return $this->temp_password !== null
+            && ($this->temp_password_expires_at === null || $this->temp_password_expires_at->isFuture());
+    }
+
+    public function checkPassword(string $plain): bool
+    {
+        return $this->hasActivatedPassword() && Hash::check($plain, $this->password);
+    }
+
+    public function checkTempPassword(string $plain): bool
+    {
+        return $this->hasValidTempPassword() && Hash::check($plain, $this->temp_password);
+    }
+
+    /** Đặt mật khẩu mới do chính user chọn, hủy mật khẩu tạm. */
+    public function setOwnPassword(string $plain): void
+    {
+        $this->forceFill([
+            'password' => $plain,
+            'password_changed_at' => now(),
+            'temp_password' => null,
+            'temp_password_expires_at' => null,
+        ])->save();
+    }
+
+    public function referrer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'referred_by_id');
+    }
+
+    public function referrals(): HasMany
+    {
+        return $this->hasMany(User::class, 'referred_by_id');
+    }
+
+    public function logs(): HasMany
+    {
+        return $this->hasMany(UserLog::class);
+    }
+
+    public function appSessions(): HasMany
+    {
+        return $this->hasMany(AppSession::class);
+    }
+
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(StudentMembership::class);
+    }
+
+    /** Các khoá học được học (ghi danh). */
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(CourseEnrollment::class);
+    }
+
+    public function lessonProgress(): HasMany
+    {
+        return $this->hasMany(LessonProgress::class);
+    }
+
+    public function quizAnswers(): HasMany
+    {
+        return $this->hasMany(LessonQuizAnswer::class);
+    }
+
+    public function documentPurchases(): HasMany
+    {
+        return $this->hasMany(DocumentPurchase::class);
+    }
+
+    public function savedDocuments(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Document::class, 'document_saves')->withPivot('created_at');
+    }
+
+    /** Khoá huấn luyện mà giáo viên này hướng dẫn. */
+    public function trainingCourses(): HasMany
+    {
+        return $this->hasMany(TrainingCourse::class, 'trainer_id');
+    }
+
+    /** Các lần làm bài kiểm tra đầu vào. */
+    public function placementAttempts(): HasMany
+    {
+        return $this->hasMany(PlacementAttempt::class);
+    }
+
+    public function hasActiveMembership(): bool
+    {
+        return $this->memberships()->active()->exists();
+    }
+
+    /** Ngày hết hạn xa nhất của các gói còn hạn (gói nối tiếp tính cả), null nếu không có. */
+    public function membershipEndsAt(): ?\Illuminate\Support\Carbon
+    {
+        $end = $this->memberships()->where('ends_at', '>', now())->max('ends_at');
+
+        return $end ? \Illuminate\Support\Carbon::parse($end) : null;
     }
 
     /** Chỉ admin và giảng viên (đang hoạt động) được vào CMS. Học viên dùng app. */
@@ -65,6 +212,12 @@ class User extends Authenticatable implements FilamentUser
     public function courses(): HasMany
     {
         return $this->hasMany(Course::class, 'instructor_id');
+    }
+
+    /** Tài liệu giảng viên là tác giả (trang hồ sơ giảng viên). */
+    public function authoredDocuments(): HasMany
+    {
+        return $this->hasMany(Document::class, 'author_id');
     }
 
     /**

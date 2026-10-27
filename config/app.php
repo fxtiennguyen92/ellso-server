@@ -54,6 +54,10 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    // Production sau CloudFront (xem App\Http\Middleware\TrustProxies, ForceHttps). Local để trống.
+    'trusted_proxies' => env('TRUSTED_PROXIES'),
+    'force_https' => (bool) env('FORCE_HTTPS', false),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

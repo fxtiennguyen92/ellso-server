@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Enums\ContentStatus;
+use App\Models\Concerns\CleansUpFiles;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
+use App\Support\MediaStorage;
 
 /**
  * Bài học trong thư viện dùng chung.
@@ -18,7 +19,10 @@ use Illuminate\Support\Facades\Storage;
  */
 class Lesson extends Model
 {
-    use SoftDeletes;
+    use CleansUpFiles, SoftDeletes;
+
+    /** Icon: xoá file khi bỏ / thay icon, hoặc khi xoá vĩnh viễn. */
+    protected array $fileAttributes = ['icon'];
 
     protected $fillable = [
         'owner_id',
@@ -118,7 +122,7 @@ class Lesson extends Model
 
     public function iconUrl(): ?string
     {
-        return $this->icon ? Storage::disk('public')->url($this->icon) : null;
+        return $this->icon ? MediaStorage::disk()->url($this->icon) : null;
     }
 
     /** Nhân bản bài (tên, icon, bản nháp) để sửa riêng — bản sao chưa xuất bản. */

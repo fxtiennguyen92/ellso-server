@@ -85,10 +85,13 @@ class LearningPathForm
 
         return $classifications
             ->map(fn (Classification $c) => Select::make("conditions.{$c->id}")
-                ->label($c->name . ($c->isShared() ? '' : ' (riêng)'))
-                ->options($c->options->pluck('name', 'id'))
+                ->label($c->displayName())
+                ->options($c->options->mapWithKeys(fn (ClassificationOption $o) => [
+                    $o->id => $o->name . ($o->is_active ? '' : ' (đã bỏ)'),
+                ]))
                 ->multiple()
-                ->placeholder('Mọi giá trị'))
+                ->placeholder($c->isAbility() ? 'Mọi mức' : 'Mọi giá trị')
+                ->helperText($c->isAbility() ? 'Theo mức đạt được ở bài kiểm tra đầu vào.' : null))
             ->all();
     }
 

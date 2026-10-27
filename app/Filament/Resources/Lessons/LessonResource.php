@@ -28,6 +28,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use UnitEnum;
+use App\Support\MediaStorage;
 
 /** Thư viện bài học dùng chung cho mọi khóa. */
 class LessonResource extends Resource
@@ -60,7 +61,7 @@ class LessonResource extends Resource
             ->columns([
                 ImageColumn::make('icon')
                     ->label('')
-                    ->disk('public')
+                    ->disk(MediaStorage::diskName())
                     ->circular()
                     ->imageHeight(36)
                     // Icon trắng → đặt trên nền tối

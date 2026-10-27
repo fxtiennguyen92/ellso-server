@@ -10,7 +10,8 @@
         "filament/filament": "^5.10",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.0",
-        "laravel/tinker": "^2.10.1"
+        "laravel/tinker": "^2.10.1",
+        "league/flysystem-aws-s3-v3": "^3.35"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -50,6 +51,7 @@
             "@php artisan config:clear --ansi",
             "@php artisan test"
         ],
+        "pre-autoload-dump": "Aws\\Script\\Composer\\Composer::removeUnusedServices",
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi",
@@ -73,7 +75,8 @@
     "extra": {
         "laravel": {
             "dont-discover": []
-        }
+        },
+        "aws/aws-sdk-php": ["S3"]
     },
     "config": {
         "optimize-autoloader": true,

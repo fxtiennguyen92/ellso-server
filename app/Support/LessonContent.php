@@ -19,7 +19,9 @@ use Illuminate\Validation\ValidationException;
  */
 class LessonContent
 {
-    public const BLOCK_TYPES = ['paragraph', 'header', 'list', 'quote', 'delimiter', 'image', 'table', 'code', 'warning'];
+    public const BLOCK_TYPES = ['paragraph', 'header', 'list', 'quote', 'delimiter', 'image', 'table', 'code', 'warning', 'quiz'];
+
+    public const QUIZ_MAX_OPTIONS = 8;
 
     public const MAX_BLOCKS = 500;
 
@@ -58,17 +60,20 @@ class LessonContent
             $blockData = is_array($block['data'] ?? null) ? $block['data'] : [];
 
             if ($type === 'image') {
-                $url = (string) ($blockData['file']['url'] ?? '');
+                // So theo đường dẫn /storage/… (không theo domain): CMS có thể mở bằng domain / cổng khác nhau
+                $path = (string) parse_url((string) ($blockData['file']['url'] ?? ''), PHP_URL_PATH);
+                $allowedPath = (string) (parse_url($allowedImageUrlPrefix, PHP_URL_PATH) ?: '/');
 
-                if (! str_starts_with($url, $allowedImageUrlPrefix)) {
+                if ($path === '' || ! str_starts_with($path, $allowedPath) || str_contains($path, '..')) {
                     continue;
                 }
+                $blockData['file']['url'] = rtrim($allowedImageUrlPrefix, '/') . '/' . ltrim(substr($path, strlen(rtrim($allowedPath, '/'))), '/');
             }
 
             $clean[] = array_filter([
                 'id' => isset($block['id']) ? substr((string) $block['id'], 0, 32) : null,
                 'type' => $type,
-                'data' => self::cleanValue($blockData, null),
+                'data' => $type === 'quiz' ? self::cleanQuiz($blockData) : self::cleanValue($blockData, null),
                 'tunes' => is_array($block['tunes'] ?? null) ? $block['tunes'] : null,
             ], fn ($value) => $value !== null);
         }
@@ -78,6 +83,137 @@ class LessonContent
             'blocks' => $clean,
             'version' => (string) ($data['version'] ?? ''),
         ];
+    }
+
+    /**
+     * Khối câu hỏi: chữ thuần, tối đa 8 đáp án, mã đáp án gọn. Không báo lỗi khi chưa hợp lệ
+     * (bản nháp vẫn lưu được) — khi xuất bản mới bắt buộc hợp lệ, xem quizProblems().
+     *
+     * @return array{type: string, question: string, options: list<array{id: string, text: string, correct: bool}>, explanation: string}
+     */
+    public static function cleanQuiz(array $data): array
+    {
+        $plain = fn (mixed $v, int $max) => mb_substr(trim(strip_tags((string) $v)), 0, $max);
+        $options = [];
+        $seen = [];
+
+        foreach (array_slice(is_array($data['options'] ?? null) ? $data['options'] : [], 0, self::QUIZ_MAX_OPTIONS) as $option) {
+            $text = $plain($option['text'] ?? '', 500);
+            $id = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($option['id'] ?? '')) ?: substr(md5($text . count($options)), 0, 8);
+            if ($text === '' || isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            $options[] = ['id' => substr($id, 0, 16), 'text' => $text, 'correct' => (bool) ($option['correct'] ?? false)];
+        }
+
+        return [
+            'type' => ($data['type'] ?? '') === 'multiple' ? 'multiple' : 'single',
+            'question' => $plain($data['question'] ?? '', 1000),
+            'options' => $options,
+            'explanation' => $plain($data['explanation'] ?? '', 2000),
+        ];
+    }
+
+    /**
+     * Lỗi của các câu hỏi trong nội dung (dùng khi xuất bản): thiếu câu hỏi, < 2 đáp án, không có đáp án đúng,
+     * "Chọn 1" mà nhiều đáp án đúng.
+     *
+     * @return list<string>
+     */
+    public static function quizProblems(?array $content): array
+    {
+        $problems = [];
+        $number = 0;
+
+        foreach ($content['blocks'] ?? [] as $block) {
+            if (($block['type'] ?? null) !== 'quiz') {
+                continue;
+            }
+            $number++;
+            if ($problem = self::quizProblem(self::cleanQuiz($block['data'] ?? []))) {
+                $problems[] = "Câu hỏi {$number}: {$problem}.";
+            }
+        }
+
+        return $problems;
+    }
+
+    private static function quizProblem(array $quiz): ?string
+    {
+        $correct = count(array_filter($quiz['options'], fn ($o) => $o['correct']));
+
+        return match (true) {
+            $quiz['question'] === '' => 'chưa có nội dung câu hỏi',
+            count($quiz['options']) < 2 => 'cần ít nhất 2 đáp án',
+            $correct === 0 => 'chưa đánh dấu đáp án đúng',
+            $quiz['type'] === 'single' && $correct > 1 => '"Chọn 1" chỉ được có 1 đáp án đúng',
+            default => null,
+        };
+    }
+
+    /**
+     * Các câu hỏi trong nội dung đã xuất bản: [block_id => quiz] (chỉ câu hợp lệ, có id).
+     *
+     * @return array<string, array{type: string, question: string, options: list<array{id: string, text: string, correct: bool}>, explanation: string}>
+     */
+    public static function quizzes(?array $content): array
+    {
+        $out = [];
+        foreach ($content['blocks'] ?? [] as $block) {
+            if (($block['type'] ?? null) === 'quiz' && filled($block['id'] ?? null)) {
+                $quiz = self::cleanQuiz($block['data'] ?? []);
+                if (self::quizProblem($quiz) === null) {
+                    $out[(string) $block['id']] = $quiz;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Nội dung đã xuất bản gửi cho app: câu hỏi KHÔNG kèm đáp án đúng và giải thích (server chấm,
+     * giải thích trả về sau khi trả lời); link ảnh theo domain của request; bỏ câu hỏi chưa hợp lệ.
+     *
+     * @param  list<string>  $answeredBlockIds  câu hỏi học viên đã trả lời đúng → answered = true
+     */
+    public static function forApp(?array $content, array $answeredBlockIds = []): array
+    {
+        $valid = self::quizzes($content);
+        $blocks = [];
+
+        foreach ($content['blocks'] ?? [] as $block) {
+            $type = $block['type'] ?? null;
+
+            if ($type === 'quiz') {
+                $id = (string) ($block['id'] ?? '');
+                if (! isset($valid[$id])) {
+                    continue;
+                }
+                $quiz = $valid[$id];
+                $block['data'] = [
+                    'type' => $quiz['type'],
+                    'question' => $quiz['question'],
+                    'options' => array_map(fn ($o) => ['id' => $o['id'], 'text' => $o['text']], $quiz['options']),
+                    'answered' => in_array($id, $answeredBlockIds, true),
+                ];
+            } elseif ($type === 'image' && is_string($block['data']['file']['url'] ?? null)) {
+                // Ảnh của hệ thống → dựng lại link theo ổ ảnh hiện tại (local: domain đang gọi; S3: CloudFront).
+                // Nhận cả /storage/… (ảnh soạn trên local) lẫn /media/… (ảnh trên S3).
+                $path = (string) parse_url($block['data']['file']['url'], PHP_URL_PATH);
+                foreach (array_unique(['/storage/', (string) parse_url(MediaStorage::baseUrl(), PHP_URL_PATH)]) as $prefix) {
+                    if ($prefix !== '/' && str_starts_with($path, $prefix)) {
+                        $block['data']['file']['url'] = MediaStorage::url(substr($path, strlen($prefix)));
+                        break;
+                    }
+                }
+            }
+
+            $blocks[] = $block;
+        }
+
+        return ['blocks' => $blocks, 'version' => $content['version'] ?? null];
     }
 
     private static function cleanValue(mixed $value, ?string $key): mixed

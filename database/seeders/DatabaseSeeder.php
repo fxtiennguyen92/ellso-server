@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
                 'role' => UserRole::Admin,
                 'is_active' => true,
                 'email_verified_at' => now(),
+                'password_changed_at' => now(),
             ],
         );
 

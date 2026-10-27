@@ -17,6 +17,7 @@ import CodeTool from '@editorjs/code'
 import InlineCode from '@editorjs/inline-code'
 import Marker from '@editorjs/marker'
 import Warning from '@editorjs/warning'
+import QuizTool from './quiz-tool.js'
 
 /** Bản dịch tiếng Việt cho giao diện Editor.js và các tool. */
 const vietnamese = {
@@ -57,6 +58,7 @@ const vietnamese = {
             Italic: 'Nghiêng',
             InlineCode: 'Code trong dòng',
             Marker: 'Tô sáng',
+            'Câu hỏi': 'Câu hỏi',
         },
         tools: {
             link: { 'Add a link': 'Dán liên kết' },
@@ -179,6 +181,7 @@ export default function lessonEditor({ initialData, autosaveDelay = 1500 }) {
                         inlineToolbar: true,
                         config: { titlePlaceholder: 'Tiêu đề lưu ý', messagePlaceholder: 'Nội dung lưu ý' },
                     },
+                    quiz: QuizTool,
                     inlineCode: InlineCode,
                     marker: Marker,
                 },

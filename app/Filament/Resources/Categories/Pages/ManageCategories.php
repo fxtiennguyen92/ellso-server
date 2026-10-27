@@ -16,7 +16,7 @@ class ManageCategories extends ManageRecords
         return [
             CreateAction::make()
                 ->icon(Heroicon::Plus)
-                ->color('success'),
+                ->color('primary'),
         ];
     }
 }
