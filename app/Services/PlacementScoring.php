@@ -11,8 +11,8 @@ use App\Models\PlacementLevel;
 use App\Models\PlacementQuestion;
 use App\Models\PlacementTest;
 use App\Models\User;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use App\Support\MediaStorage;
 
 /**
  * Chấm điểm tự động bài kiểm tra đầu vào.
@@ -308,7 +308,7 @@ class PlacementScoring
                 'id' => $c->id,
                 'title' => $c->title,
                 'short_description' => $c->short_description,
-                'cover_url' => $c->cover_image ? Storage::disk('public')->url($c->cover_image) : null,
+                'cover_url' => $c->cover_image ? MediaStorage::disk()->url($c->cover_image) : null,
             ])->values()->all(),
         ];
     }

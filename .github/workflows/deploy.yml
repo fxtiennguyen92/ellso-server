@@ -1,0 +1,126 @@
+# Chạy test trên MySQL rồi deploy lên Elastic Beanstalk mỗi khi có code mới ở nhánh main.
+# Nhánh khác (claude…) chỉ chạy test. Có thể chạy tay: Actions › Deploy › Run workflow.
+#
+# Cần khai báo trong GitHub repo › Settings › Secrets and variables › Actions:
+#   Secrets:   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   (IAM user ellso-github-deploy)
+#   Variables: AWS_REGION (ap-southeast-1), EB_APPLICATION (ellso-server), EB_ENVIRONMENT (ellso-server-prod)
+name: Deploy
+
+on:
+  push:
+    branches: [main, claude]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: ellso_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -psecret"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql, mbstring, intl, gd, zip, bcmath
+          coverage: none
+
+      - name: Composer install
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Test (MySQL)
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: ellso_test
+          DB_USERNAME: root
+          DB_PASSWORD: secret
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php artisan test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, gd, zip, bcmath
+          coverage: none
+
+      # vendor/ build sẵn ở đây (EB thấy vendor/ thì bỏ qua composer) + publish asset Filament (post-autoload-dump)
+      - name: Build
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress
+
+      - name: Đóng gói source bundle
+        run: |
+          VERSION="main-$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA::7}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUNDLE=$RUNNER_TEMP/$VERSION.zip" >> "$GITHUB_ENV"
+          # Gồm cả .platform/ và .ebextensions/ (cấu hình máy chủ), vendor/ và asset Filament vừa build
+          zip -qr "$RUNNER_TEMP/$VERSION.zip" . -x '.git/*' '.github/*' 'node_modules/*' 'tests/*' '.env' '.env.*'
+          ls -lh "$RUNNER_TEMP/$VERSION.zip"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Deploy lên Elastic Beanstalk
+        env:
+          APP: ${{ vars.EB_APPLICATION }}
+          ENV_NAME: ${{ vars.EB_ENVIRONMENT }}
+        run: |
+          BUCKET=$(aws elasticbeanstalk create-storage-location --query S3Bucket --output text)
+          KEY="$APP/$VERSION.zip"
+          aws s3 cp "$BUNDLE" "s3://$BUCKET/$KEY" --only-show-errors
+          aws elasticbeanstalk create-application-version --application-name "$APP" \
+            --version-label "$VERSION" --description "${GITHUB_SHA::7} $(git log -1 --pretty=%s | cut -c1-150)" \
+            --source-bundle "S3Bucket=$BUCKET,S3Key=$KEY" > /dev/null
+          aws elasticbeanstalk update-environment --environment-name "$ENV_NAME" --version-label "$VERSION" > /dev/null
+          echo "Đang deploy $VERSION lên $ENV_NAME…"
+
+          # Chờ tối đa 20 phút cho tới khi môi trường Ready
+          for i in $(seq 1 80); do
+            sleep 15
+            read -r STATUS HEALTH LABEL <<< "$(aws elasticbeanstalk describe-environments --environment-names "$ENV_NAME" \
+              --query 'Environments[0].[Status,Health,VersionLabel]' --output text)"
+            echo "$STATUS / $HEALTH / $LABEL"
+            if [ "$STATUS" = "Ready" ]; then
+              if [ "$LABEL" != "$VERSION" ]; then
+                echo "::error::Deploy thất bại, môi trường vẫn chạy bản $LABEL. Xem Elastic Beanstalk › Events / Logs."; exit 1
+              fi
+              if [ "$HEALTH" = "Red" ]; then
+                echo "::error::Đã deploy $VERSION nhưng môi trường báo Red (Severe). Xem Elastic Beanstalk › Health / Logs."; exit 1
+              fi
+              echo "Xong: $VERSION"; exit 0
+            fi
+          done
+          echo "::error::Quá 20 phút chưa xong, xem Elastic Beanstalk › Events."; exit 1
+
+      - name: Lưu bundle (để deploy tay nếu cần)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.VERSION }}
+          path: ${{ env.BUNDLE }}
+          retention-days: 7

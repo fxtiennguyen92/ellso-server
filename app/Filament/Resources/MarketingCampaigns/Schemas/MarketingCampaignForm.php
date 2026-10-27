@@ -20,6 +20,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Carbon;
+use App\Support\MediaStorage;
 
 class MarketingCampaignForm
 {
@@ -64,9 +65,9 @@ class MarketingCampaignForm
                             ->hiddenLabel()
                             ->image()
                             ->required()
-                            ->disk('public')
+                            ->disk(MediaStorage::diskName())
                             ->directory('campaigns/banners')
-                            ->visibility('public')
+                            ->visibility(MediaStorage::uploadVisibility())
                             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                             ->maxSize(3072)
                             // Cắt + thu về đúng 1280 × 720 ngay trên trình duyệt trước khi tải lên

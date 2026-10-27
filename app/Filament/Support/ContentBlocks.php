@@ -13,6 +13,7 @@ use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Grid;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Str;
+use App\Support\MediaStorage;
 
 /**
  * Các khối nội dung (Filament Builder) dùng chung cho trang chi tiết Chiến dịch và Khoá huấn luyện.
@@ -85,9 +86,9 @@ class ContentBlocks
                         ->hiddenLabel()
                         ->image()
                         ->imageEditor()
-                        ->disk('public')
+                        ->disk(MediaStorage::diskName())
                         ->directory($imageDirectory)
-                        ->visibility('public')
+                        ->visibility(MediaStorage::uploadVisibility())
                         ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                         ->maxSize(3072)
                         ->required(),

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
+use App\Support\MediaStorage;
 
 /**
  * Khoá huấn luyện offline: 1 khoá = 1 buổi, mở vào nhiều ngày (sessions), giá theo khoá.
@@ -71,6 +71,6 @@ class TrainingCourse extends Model
 
     public function bannerUrl(): ?string
     {
-        return $this->banner_path ? Storage::disk('public')->url($this->banner_path) : null;
+        return $this->banner_path ? MediaStorage::disk()->url($this->banner_path) : null;
     }
 }

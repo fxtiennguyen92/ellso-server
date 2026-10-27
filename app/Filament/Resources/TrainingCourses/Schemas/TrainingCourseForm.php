@@ -15,6 +15,7 @@ use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use App\Support\MediaStorage;
 
 class TrainingCourseForm
 {
@@ -92,9 +93,9 @@ class TrainingCourseForm
                             ->hiddenLabel()
                             ->image()
                             ->required()
-                            ->disk('public')
+                            ->disk(MediaStorage::diskName())
                             ->directory('trainings/banners')
-                            ->visibility('public')
+                            ->visibility(MediaStorage::uploadVisibility())
                             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                             ->maxSize(3072)
                             ->imageEditor()

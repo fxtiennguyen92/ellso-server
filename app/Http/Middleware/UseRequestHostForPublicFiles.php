@@ -15,6 +15,7 @@ use Symfony\Component\HttpFoundation\Response;
  * thư mục public. Nếu link ảnh trỏ sang domain khác, trình duyệt chặn khi ô tải ảnh của Filament
  * đọc file (khác origin) → ô ảnh kẹt "Loading", không xoá được. App gọi API cũng nhận link theo domain API.
  * Chạy bằng lệnh (queue, mail) thì vẫn dùng APP_URL như cũ.
+ * Production dùng S3 (MEDIA_DISK=media_s3, link CloudFront) nên middleware này không ảnh hưởng gì ở đó.
  */
 class UseRequestHostForPublicFiles
 {

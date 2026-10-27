@@ -26,6 +26,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
+use App\Support\MediaStorage;
 
 class CourseForm
 {
@@ -60,7 +61,7 @@ class CourseForm
                                 ->columnSpanFull(),
                             RichEditor::make('description')
                                 ->label('Mô tả chi tiết')
-                                ->fileAttachmentsDisk('public')
+                                ->fileAttachmentsDisk(MediaStorage::diskName())
                                 ->fileAttachmentsDirectory('courses/descriptions')
                                 ->columnSpanFull(),
                         ]),
@@ -180,7 +181,7 @@ class CourseForm
                                 ->hiddenLabel()
                                 ->image()
                                 ->imageEditor()
-                                ->disk('public')
+                                ->disk(MediaStorage::diskName())
                                 ->directory('courses/covers')
                                 ->maxSize(4096),
                         ]),

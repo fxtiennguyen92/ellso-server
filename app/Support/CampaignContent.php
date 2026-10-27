@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Models\PromoCode;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Nội dung trang chi tiết chiến dịch = danh sách khối, lưu ở marketing_campaigns.content
@@ -28,7 +27,7 @@ class CampaignContent
     /** @return list<array{type: string} & array<string, mixed>> */
     public static function resolve(?array $blocks, ?callable $imageUrl = null): array
     {
-        $imageUrl ??= fn (mixed $path) => is_string($path) ? Storage::disk('public')->url($path) : null;
+        $imageUrl ??= fn (mixed $path) => is_string($path) ? MediaStorage::disk()->url($path) : null;
         $out = [];
 
         foreach ($blocks ?? [] as $block) {

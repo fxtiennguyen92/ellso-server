@@ -1,0 +1,11 @@
+{
+  "Rules": [
+    {
+      "ID": "xoa-file-tam-livewire",
+      "Filter": { "Prefix": "documents/livewire-tmp/" },
+      "Status": "Enabled",
+      "Expiration": { "Days": 1 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
+    }
+  ]
+}

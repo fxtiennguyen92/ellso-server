@@ -3,7 +3,7 @@
 namespace App\Models\Concerns;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
+use App\Support\MediaStorage;
 
 /**
  * Xoá file trên disk "public" khi không còn dùng:
@@ -62,7 +62,7 @@ trait CleansUpFiles
     {
         foreach ($paths as $path) {
             if (! $this->fileUsedElsewhere($path)) {
-                Storage::disk('public')->delete($path);
+                MediaStorage::disk()->delete($path);
             }
         }
     }

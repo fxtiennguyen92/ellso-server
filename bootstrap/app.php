@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\ForceHttps;
+use App\Http\Middleware\TrustProxies;
 use App\Http\Middleware\UseRequestHostForPublicFiles;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -26,6 +28,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Link ảnh /storage theo domain đang gọi (CMS hay API), tránh lỗi khác origin
         $middleware->prepend(UseRequestHostForPublicFiles::class);
+
+        // Production sau CloudFront: IP thật (TRUSTED_PROXIES) + https (FORCE_HTTPS). Local không bật gì.
+        $middleware->replace(\Illuminate\Http\Middleware\TrustProxies::class, TrustProxies::class);
+        $middleware->prepend(ForceHttps::class);
 
         $middleware->alias([
             'abilities' => CheckAbilities::class,

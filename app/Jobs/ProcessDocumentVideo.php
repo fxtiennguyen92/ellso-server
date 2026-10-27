@@ -117,6 +117,21 @@ class ProcessDocumentVideo implements ShouldQueue
         }
     }
 
+    /**
+     * Job bị ngắt giữa chừng (máy chủ khởi động lại / deploy khi đang cắt video) → hàng đợi đánh dấu thất bại
+     * sau DB_QUEUE_RETRY_AFTER giây. Chuyển tài liệu sang "Lỗi" để admin biết mà tải lại video, không kẹt ở "Đang xử lý".
+     */
+    public function failed(?Throwable $e): void
+    {
+        $doc = Document::withTrashed()->find($this->documentId);
+        if ($doc && in_array($doc->video_status, [VideoStatus::Pending, VideoStatus::Processing], true)) {
+            $doc->forceFill([
+                'video_status' => VideoStatus::Failed,
+                'video_error' => 'Xử lý bị gián đoạn (máy chủ khởi động lại). Vui lòng tải lại video.',
+            ])->saveQuietly();
+        }
+    }
+
     /** @return array{0: float, 1: int|null} thời lượng (giây), chiều cao video */
     private function probe(string $file): array
     {

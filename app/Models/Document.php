@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
+use App\Support\MediaStorage;
 
 /**
  * Tài liệu: Video (HLS), PDF, Sách. Quyền xem: App\Services\DocumentAccess.
@@ -153,7 +153,7 @@ class Document extends Model
 
     public function coverUrl(): ?string
     {
-        return $this->cover_image ? Storage::disk('public')->url($this->cover_image) : null;
+        return $this->cover_image ? MediaStorage::disk()->url($this->cover_image) : null;
     }
 
     /** "1:12:05" / "10:24" */

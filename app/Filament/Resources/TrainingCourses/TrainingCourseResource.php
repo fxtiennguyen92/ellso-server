@@ -26,6 +26,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
+use App\Support\MediaStorage;
 
 /**
  * Đào tạo › Khoá huấn luyện (offline). Tab: Thông tin · Lịch tổ chức.
@@ -72,7 +73,7 @@ class TrainingCourseResource extends Resource
             ->columns([
                 ImageColumn::make('banner_path')
                     ->label('Banner')
-                    ->disk('public')
+                    ->disk(MediaStorage::diskName())
                     ->imageWidth(128)
                     ->imageHeight(72)
                     ->extraImgAttributes(['style' => 'border-radius: 10px; object-fit: cover;']),

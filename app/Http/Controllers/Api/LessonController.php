@@ -9,7 +9,7 @@ use App\Services\LearningProgress;
 use App\Support\LessonContent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use App\Support\MediaStorage;
 
 /**
  * Học bài (học viên đã đăng nhập).
@@ -33,7 +33,7 @@ class LessonController extends Controller
                 'id' => $lesson->id,
                 'title' => $lesson->title,
                 'summary' => $lesson->summary,
-                'icon_url' => $lesson->icon ? Storage::disk('public')->url($lesson->icon) : null,
+                'icon_url' => $lesson->icon ? MediaStorage::disk()->url($lesson->icon) : null,
                 'course_id' => $access['enrollment']?->course_id,
                 'content' => LessonContent::forApp($lesson->content_published, $answered),
                 'quiz_count' => count(LessonContent::quizzes($lesson->content_published)),

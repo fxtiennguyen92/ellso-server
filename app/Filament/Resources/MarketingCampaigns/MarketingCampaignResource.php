@@ -22,6 +22,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
+use App\Support\MediaStorage;
 
 /**
  * Marketing › Chiến dịch: banner trên Home của app + trang chi tiết khi bấm vào banner.
@@ -60,7 +61,7 @@ class MarketingCampaignResource extends Resource
             ->columns([
                 ImageColumn::make('banner_path')
                     ->label('Banner')
-                    ->disk('public')
+                    ->disk(MediaStorage::diskName())
                     ->imageWidth(144)
                     ->imageHeight(60)
                     ->extraImgAttributes(['style' => 'border-radius: 10px; object-fit: cover;']),

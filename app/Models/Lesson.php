@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
+use App\Support\MediaStorage;
 
 /**
  * Bài học trong thư viện dùng chung.
@@ -122,7 +122,7 @@ class Lesson extends Model
 
     public function iconUrl(): ?string
     {
-        return $this->icon ? Storage::disk('public')->url($this->icon) : null;
+        return $this->icon ? MediaStorage::disk()->url($this->icon) : null;
     }
 
     /** Nhân bản bài (tên, icon, bản nháp) để sửa riêng — bản sao chưa xuất bản. */

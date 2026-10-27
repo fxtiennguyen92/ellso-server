@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
+use App\Support\MediaStorage;
 
 /**
  * Chiến dịch marketing hiển thị trên Home của app (banner) + trang chi tiết.
@@ -87,7 +87,7 @@ class MarketingCampaign extends Model
 
     public function bannerUrl(): ?string
     {
-        return $this->banner_path ? Storage::disk('public')->url($this->banner_path) : null;
+        return $this->banner_path ? MediaStorage::disk()->url($this->banner_path) : null;
     }
 
     /** 'hidden' | 'scheduled' | 'live' | 'ended' */

@@ -199,9 +199,14 @@ class LessonContent
                     'answered' => in_array($id, $answeredBlockIds, true),
                 ];
             } elseif ($type === 'image' && is_string($block['data']['file']['url'] ?? null)) {
+                // Ảnh của hệ thống → dựng lại link theo ổ ảnh hiện tại (local: domain đang gọi; S3: CloudFront).
+                // Nhận cả /storage/… (ảnh soạn trên local) lẫn /media/… (ảnh trên S3).
                 $path = (string) parse_url($block['data']['file']['url'], PHP_URL_PATH);
-                if (str_starts_with($path, '/storage/')) {
-                    $block['data']['file']['url'] = \Illuminate\Support\Facades\Storage::disk('public')->url(substr($path, strlen('/storage/')));
+                foreach (array_unique(['/storage/', (string) parse_url(MediaStorage::baseUrl(), PHP_URL_PATH)]) as $prefix) {
+                    if ($prefix !== '/' && str_starts_with($path, $prefix)) {
+                        $block['data']['file']['url'] = MediaStorage::url(substr($path, strlen($prefix)));
+                        break;
+                    }
                 }
             }
 

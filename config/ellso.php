@@ -24,7 +24,12 @@ return [
         'referral_check_max_per_ip_per_minute' => 20,
     ],
 
-    // Tài liệu: ổ lưu file (documents_local | s3), thời hạn link, video HLS
+    // Ảnh công khai (banner, ảnh bìa, icon, ảnh trong nội dung): public (local) | media_s3 (production). Xem App\Support\MediaStorage.
+    'media' => [
+        'disk' => env('MEDIA_DISK', 'public'),
+    ],
+
+    // Tài liệu: ổ lưu file (documents_local | documents_s3), thời hạn link, video HLS
     'documents' => [
         'disk' => env('DOCUMENTS_DISK', 'documents_local'),
         'link_ttl_minutes' => 5,          // link mở PDF / sách / bắt đầu phát video

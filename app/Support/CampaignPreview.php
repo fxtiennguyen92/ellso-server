@@ -4,7 +4,6 @@ namespace App\Support;
 
 use App\Models\MarketingCampaign;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
@@ -62,6 +61,6 @@ class CampaignPreview
             }
         }
 
-        return is_string($value) && $value !== '' ? Storage::disk('public')->url($value) : null;
+        return is_string($value) && $value !== '' ? MediaStorage::disk()->url($value) : null;
     }
 }

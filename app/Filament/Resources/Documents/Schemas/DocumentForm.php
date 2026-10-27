@@ -25,6 +25,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
+use App\Support\MediaStorage;
 
 class DocumentForm
 {
@@ -95,6 +96,7 @@ class DocumentForm
                             ->disk(DocumentStorage::diskName())
                             ->directory('uploads/videos')
                             ->visibility('private')
+                            ->moveFiles() // production: file tạm Livewire cùng ổ S3 → move ngay trong S3, không tải 2 GB qua server
                             ->acceptedFileTypes(['video/mp4', 'video/quicktime', 'video/x-matroska', 'video/webm'])
                             ->maxSize((int) config('ellso.documents.video_max_upload_mb') * 1024)
                             ->previewable(false)
@@ -108,6 +110,7 @@ class DocumentForm
                             ->disk(DocumentStorage::diskName())
                             ->directory(fn (Get $get) => 'files/' . (self::type($get)?->value ?? 'pdf'))
                             ->visibility('private')
+                            ->moveFiles()
                             ->acceptedFileTypes(fn (Get $get) => self::type($get) === DocumentType::Book
                                 ? ['application/pdf', 'application/epub+zip']
                                 : ['application/pdf'])
@@ -205,9 +208,9 @@ class DocumentForm
                             ->label('Ảnh bìa (tuỳ chọn)')
                             ->image()
                             ->imageEditor()
-                            ->disk('public')
+                            ->disk(MediaStorage::diskName())
                             ->directory('documents/covers')
-                            ->visibility('public')
+                            ->visibility(MediaStorage::uploadVisibility())
                             ->maxSize(2048)
                             ->helperText(fn (Get $get) => self::type($get) === DocumentType::Book ? 'Sách: nên dùng ảnh dọc tỉ lệ 2:3.' : 'Video / PDF: ảnh ngang 16:9.'),
                     ]),

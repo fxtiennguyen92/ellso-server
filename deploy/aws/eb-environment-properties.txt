@@ -1,0 +1,54 @@
+# Biến môi trường cho Elastic Beanstalk (Configuration › Updates, monitoring, and logging › Environment properties).
+# Mỗi dòng: Tên = Giá trị. Thay phần <...>. KHÔNG commit giá trị thật vào git.
+# Sau khi đổi biến: EB tự chạy lại .platform/confighooks (cache lại config + khởi động lại queue worker).
+
+APP_NAME=Ellso
+APP_ENV=production
+APP_DEBUG=false
+APP_KEY=<chạy trên máy: php artisan key:generate --show>
+APP_URL=https://cms.ellso.edu.vn
+
+LOG_CHANNEL=daily
+LOG_LEVEL=info
+
+# Sau CloudFront
+TRUSTED_PROXIES=*
+FORCE_HTTPS=true
+SESSION_SECURE_COOKIE=true
+
+# RDS MySQL
+DB_CONNECTION=mysql
+DB_HOST=<endpoint RDS, VD ellso-db.xxxxxx.ap-southeast-1.rds.amazonaws.com>
+DB_PORT=3306
+DB_DATABASE=ellso
+DB_USERNAME=<master username RDS, VD ellso_admin>
+DB_PASSWORD=<master password RDS>
+
+SESSION_DRIVER=database
+CACHE_STORE=database
+QUEUE_CONNECTION=database
+# Lớn hơn timeout job cắt video (3600 giây)
+DB_QUEUE_RETRY_AFTER=3700
+
+# S3 + CloudFront
+MEDIA_DISK=media_s3
+DOCUMENTS_DISK=documents_s3
+LIVEWIRE_TEMPORARY_FILE_UPLOAD_DISK=documents_s3
+AWS_ACCESS_KEY_ID=<access key của IAM user ellso-app-s3>
+AWS_SECRET_ACCESS_KEY=<secret key của IAM user ellso-app-s3>
+AWS_DEFAULT_REGION=ap-southeast-1
+AWS_BUCKET=<tên bucket, VD ellso-files-prod>
+AWS_URL=https://media.ellso.edu.vn
+
+# Video HLS (ffmpeg do .platform/hooks/prebuild/01-ffmpeg.sh cài)
+FFMPEG_BINARY=/usr/local/bin/ffmpeg
+FFPROBE_BINARY=/usr/local/bin/ffprobe
+
+# Gmail / Google Workspace SMTP (App Password, tài khoản phải bật xác minh 2 bước)
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=<email gửi, VD no-reply@ellso.edu.vn>
+MAIL_PASSWORD=<App Password 16 ký tự, viết liền không dấu cách>
+MAIL_FROM_ADDRESS=<email gửi, trùng MAIL_USERNAME>
+MAIL_FROM_NAME=Ellso

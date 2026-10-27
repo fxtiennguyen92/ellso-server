@@ -10,8 +10,8 @@ use App\Models\User;
 use App\Services\LearningProgress;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use App\Support\MediaStorage;
 
 /**
  * Khoá học của tôi (học viên đã đăng nhập).
@@ -65,7 +65,7 @@ class MyCourseController extends Controller
             $chapters[$chapterId]['lessons'][] = [
                 'id' => $item->lesson->id,
                 'title' => $item->lesson->title,
-                'icon_url' => $item->lesson->icon ? Storage::disk('public')->url($item->lesson->icon) : null,
+                'icon_url' => $item->lesson->icon ? MediaStorage::disk()->url($item->lesson->icon) : null,
                 'state' => $row['state'],
                 'completed_at' => $row['progress']?->completed_at?->toIso8601String(),
             ];
@@ -138,7 +138,7 @@ class MyCourseController extends Controller
                 'id' => $course->id,
                 'title' => $course->title,
                 'short_description' => $course->short_description,
-                'cover_url' => $course->cover_image ? Storage::disk('public')->url($course->cover_image) : null,
+                'cover_url' => $course->cover_image ? MediaStorage::disk()->url($course->cover_image) : null,
                 'type' => $course->type->value,
             ],
             'path' => $e->learningPath ? ['id' => $e->learningPath->id, 'name' => $e->learningPath->name] : null,

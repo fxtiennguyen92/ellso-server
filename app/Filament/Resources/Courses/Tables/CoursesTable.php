@@ -23,6 +23,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use App\Support\MediaStorage;
 
 class CoursesTable
 {
@@ -35,7 +36,7 @@ class CoursesTable
             ->columns([
                 ImageColumn::make('cover_image')
                     ->label('')
-                    ->disk('public')
+                    ->disk(MediaStorage::diskName())
                     ->imageHeight(40),
                 TextColumn::make('title')
                     ->label('Khóa học')
