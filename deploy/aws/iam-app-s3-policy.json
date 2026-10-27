@@ -5,7 +5,7 @@
       "Sid": "ListBucket",
       "Effect": "Allow",
       "Action": ["s3:ListBucket"],
-      "Resource": "arn:aws:s3:::TEN-BUCKET"
+      "Resource": "arn:aws:s3:::ellso-files-prod"
     },
     {
       "Sid": "ReadWriteObjects",
@@ -19,7 +19,7 @@
         "s3:AbortMultipartUpload",
         "s3:ListMultipartUploadParts"
       ],
-      "Resource": "arn:aws:s3:::TEN-BUCKET/*"
+      "Resource": "arn:aws:s3:::ellso-files-prod/*"
     }
   ]
 }

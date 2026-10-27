@@ -37,7 +37,7 @@ LIVEWIRE_TEMPORARY_FILE_UPLOAD_DISK=documents_s3
 AWS_ACCESS_KEY_ID=<access key của IAM user ellso-app-s3>
 AWS_SECRET_ACCESS_KEY=<secret key của IAM user ellso-app-s3>
 AWS_DEFAULT_REGION=ap-southeast-1
-AWS_BUCKET=<tên bucket, VD ellso-files-prod>
+AWS_BUCKET=ellso-files-prod
 AWS_URL=https://media.ellso.edu.vn
 
 # Video HLS (ffmpeg do .platform/hooks/prebuild/01-ffmpeg.sh cài)
