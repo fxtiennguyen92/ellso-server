@@ -40,6 +40,9 @@ jobs:
       - name: Composer install
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: ffmpeg (test cắt video HLS)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
       - name: Test (MySQL)
         env:
           DB_CONNECTION: mysql

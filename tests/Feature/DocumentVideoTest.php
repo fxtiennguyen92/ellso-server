@@ -23,7 +23,12 @@ class DocumentVideoTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        if (! (new Process(['ffmpeg', '-version']))->run() === 0) {
+        try {
+            $hasFfmpeg = (new Process(['ffmpeg', '-version']))->run() === 0;
+        } catch (\Throwable) {
+            $hasFfmpeg = false;
+        }
+        if (! $hasFfmpeg) {
             $this->markTestSkipped('Cần ffmpeg');
         }
         Storage::fake('documents_local', ['serve' => true]);
