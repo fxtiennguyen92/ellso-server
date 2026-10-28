@@ -36,7 +36,7 @@ class ProductionSetupTest extends TestCase
 
     public function test_behind_cloudfront_uses_real_ip_and_https(): void
     {
-        config(['app.trusted_proxies' => '*', 'app.force_https' => true]);
+        config(['app.trusted_proxies' => 'all', 'app.force_https' => true]);
 
         $this->withServerVariables(['REMOTE_ADDR' => '130.176.1.1'])
             ->get('http://cms.ellso.test/_probe', [
