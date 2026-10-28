@@ -10,7 +10,7 @@ use App\Models\TrainingSession;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Storage;
+use App\Support\MediaStorage;
 use RuntimeException;
 
 /**
@@ -73,7 +73,7 @@ class DemoTrainingSeeder extends Seeder
         imagefilledellipse($img, 1130, 560, 240, 240, imagecolorallocate($img, 245, 158, 11));
         ob_start();
         imagepng($img);
-        Storage::disk('public')->put($path, ob_get_clean());
+        MediaStorage::disk()->put($path, ob_get_clean());
 
         return $path;
     }
