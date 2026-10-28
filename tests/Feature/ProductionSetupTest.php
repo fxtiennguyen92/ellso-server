@@ -42,10 +42,23 @@ class ProductionSetupTest extends TestCase
             ->get('http://cms.ellso.test/_probe', [
                 'X-Forwarded-For' => '1.1.1.1, 113.161.2.3', // 1.1.1.1 do người dùng tự gửi, CloudFront nối IP thật vào cuối
                 'X-Forwarded-Host' => 'evil.test',
-                'X-Forwarded-Proto' => 'http',
             ])
             ->assertJson(['ip' => '113.161.2.3', 'secure' => true, 'host' => 'cms.ellso.test'])
             ->assertJsonPath('url', 'https://cms.ellso.test/x');
+    }
+
+    public function test_behind_load_balancer_redirects_http_to_https(): void
+    {
+        config(['app.trusted_proxies' => 'all', 'app.force_https' => true]);
+
+        $this->get('http://cms.ellso.test/_probe?a=1', ['X-Forwarded-Proto' => 'http'])
+            ->assertStatus(301)
+            ->assertRedirect('https://cms.ellso.test/_probe?a=1');
+
+        // https qua Load Balancer, hoặc không có header (health check, CloudFront) → chạy bình thường
+        $this->get('http://cms.ellso.test/_probe', ['X-Forwarded-Proto' => 'https'])->assertOk()->assertJson(['secure' => true]);
+        $this->get('http://cms.ellso.test/_probe')->assertOk();
+        $this->post('http://cms.ellso.test/_probe', [], ['X-Forwarded-Proto' => 'http'])->assertStatus(405);
     }
 
     public function test_media_on_s3_links_through_cloudfront(): void

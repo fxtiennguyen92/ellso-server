@@ -14,7 +14,7 @@ APP_URL=https://cms.ellso.edu.vn
 LOG_CHANNEL=daily
 LOG_LEVEL=info
 
-# Sau CloudFront
+# Sau Load Balancer (hoặc CloudFront)
 TRUSTED_PROXIES=all
 FORCE_HTTPS=true
 SESSION_SECURE_COOKIE=true
@@ -41,7 +41,9 @@ AWS_ACCESS_KEY_ID=<access key của IAM user ellso-app-s3>
 AWS_SECRET_ACCESS_KEY=<secret key của IAM user ellso-app-s3>
 AWS_DEFAULT_REGION=ap-southeast-1
 AWS_BUCKET=ellso-files-prod
-AWS_URL=https://media.ellso.edu.vn
+# Chưa có CloudFront: link S3 trực tiếp (bucket policy deploy/aws/s3-bucket-policy-public-media.json).
+# Khi CloudFront được mở: đổi thành https://media.ellso.edu.vn
+AWS_URL=https://ellso-files-prod.s3.ap-southeast-1.amazonaws.com
 
 # Video HLS (ffmpeg do .platform/hooks/prebuild/01-ffmpeg.sh cài)
 FFMPEG_BINARY=/usr/local/bin/ffmpeg
