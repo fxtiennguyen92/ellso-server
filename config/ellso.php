@@ -24,6 +24,9 @@ return [
         'referral_check_max_per_ip_per_minute' => 20,
     ],
 
+    // Cho phép chạy Demo*Seeder trên production (chỉ để test trước khi launch). Launch: xoá biến này + reset DB.
+    'allow_demo_seed' => (bool) env('ALLOW_DEMO_SEED', false),
+
     // Ảnh công khai (banner, ảnh bìa, icon, ảnh trong nội dung): public (local) | media_s3 (production). Xem App\Support\MediaStorage.
     'media' => [
         'disk' => env('MEDIA_DISK', 'public'),

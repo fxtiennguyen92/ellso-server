@@ -22,8 +22,8 @@ class DemoTrainingSeeder extends Seeder
 {
     public function run(): void
     {
-        if (app()->isProduction()) {
-            throw new RuntimeException('Không chạy dữ liệu demo trên production.');
+        if (app()->isProduction() && ! config('ellso.allow_demo_seed')) {
+            throw new RuntimeException('Không chạy dữ liệu demo trên production (đặt ALLOW_DEMO_SEED=true để cho phép tạm thời).');
         }
 
         $cafeA = TrainingLocation::firstOrCreate(['label' => 'Cafe A – Quận 1'], [

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Tests\TestCase;
 
-/** Dữ liệu demo không bao giờ được chạy trên production (tài khoản demo có mật khẩu "password"). */
+/** Dữ liệu demo chỉ chạy trên production khi bật ALLOW_DEMO_SEED (tài khoản demo có mật khẩu "password"). */
 class DemoSeedersTest extends TestCase
 {
     use RefreshDatabase;
@@ -28,11 +28,21 @@ class DemoSeedersTest extends TestCase
                 $this->app->make('Database\\Seeders\\' . $name)->setContainer($this->app)->run();
                 $this->fail("{$name} chạy được trên production");
             } catch (RuntimeException $e) {
-                $this->assertSame('Không chạy dữ liệu demo trên production.', $e->getMessage(), $name);
+                $this->assertStringStartsWith('Không chạy dữ liệu demo trên production', $e->getMessage(), $name);
             }
         }
 
         $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_demo_seed_allowed_on_production_with_flag(): void
+    {
+        $this->app['env'] = 'production';
+        config(['ellso.allow_demo_seed' => true]);
+
+        $this->app->make(\Database\Seeders\DemoCourseSeeder::class)->setContainer($this->app)->run();
+
+        $this->assertDatabaseHas('users', ['email' => 'giangvien@ellso.test']);
     }
 
     public function test_database_seeder_on_production_creates_only_admin(): void
