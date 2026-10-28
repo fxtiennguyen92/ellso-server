@@ -13,6 +13,7 @@ use App\Models\ClassificationOption;
 use App\Models\Course;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use RuntimeException;
 
 /**
  * Dữ liệu mẫu cho môi trường local:
@@ -27,6 +28,10 @@ class DemoCourseSeeder extends Seeder
 
     public function run(): void
     {
+        if (app()->isProduction()) {
+            throw new RuntimeException('Không chạy dữ liệu demo trên production.');
+        }
+
         $this->instructor = User::updateOrCreate(
             ['email' => 'giangvien@ellso.test'],
             [
