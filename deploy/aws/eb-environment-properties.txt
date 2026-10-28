@@ -1,5 +1,8 @@
-# Biến môi trường cho Elastic Beanstalk (Configuration › Updates, monitoring, and logging › Environment properties).
-# Mỗi dòng: Tên = Giá trị. Thay phần <...>. KHÔNG commit giá trị thật vào git.
+# Biến môi trường cho Elastic Beanstalk: Configuration › Updates, monitoring, and logging › Edit ›
+# Runtime environment variables › Add environment variable (Source: Plain text).
+# Mỗi dòng: Tên = Giá trị. Thay phần <...>. KHÔNG commit giá trị thật vào git (repo đang public).
+# Giá trị chỉ được chứa chữ, số, dấu cách và _ . : / = + \ - @ ' "  (không có ! # $ % * & , ; ...).
+# Tổng tất cả biến tối đa 4096 byte.
 # Sau khi đổi biến: EB tự chạy lại .platform/confighooks (cache lại config + khởi động lại queue worker).
 
 APP_NAME=Ellso
@@ -12,17 +15,17 @@ LOG_CHANNEL=daily
 LOG_LEVEL=info
 
 # Sau CloudFront
-TRUSTED_PROXIES=*
+TRUSTED_PROXIES=all
 FORCE_HTTPS=true
 SESSION_SECURE_COOKIE=true
 
 # RDS MySQL
 DB_CONNECTION=mysql
-DB_HOST=<endpoint RDS, VD ellso-db.xxxxxx.ap-southeast-1.rds.amazonaws.com>
+DB_HOST=ellso-db.cnaaqucwafzr.ap-southeast-1.rds.amazonaws.com
 DB_PORT=3306
 DB_DATABASE=ellso
-DB_USERNAME=<master username RDS, VD ellso_admin>
-DB_PASSWORD=<master password RDS>
+DB_USERNAME=ellso_admin
+DB_PASSWORD=<master password RDS, chỉ chữ / số / _ - . @>
 
 SESSION_DRIVER=database
 CACHE_STORE=database
