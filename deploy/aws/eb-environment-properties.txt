@@ -57,3 +57,6 @@ MAIL_USERNAME=<email gửi, VD no-reply@ellso.edu.vn>
 MAIL_PASSWORD=<App Password 16 ký tự, viết liền không dấu cách>
 MAIL_FROM_ADDRESS=<email gửi, trùng MAIL_USERNAME>
 MAIL_FROM_NAME=Ellso
+
+# Tạm thời trước khi launch: cho phép chạy Demo*Seeder để test. Khi launch: XOÁ biến này + reset database.
+# ALLOW_DEMO_SEED=true
