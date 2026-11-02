@@ -89,4 +89,85 @@ class ProductionSetupTest extends TestCase
         $this->assertSame('https://media.ellso.test/media/lessons/content/1/y.jpg', $content['blocks'][1]['data']['file']['url']);
         $this->assertSame('https://example.com/z.jpg', $content['blocks'][2]['data']['file']['url']);
     }
+
+    public function test_s3_disks_default_to_aws_setup(): void
+    {
+        $disks = $this->filesystemsConfigWith([])['disks'];
+
+        $this->assertNull($disks['media_s3']['endpoint']);
+        $this->assertNull($disks['documents_s3']['endpoint']);
+        $this->assertSame('bucket-owner-full-control', $disks['media_s3']['options']['ACL']);
+        $this->assertSame('bucket-owner-full-control', $disks['documents_s3']['options']['ACL']);
+        $this->assertSame($disks['documents_s3']['bucket'], $disks['media_s3']['bucket']);
+    }
+
+    public function test_s3_disks_support_bizfly_simple_storage(): void
+    {
+        $disks = $this->filesystemsConfigWith([
+            'AWS_ENDPOINT' => 'https://hcm.ss.bfcplatform.vn',
+            'AWS_USE_PATH_STYLE_ENDPOINT' => 'true',
+            'AWS_BUCKET' => 'ellso-documents',
+            'AWS_MEDIA_BUCKET' => 'ellso-media',
+            'MEDIA_S3_ACL' => 'public-read',
+            'DOCUMENTS_S3_ACL' => 'private',
+        ])['disks'];
+
+        $this->assertSame('ellso-media', $disks['media_s3']['bucket']);
+        $this->assertSame('ellso-documents', $disks['documents_s3']['bucket']);
+        foreach (['media_s3', 'documents_s3'] as $name) {
+            $this->assertSame('https://hcm.ss.bfcplatform.vn', $disks[$name]['endpoint']);
+            $this->assertTrue($disks[$name]['use_path_style_endpoint']);
+        }
+        $this->assertSame('public-read', $disks['media_s3']['options']['ACL']);
+        $this->assertSame('private', $disks['documents_s3']['options']['ACL']);
+
+        // Link ảnh dạng path-style: <endpoint>/<bucket>/media/...
+        config([
+            'ellso.media.disk' => 'media_s3',
+            'filesystems.disks.media_s3' => array_merge($disks['media_s3'], [
+                'key' => 'test', 'secret' => 'test', 'region' => 'us-east-1',
+                'url' => 'https://hcm.ss.bfcplatform.vn/ellso-media',
+            ]),
+        ]);
+        Storage::forgetDisk('media_s3');
+
+        $this->assertSame(
+            'https://hcm.ss.bfcplatform.vn/ellso-media/media/campaigns/a.jpg',
+            MediaStorage::url('campaigns/a.jpg'),
+        );
+    }
+
+    /** Đọc lại config/filesystems.php với các biến môi trường cho trước. */
+    private function filesystemsConfigWith(array $vars): array
+    {
+        $names = ['AWS_ENDPOINT', 'AWS_USE_PATH_STYLE_ENDPOINT', 'AWS_BUCKET', 'AWS_MEDIA_BUCKET', 'MEDIA_S3_ACL', 'DOCUMENTS_S3_ACL'];
+        $saved = [];
+        foreach ($names as $name) {
+            $saved[$name] = [$_ENV[$name] ?? null, $_SERVER[$name] ?? null, getenv($name)];
+            unset($_ENV[$name], $_SERVER[$name]);
+            putenv($name);
+        }
+        foreach ($vars as $name => $value) {
+            $_ENV[$name] = $_SERVER[$name] = $value;
+            putenv("{$name}={$value}");
+        }
+
+        try {
+            return require config_path('filesystems.php');
+        } finally {
+            foreach ($saved as $name => [$env, $server, $getenv]) {
+                unset($_ENV[$name], $_SERVER[$name]);
+                putenv($name);
+                if ($env !== null) {
+                    $_ENV[$name] = $env;
+                }
+                if ($server !== null) {
+                    $_SERVER[$name] = $server;
+                }
+                if ($getenv !== false) {
+                    putenv("{$name}={$getenv}");
+                }
+            }
+        }
+    }
 }
