@@ -1,9 +1,13 @@
-# Chạy test trên MySQL rồi deploy lên Elastic Beanstalk mỗi khi có code mới ở nhánh main.
+# Chạy test trên MySQL rồi deploy mỗi khi có code mới ở nhánh main.
 # Nhánh khác (claude…) chỉ chạy test. Có thể chạy tay: Actions › Deploy › Run workflow.
 #
-# Cần khai báo trong GitHub repo › Settings › Secrets and variables › Actions:
-#   Secrets:   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   (IAM user ellso-github-deploy)
-#   Variables: AWS_REGION (ap-southeast-1), EB_APPLICATION (ellso-server), EB_ENVIRONMENT (ellso-server-prod)
+# Hai nơi deploy, mỗi job chỉ chạy khi có biến của nó (GitHub repo › Settings › Secrets and variables › Actions):
+#   BizFly Cloud (deploy/bizfly/README.md):
+#     Secret:    BIZFLY_SSH_KEY                         (khoá bí mật của user deploy trên server)
+#     Variables: BIZFLY_HOST (IP server), BIZFLY_USER (deploy)
+#   Elastic Beanstalk (cũ, xoá EB_ENVIRONMENT khi tắt AWS):
+#     Secrets:   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   (IAM user ellso-github-deploy)
+#     Variables: AWS_REGION (ap-southeast-1), EB_APPLICATION (ellso-server), EB_ENVIRONMENT (ellso-server-prod2)
 name: Deploy
 
 on:
@@ -58,7 +62,7 @@ jobs:
 
   deploy:
     needs: test
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && vars.EB_ENVIRONMENT != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -127,3 +131,49 @@ jobs:
           name: ${{ env.VERSION }}
           path: ${{ env.BUNDLE }}
           retention-days: 7
+
+  deploy-bizfly:
+    needs: test
+    if: github.ref == 'refs/heads/main' && vars.BIZFLY_HOST != ''
+    runs-on: ubuntu-latest
+    env:
+      SSH_HOST: ${{ vars.BIZFLY_HOST }}
+      SSH_USER: ${{ vars.BIZFLY_USER || 'deploy' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, gd, zip, bcmath
+          coverage: none
+
+      # vendor/ build sẵn ở đây (server không cần composer) + publish asset Filament (post-autoload-dump)
+      - name: Build
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress
+
+      - name: SSH key
+        env:
+          SSH_KEY: ${{ secrets.BIZFLY_SSH_KEY }}
+        run: |
+          if [ -z "$SSH_KEY" ]; then echo "::error::Thiếu secret BIZFLY_SSH_KEY"; exit 1; fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/bizfly
+          chmod 600 ~/.ssh/bizfly
+          ssh-keyscan -T 20 -t ed25519 "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Đẩy code lên server
+        run: |
+          RELEASE="$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA::7}"
+          echo "RELEASE=$RELEASE" >> "$GITHUB_ENV"
+          # storage/ và .env dùng chung trên server (activate.sh nối vào), không đẩy lên
+          tar -czf - --exclude=./.git --exclude=./.github --exclude=./node_modules --exclude=./tests \
+              --exclude=./storage --exclude=./.env --exclude='./.env.*' . \
+            | ssh -i ~/.ssh/bizfly "$SSH_USER@$SSH_HOST" \
+                "mkdir -p /var/www/ellso/releases/$RELEASE && tar -xzf - -C /var/www/ellso/releases/$RELEASE"
+          echo "Đã đẩy $RELEASE"
+
+      - name: Kích hoạt (migrate, cache, đổi current, khởi động lại PHP + queue)
+        run: |
+          ssh -i ~/.ssh/bizfly "$SSH_USER@$SSH_HOST" \
+            "bash /var/www/ellso/releases/$RELEASE/deploy/bizfly/activate.sh $RELEASE"

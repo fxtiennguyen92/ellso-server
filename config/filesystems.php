@@ -72,8 +72,11 @@ return [
             'report' => false,
         ],
 
-        // ── Production (AWS): một bucket riêng tư (Block Public Access bật, ACL tắt), chia 2 thư mục ──
-        // ACL luôn "bucket-owner-full-control": bucket tắt ACL từ chối public-read; quyền xem do bucket policy / link tạm quyết định.
+        // ── Production: storage chuẩn S3, ảnh ở thư mục media/, tài liệu ở thư mục documents/ ──
+        // AWS (cũ): một bucket riêng tư (ACL tắt), ACL "bucket-owner-full-control", quyền xem do bucket policy / link tạm.
+        // BizFly Simple Storage (deploy/bizfly/README.md): AWS_ENDPOINT + AWS_USE_PATH_STYLE_ENDPOINT=true,
+        //   ảnh ở bucket công khai riêng (AWS_MEDIA_BUCKET, MEDIA_S3_ACL=public-read),
+        //   tài liệu ở bucket riêng tư (AWS_BUCKET, DOCUMENTS_S3_ACL=private).
 
         // Ảnh công khai (MEDIA_DISK=media_s3): thư mục media/ của bucket, xem qua CloudFront (AWS_URL, VD https://media.ellso.edu.vn).
         'media_s3' => [
@@ -81,11 +84,13 @@ return [
             'key' => env('AWS_ACCESS_KEY_ID'),
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
             'region' => env('AWS_DEFAULT_REGION'),
-            'bucket' => env('AWS_BUCKET'),
+            'bucket' => env('AWS_MEDIA_BUCKET', env('AWS_BUCKET')),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'root' => 'media',
             'url' => env('AWS_URL'),
             'visibility' => 'private',
-            'options' => ['ACL' => 'bucket-owner-full-control', 'CacheControl' => 'public, max-age=31536000'],
+            'options' => ['ACL' => env('MEDIA_S3_ACL', 'bucket-owner-full-control'), 'CacheControl' => 'public, max-age=31536000'],
             'throw' => false,
             'report' => false,
         ],
@@ -99,9 +104,11 @@ return [
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
             'region' => env('AWS_DEFAULT_REGION'),
             'bucket' => env('AWS_BUCKET'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'root' => 'documents',
             'visibility' => 'private',
-            'options' => ['ACL' => 'bucket-owner-full-control'],
+            'options' => ['ACL' => env('DOCUMENTS_S3_ACL', 'bucket-owner-full-control')],
             'throw' => false,
             'report' => false,
         ],
