@@ -36,7 +36,7 @@ Cần trong GitHub › Settings › Secrets and variables › Actions:
 | Variable | `BIZFLY_HOST` | `103.153.75.83` |
 | Variable | `BIZFLY_USER` | `deploy` |
 
-Job chỉ chạy khi có `BIZFLY_HOST`. Job Elastic Beanstalk cũ chỉ chạy khi còn `EB_ENVIRONMENT` → xoá biến đó khi tắt AWS.
+Job chỉ chạy khi có `BIZFLY_HOST`. Các bước cập nhật code cho người dùng: `README.md` ở thư mục gốc, mục “Cập nhật code lên server”.
 
 ## Thao tác thường dùng (SSH bằng root)
 
