@@ -13,15 +13,28 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Nút "Làm thử": admin trả lời đề ngay trên CMS và xem kết quả chấm (không lưu bài làm).
  * Dùng để kiểm tra điểm của đáp án + ngưỡng mức độ đã hợp lý chưa.
+ * Bài rút câu: mỗi lần bấm "Làm thử" / "Làm lại" rút một bộ câu mới, giống học viên.
  */
 trait SimulatesPlacementTest
 {
+    /** Seed của bộ câu đang làm thử (giữ qua các request của modal). */
+    public ?int $simulationSeed = null;
+
+    /** Bộ câu đang làm thử. */
+    protected function simulatedDraw(): PlacementTest
+    {
+        $this->simulationSeed ??= random_int(1, PHP_INT_MAX);
+
+        return $this->simulatedTest()->withDrawnQuestions($this->simulationSeed);
+    }
+
     protected function simulatedTest(): PlacementTest
     {
         $record = method_exists($this, 'getOwnerRecord') ? $this->getOwnerRecord() : $this->getRecord();
@@ -39,12 +52,21 @@ trait SimulatesPlacementTest
             ->disabled(fn () => $this->simulatedTest()->questions->isEmpty())
             ->tooltip(fn () => $this->simulatedTest()->questions->isEmpty() ? 'Thêm câu hỏi trước' : null)
             ->modalHeading('Làm thử bài kiểm tra')
-            ->modalDescription('Trả lời như học viên để xem hệ thống chấm ra mức nào. Bài làm thử không được lưu.')
             ->modalWidth('3xl')
             ->modalSubmitActionLabel('Chấm điểm')
+            ->mountUsing(function (?Schema $schema) {
+                $this->simulationSeed = random_int(1, PHP_INT_MAX);
+                $schema?->fill();
+            })
+            ->modalDescription(function () {
+                $test = $this->simulatedTest();
+
+                return 'Trả lời như học viên để xem hệ thống chấm ra mức nào. Bài làm thử không được lưu.'
+                    . ($test->drawsQuestions() ? ' Bộ câu được rút ngẫu nhiên ' . $test->questionsPerAttempt() . ' / ' . $test->questions->count() . ' câu.' : '');
+            })
             ->schema(fn () => $this->simulatorFields())
             ->action(function (array $data, Action $action) {
-                $test = $this->simulatedTest();
+                $test = $this->simulatedDraw();
                 $answers = [];
 
                 foreach ($test->questions as $question) {
@@ -74,7 +96,7 @@ trait SimulatesPlacementTest
     {
         return Action::make('simulationResult')
             ->modalHeading('Kết quả làm thử')
-            ->modalDescription('Thanh điểm hiển thị khoảng điểm có thể đạt và ngưỡng của từng mức.')
+            ->modalDescription('Thanh hiển thị % điểm (0% = thấp nhất, 100% = cao nhất có thể với bộ câu vừa làm) và ngưỡng của từng mức.')
             ->modalWidth('3xl')
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Đóng')
@@ -101,7 +123,7 @@ trait SimulatesPlacementTest
                     'results' => $results,
                     'answers' => [],
                     'levels' => $test->dimensions->mapWithKeys(fn ($d) => [
-                        $d->id => $d->levels->sortBy('min_score')->map(fn ($l) => ['name' => $l->name, 'min' => $l->min_score])->values()->all(),
+                        $d->id => $d->levels->sortBy('min_percent')->map(fn ($l) => ['name' => $l->name, 'min' => $l->min_percent])->values()->all(),
                     ])->all(),
                     'courses' => $courses->all(),
                 ]);
@@ -111,7 +133,7 @@ trait SimulatesPlacementTest
     /** Trường trả lời cho từng câu, giống cách app hiển thị. */
     private function simulatorFields(): array
     {
-        return $this->simulatedTest()->questions->values()->map(function (PlacementQuestion $q, int $i) {
+        return $this->simulatedDraw()->questions->values()->map(function (PlacementQuestion $q, int $i) {
             $label = 'Câu ' . ($i + 1) . '. ' . $q->prompt;
             $options = $q->options->pluck('label', 'id')->all();
 

@@ -86,7 +86,7 @@ class AbilityClassifications
                 }
                 $classification->save();
 
-                $levels = $dimension->levels->sortByDesc('min_score')->values();
+                $levels = $dimension->levels->sortByDesc('min_percent')->values();
                 foreach ($levels as $i => $level) {
                     $option = ClassificationOption::query()->firstOrNew([
                         'classification_id' => $classification->id,

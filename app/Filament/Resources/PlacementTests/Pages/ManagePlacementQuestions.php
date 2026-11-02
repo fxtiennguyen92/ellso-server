@@ -53,7 +53,13 @@ class ManagePlacementQuestions extends ManageRelatedRecords
 
     public function getSubheading(): ?string
     {
-        return $this->test()->title;
+        $test = $this->test();
+        $total = $test->questions()->count();
+
+        return $test->title . ($test->drawsQuestions() && $total
+            ? ' — ngân hàng ' . $total . ' câu, mỗi lần làm rút ngẫu nhiên ' . $test->questionsPerAttempt($total) . ' câu'
+                . ($test->question_count > $total ? ' (đang thiếu ' . ($test->question_count - $total) . ' câu so với số đã đặt)' : '')
+            : '');
     }
 
     protected function getHeaderActions(): array

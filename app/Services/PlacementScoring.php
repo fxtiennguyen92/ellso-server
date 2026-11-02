@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\CourseStatus;
 use App\Enums\PlacementQuestionType;
+use App\Exceptions\PlacementTestChanged;
 use App\Models\Course;
 use App\Models\PlacementAttempt;
 use App\Models\PlacementDimension;
@@ -19,8 +20,11 @@ use App\Support\MediaStorage;
  *
  *  - Chọn 1 / chọn nhiều: cộng điểm (scores) của mọi đáp án được chọn vào từng phân loại.
  *  - Sắp xếp: điểm của mục × trọng số của vị trí học viên xếp mục đó (hạng 1, hạng 2, …).
- *  - Mức độ của phân loại = mức có min_score cao nhất mà tổng điểm ≥ min_score.
- *    Điểm thấp hơn mọi mức → lấy mức thấp nhất.
+ *  - % điểm = (tổng điểm − điểm thấp nhất có thể) / (cao nhất có thể − thấp nhất có thể) × 100, khoảng điểm tính trên
+ *    CHÍNH các câu học viên nhận được (bài rút ngẫu nhiên → mỗi người một bộ câu, % vẫn so sánh được).
+ *  - Mức độ của năng lực = mức có min_percent cao nhất mà % điểm ≥ min_percent. Thấp hơn mọi mức → mức thấp nhất.
+ *    Bộ câu không có câu nào cộng điểm cho năng lực (khoảng = 0) → chưa xác định được mức (level null).
+ *  - Bài rút câu: chấm trên bộ câu của lần làm đó (PlacementTest::draw, seed theo học viên), xem submit().
  */
 class PlacementScoring
 {
@@ -127,16 +131,30 @@ class PlacementScoring
         return $totals;
     }
 
-    /** Mức đạt được với số điểm này (levels đã sắp từ cao xuống thấp). */
-    public function levelFor(PlacementDimension $dimension, int $score): ?PlacementLevel
+    /** % điểm trong khoảng [min, max] (1 chữ số thập phân); khoảng = 0 → null. */
+    public function percent(int $score, int $min, int $max): ?float
     {
-        $levels = $dimension->levels->sortByDesc('min_score')->values();
+        if ($max <= $min) {
+            return null;
+        }
 
-        return $levels->first(fn (PlacementLevel $l) => $score >= $l->min_score) ?? $levels->last();
+        return round(max(0, min(100, ($score - $min) / ($max - $min) * 100)), 1);
+    }
+
+    /** Mức đạt được với % điểm này. */
+    public function levelFor(PlacementDimension $dimension, ?float $percent): ?PlacementLevel
+    {
+        if ($percent === null) {
+            return null;
+        }
+        $levels = $dimension->levels->sortByDesc('min_percent')->values();
+
+        return $levels->first(fn (PlacementLevel $l) => $percent >= $l->min_percent) ?? $levels->last();
     }
 
     /**
-     * Kết quả theo phân loại (dùng cho cả lưu bài làm, API và "Làm thử" trên CMS).
+     * Kết quả theo năng lực (dùng cho cả lưu bài làm, API và "Làm thử" trên CMS).
+     * $test->questions phải là bộ câu học viên đã làm (bài rút câu: PlacementTest::withDrawnQuestions).
      *
      * @param  array<int, list<int>>  $answers  đã chuẩn hoá
      */
@@ -147,8 +165,10 @@ class PlacementScoring
 
         return $test->dimensions->map(function (PlacementDimension $dimension) use ($totals, $ranges) {
             $score = $totals[$dimension->id] ?? 0;
-            $level = $this->levelFor($dimension, $score);
-            $levels = $dimension->levels->sortByDesc('min_score')->values();
+            [$min, $max] = $ranges[$dimension->id];
+            $percent = $this->percent($score, $min, $max);
+            $level = $this->levelFor($dimension, $percent);
+            $levels = $dimension->levels->sortByDesc('min_percent')->values();
 
             return [
                 'dimension_id' => $dimension->id,
@@ -156,8 +176,9 @@ class PlacementScoring
                 'name' => $dimension->name,
                 'description' => $dimension->description,
                 'score' => $score,
-                'min' => $ranges[$dimension->id][0],
-                'max' => $ranges[$dimension->id][1],
+                'min' => $min,
+                'max' => $max,
+                'percent' => $percent,
                 'level_id' => $level?->id,
                 'level_key' => $level?->key,
                 'level' => $level?->name,
@@ -242,19 +263,51 @@ class PlacementScoring
         return [$min, $max];
     }
 
-    /** Chấm và lưu bài làm của học viên. */
-    public function submit(User $user, PlacementTest $test, array $answers): PlacementAttempt
+    /**
+     * Bộ câu của lần làm tiếp theo của học viên (đã rút + xáo theo cấu hình bài).
+     * Cố định cho đến khi học viên nộp bài.
+     */
+    public function testFor(User $user, PlacementTest $test): PlacementTest
     {
         $test->loadStructure();
-        $normalized = $this->normalizeAnswers($test, $answers);
+
+        return $test->withDrawnQuestions($test->seedFor($user));
+    }
+
+    /**
+     * Chấm và lưu bài làm của học viên, trên bộ câu học viên được giao.
+     *
+     * @throws ValidationException
+     * @throws PlacementTestChanged câu trả lời có câu không nằm trong bộ câu (đề / cấu hình vừa đổi)
+     */
+    public function submit(User $user, PlacementTest $test, array $answers): PlacementAttempt
+    {
+        $drawn = $this->testFor($user, $test);
+        $answeredIds = $this->answeredQuestionIds($answers);
+        if (array_diff($answeredIds, $drawn->questions->pluck('id')->all()) !== []) {
+            throw new PlacementTestChanged;
+        }
+
+        $normalized = $this->normalizeAnswers($drawn, $answers);
 
         return PlacementAttempt::create([
             'user_id' => $user->id,
             'placement_test_id' => $test->id,
-            'answers' => $this->snapshotAnswers($test, $normalized),
-            'results' => $this->results($test, $normalized),
+            'answers' => $this->snapshotAnswers($drawn, $normalized),
+            'results' => $this->results($drawn, $normalized),
             'completed_at' => now(),
         ]);
+    }
+
+    /** @return list<int> */
+    private function answeredQuestionIds(array $answers): array
+    {
+        $ids = [];
+        foreach ($answers as $key => $value) {
+            $ids[] = is_array($value) && array_key_exists('question_id', $value) ? (int) $value['question_id'] : (int) $key;
+        }
+
+        return $ids;
     }
 
     /** Bản chụp câu trả lời (kèm nội dung câu hỏi/đáp án) để xem lại về sau. */
@@ -297,6 +350,7 @@ class PlacementScoring
                 'score' => $r['score'],
                 'min_score' => $r['min'],
                 'max_score' => $r['max'],
+                'percent' => $r['percent'] ?? null,
                 'level' => $r['level_id'] ? [
                     'id' => $r['level_id'],
                     'name' => $r['level'],

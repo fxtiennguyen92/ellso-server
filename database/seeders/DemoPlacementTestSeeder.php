@@ -38,29 +38,29 @@ class DemoPlacementTestSeeder extends Seeder
 
         $courses = Course::where('status', CourseStatus::Published)->pluck('id');
 
-        // Phân loại + mức độ (điểm từ, cao → thấp)
+        // Năng lực + mức độ (đạt từ %, cao → thấp)
         $dims = [];
         foreach ([
             'tiep_thu' => ['Khả năng tiếp thu', 'Tốc độ nắm bắt và áp dụng kiến thức mới.', [
-                ['Xuất sắc', 9, 'Bạn nắm bắt kiến thức mới rất nhanh — phù hợp lộ trình nâng cao, nhịp học dày.'],
-                ['Tốt', 6, 'Bạn tiếp thu tốt; lộ trình tiêu chuẩn kèm bài thực hành sẽ giúp bạn tiến nhanh.'],
-                ['Khá', 3, 'Bạn cần thêm ví dụ minh hoạ; nên học từng phần nhỏ và ôn lại thường xuyên.'],
+                ['Xuất sắc', 75, 'Bạn nắm bắt kiến thức mới rất nhanh — phù hợp lộ trình nâng cao, nhịp học dày.'],
+                ['Tốt', 50, 'Bạn tiếp thu tốt; lộ trình tiêu chuẩn kèm bài thực hành sẽ giúp bạn tiến nhanh.'],
+                ['Khá', 25, 'Bạn cần thêm ví dụ minh hoạ; nên học từng phần nhỏ và ôn lại thường xuyên.'],
                 ['Cần hỗ trợ', 0, 'Hãy bắt đầu với các bài nền tảng và nhờ mentor đồng hành trong tuần đầu.'],
             ]],
             'ky_luat' => ['Tính kỷ luật tự học', 'Khả năng duy trì thói quen học đều đặn.', [
-                ['Rất cao', 9, 'Bạn có thói quen học rất đều — có thể tự học theo lộ trình dài.'],
-                ['Tốt', 5, 'Bạn khá chủ động; đặt lịch nhắc học sẽ giúp bạn duy trì tốt hơn.'],
-                ['Cần rèn luyện', -2, 'Hãy bắt đầu với mục tiêu nhỏ mỗi ngày (15 phút) và bật nhắc học trên app.'],
+                ['Rất cao', 70, 'Bạn có thói quen học rất đều — có thể tự học theo lộ trình dài.'],
+                ['Tốt', 40, 'Bạn khá chủ động; đặt lịch nhắc học sẽ giúp bạn duy trì tốt hơn.'],
+                ['Cần rèn luyện', 0, 'Hãy bắt đầu với mục tiêu nhỏ mỗi ngày (15 phút) và bật nhắc học trên app.'],
             ]],
             'kinh_nghiem' => ['Kinh nghiệm thực tế', 'Nền tảng kinh nghiệm trong lĩnh vực muốn học.', [
-                ['Chuyên sâu', 6, 'Bạn đã có nhiều kinh nghiệm — nên chọn các khoá chuyên sâu, bỏ qua phần cơ bản.'],
-                ['Có nền tảng', 3, 'Bạn đã có nền tảng; lộ trình trung cấp sẽ phù hợp.'],
+                ['Chuyên sâu', 65, 'Bạn đã có nhiều kinh nghiệm — nên chọn các khoá chuyên sâu, bỏ qua phần cơ bản.'],
+                ['Có nền tảng', 35, 'Bạn đã có nền tảng; lộ trình trung cấp sẽ phù hợp.'],
                 ['Mới bắt đầu', 0, 'Bắt đầu từ lộ trình cơ bản để xây nền vững chắc.'],
             ]],
         ] as $key => [$name, $description, $levels]) {
             $dimension = $test->dimensions()->create(['name' => $name, 'description' => $description, 'sort_order' => count($dims) + 1]);
             foreach ($levels as $i => [$levelName, $min, $comment]) {
-                $level = $dimension->levels()->create(['name' => $levelName, 'min_score' => $min, 'description' => $comment, 'sort_order' => $i]);
+                $level = $dimension->levels()->create(['name' => $levelName, 'min_percent' => $min, 'description' => $comment, 'sort_order' => $i]);
                 if ($courses->isNotEmpty() && $i === 0) {
                     $level->courses()->sync($courses->random(min(2, $courses->count())));
                 }

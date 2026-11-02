@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\PlacementQuestionType;
+use App\Exceptions\PlacementTestChanged;
 use App\Http\Controllers\Controller;
 use App\Models\PlacementAttempt;
 use App\Models\PlacementQuestion;
@@ -16,6 +17,8 @@ use Illuminate\Http\Request;
 /**
  * Bài kiểm tra đầu vào cho app (học viên đã đăng nhập). Có thể có nhiều bài, mỗi bài một nhóm năng lực.
  * "Đã làm" / kết quả tính theo bài (mọi phiên bản của bài, xem PlacementTest::$key).
+ * Bài rút câu: đề trả về là bộ câu của học viên (cố định đến khi nộp bài; tải lại vẫn ra bộ đó), câu + đáp án
+ * theo thứ tự hiển thị. Nộp bài chấm trên đúng bộ câu đó.
  *
  * - GET  /placement-tests                 : các bài đang dùng + trạng thái đã làm của học viên
  * - GET  /placement-tests/{id}            : đề (không kèm điểm)
@@ -39,7 +42,7 @@ class PlacementTestController extends Controller
         return response()->json([
             'data' => $tests->map(fn (PlacementTest $test) => [
                 ...$this->summary($test, $latest[$test->key] ?? null),
-                'question_count' => $test->questions_count,
+                'question_count' => $test->questionsPerAttempt((int) $test->questions_count),
             ])->values(),
         ]);
     }
@@ -104,7 +107,15 @@ class PlacementTestController extends Controller
             ], 409);
         }
 
-        $attempt = $this->scoring->submit($user, $test, $answers);
+        try {
+            $attempt = $this->scoring->submit($user, $test, $answers);
+        } catch (PlacementTestChanged) {
+            return response()->json([
+                'message' => 'Bài kiểm tra vừa được cập nhật. Vui lòng tải lại và làm lại bài.',
+                'code' => 'test_changed',
+                'replacement_test_id' => $test->id,
+            ], 409);
+        }
 
         return response()->json(['data' => $this->scoring->present($attempt)], 201);
     }
@@ -157,10 +168,11 @@ class PlacementTestController extends Controller
 
     private function detail(PlacementTest $test, User $user): array
     {
-        $test->load('questions.options');
+        $test = $this->scoring->testFor($user, $test);
 
         return [
             ...$this->summary($test, $this->latestByKey($user)[$test->key] ?? null),
+            'question_count' => $test->questions->count(),
             'questions' => $test->questions->map(fn (PlacementQuestion $q) => [
                 'id' => $q->id,
                 'type' => $q->type->value,

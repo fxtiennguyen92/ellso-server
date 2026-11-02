@@ -44,8 +44,8 @@ class AbilityClassificationTest extends TestCase
         // 1 câu chọn 1: A → 5 điểm (Xuất sắc), B → 1 điểm (Cần hỗ trợ)
         $this->test = PlacementTest::create(['title' => 'Đầu vào', 'is_active' => true]);
         $this->dimension = $this->test->dimensions()->create(['name' => 'Khả năng tiếp thu', 'sort_order' => 1]);
-        $this->dimension->levels()->create(['name' => 'Cần hỗ trợ', 'min_score' => 0]);
-        $this->dimension->levels()->create(['name' => 'Xuất sắc', 'min_score' => 4]);
+        $this->dimension->levels()->create(['name' => 'Cần hỗ trợ', 'min_percent' => 0]);
+        $this->dimension->levels()->create(['name' => 'Xuất sắc', 'min_percent' => 75]);
         $q = $this->test->questions()->create(['type' => PlacementQuestionType::Single, 'prompt' => 'Câu 1']);
         $q->options()->create(['label' => 'A', 'scores' => [$this->dimension->id => 5]]);
         $q->options()->create(['label' => 'B', 'scores' => [$this->dimension->id => 1]]);
@@ -77,7 +77,7 @@ class AbilityClassificationTest extends TestCase
 
         // Đổi tên, thêm mức, xoá mức → đồng bộ (mức xoá chỉ ẩn để giữ điều kiện cũ)
         $this->dimension->update(['name' => 'Tiếp thu']);
-        $this->dimension->levels()->create(['name' => 'Tốt', 'min_score' => 2]);
+        $this->dimension->levels()->create(['name' => 'Tốt', 'min_percent' => 50]);
         $this->dimension->levels()->where('name', 'Cần hỗ trợ')->first()->delete();
         $ability = $this->ability();
         $this->assertSame('Tiếp thu', $ability->name);
@@ -154,9 +154,10 @@ class AbilityClassificationTest extends TestCase
         // Bài kiểm tra thứ hai (nhóm năng lực khác): gộp mức của bài làm mới nhất của TỪNG bài
         $second = PlacementTest::create(['title' => 'Tư duy', 'is_active' => true]);
         $logic = $second->dimensions()->create(['name' => 'Tư duy logic']);
-        $logic->levels()->create(['name' => 'Tốt', 'min_score' => 1]);
+        $logic->levels()->create(['name' => 'Tốt', 'min_percent' => 1]);
         $q = $second->questions()->create(['type' => PlacementQuestionType::Single, 'prompt' => 'Câu 1']);
         $o = $q->options()->create(['label' => 'X', 'scores' => [$logic->id => 2]]);
+        $q->options()->create(['label' => 'Z', 'scores' => []]);
         $this->travel(1)->minutes();
         app(PlacementScoring::class)->submit($this->student, $second->fresh()->loadStructure(), [['question_id' => $q->id, 'option_ids' => [$o->id]]]);
 

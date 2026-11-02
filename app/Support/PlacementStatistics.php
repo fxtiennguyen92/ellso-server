@@ -126,7 +126,7 @@ class PlacementStatistics
                 return [];
             }
 
-            $rows = $dimension->levels->sortByDesc('min_score')->values()
+            $rows = $dimension->levels->sortByDesc('min_percent')->values()
                 ->mapWithKeys(fn ($level, $i) => ['id:' . $level->id => ['name' => $level->name, 'count' => 0, 'rank' => $i + 1]])
                 ->all();
 

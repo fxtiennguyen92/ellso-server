@@ -68,6 +68,24 @@ class PlacementTestResource extends Resource
                         ->label('Lời giới thiệu')
                         ->rows(4)
                         ->helperText('Hiện trên app trước khi học viên bắt đầu làm bài. VD: mục đích, thời gian làm khoảng 5 phút, không có đáp án đúng/sai.'),
+                    TextInput::make('question_count')
+                        ->label('Số câu mỗi lần làm')
+                        ->integer()
+                        ->minValue(1)
+                        ->maxValue(500)
+                        ->placeholder('Tất cả câu')
+                        ->suffix('câu')
+                        ->helperText(function (?PlacementTest $record) {
+                            $total = $record?->questions()->count();
+
+                            return 'Để trống = học viên làm tất cả câu, theo thứ tự soạn. Nhập số (VD: 10) → mỗi lần làm rút ngẫu nhiên từng ấy câu'
+                                . ($total ? " trong {$total} câu đã soạn" : ' trong các câu đã soạn')
+                                . ', thứ tự ngẫu nhiên, ưu tiên mỗi năng lực có ít nhất 1 câu. Mức độ tính theo % điểm trên chính bộ câu học viên nhận được.';
+                        }),
+                    Toggle::make('shuffle_options')
+                        ->label('Đảo thứ tự đáp án')
+                        ->default(true)
+                        ->helperText('Mỗi học viên thấy đáp án theo thứ tự khác nhau. Điểm vẫn tính theo đáp án được chọn.'),
                     Toggle::make('is_active')
                         ->label('Đang dùng trên app')
                         ->helperText('Có thể dùng nhiều bài cùng lúc. Bật một phiên bản mới (bản nhân bản) sẽ tự tắt phiên bản cũ của cùng bài.'),
@@ -94,7 +112,15 @@ class PlacementTestResource extends Resource
                     ->badge()
                     ->formatStateUsing(fn (bool $state) => $state ? 'Đang dùng' : 'Không dùng')
                     ->color(fn (bool $state) => $state ? 'success' : 'gray'),
-                TextColumn::make('questions_count')->label('Câu hỏi')->numeric()->alignCenter(),
+                TextColumn::make('questions_count')
+                    ->label('Câu hỏi')
+                    ->alignCenter()
+                    ->formatStateUsing(fn (int $state, PlacementTest $record) => $record->drawsQuestions() && $record->question_count < $state
+                        ? $record->question_count . ' / ' . $state
+                        : (string) $state)
+                    ->tooltip(fn (PlacementTest $record) => $record->drawsQuestions()
+                        ? 'Mỗi lần làm rút ngẫu nhiên ' . $record->questionsPerAttempt((int) $record->questions_count) . ' câu trong ' . $record->questions_count . ' câu'
+                        : 'Làm tất cả câu'),
                 TextColumn::make('dimensions_count')->label('Năng lực')->numeric()->alignCenter(),
                 TextColumn::make('requiring_courses_count')
                     ->label('Khoá bắt buộc')

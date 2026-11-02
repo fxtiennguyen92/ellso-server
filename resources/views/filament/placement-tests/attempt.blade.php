@@ -1,7 +1,7 @@
 {{--
     Kết quả bài kiểm tra đầu vào (dùng cho "Làm thử" và "Xem bài làm").
-    $results: [{dimension_id, name, score, min, max, level, level_description, rank, level_count}]
-    $levels (tuỳ chọn): [dimension_id => [{name, min}] tăng dần] → vẽ ngưỡng trên thanh điểm
+    $results: [{dimension_id, name, score, min, max, percent, level, level_description, rank, level_count}]
+    $levels (tuỳ chọn): [dimension_id => [{name, min (%)}] tăng dần] → vẽ ngưỡng % trên thanh điểm
     $courses (tuỳ chọn): tên khoá học được gợi ý
     $answers (tuỳ chọn): bản chụp câu trả lời
 --}}
@@ -14,32 +14,38 @@
         @php
             $min = (int) ($r['min'] ?? 0);
             $max = (int) ($r['max'] ?? 0);
-            $span = max(1, $max - $min);
-            $pct = fn ($v) => max(0, min(100, ($v - $min) / $span * 100));
+            // Bài làm cũ chưa lưu % → tính lại từ điểm
+            $percent = $r['percent'] ?? ($max > $min ? round(($r['score'] - $min) / ($max - $min) * 100, 1) : null);
             $dimLevels = $levels[$r['dimension_id']] ?? [];
             $top = ($r['rank'] ?? null) === 1;
+            $fmt = fn ($v) => rtrim(rtrim(number_format((float) $v, 1, ',', ''), '0'), ',');
         @endphp
         <div style="border:1px solid color-mix(in oklab, var(--gray-500) 22%, transparent);border-radius:12px;padding:14px 16px">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
                 <div style="font-weight:600">{{ $r['name'] }}</div>
                 <div style="display:flex;gap:8px;align-items:center">
-                    <span style="font-size:13px;opacity:.7">{{ $r['score'] }} điểm @if ($max !== $min) (khoảng {{ $min }} → {{ $max }}) @endif</span>
+                    <span style="font-size:13px;opacity:.7">
+                        @if ($percent !== null)
+                            {{ $fmt($percent) }}% · {{ $r['score'] }} điểm (khoảng {{ $min }} → {{ $max }})
+                        @else
+                            Bộ câu không có câu nào tính điểm năng lực này
+                        @endif
+                    </span>
                     <span style="padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;{{ $top ? 'background:color-mix(in oklab, var(--success-500) 16%, transparent);color:var(--success-700)' : 'background:color-mix(in oklab, var(--primary-500) 12%, transparent);color:var(--primary-700)' }}">
                         {{ $r['level'] ?? 'Chưa có mức' }}
                     </span>
                 </div>
             </div>
 
-            @if ($max !== $min)
+            @if ($percent !== null)
                 <div style="position:relative;height:8px;border-radius:999px;margin:16px 0 {{ $dimLevels ? '22px' : '6px' }};background:color-mix(in oklab, var(--gray-500) 18%, transparent)">
-                    <div style="position:absolute;left:0;top:0;bottom:0;width:{{ $pct($r['score']) }}%;border-radius:999px;background:var(--primary-500)"></div>
+                    <div style="position:absolute;left:0;top:0;bottom:0;width:{{ $percent }}%;border-radius:999px;background:var(--primary-500)"></div>
                     @foreach ($dimLevels as $lv)
-                        @if ($lv['min'] > $min && $lv['min'] <= $max)
-                            <div title="{{ $lv['name'] }} từ {{ $lv['min'] }}" style="position:absolute;top:-4px;bottom:-4px;width:2px;left:{{ $pct($lv['min']) }}%;background:var(--gray-600)"></div>
+                        @php $at = max(0, min(100, (int) $lv['min'])); @endphp
+                        @if ($at > 0)
+                            <div title="{{ $lv['name'] }} từ {{ $at }}%" style="position:absolute;top:-4px;bottom:-4px;width:2px;left:{{ $at }}%;background:var(--gray-600)"></div>
                         @endif
-                        @if ($lv['min'] <= $max)
-                            <div style="position:absolute;top:14px;left:{{ $pct(max($lv['min'], $min)) }}%;font-size:11px;white-space:nowrap;opacity:.65;transform:translateX({{ $lv['min'] > $min ? '-50%' : '0' }})">{{ $lv['name'] }} ≥ {{ $lv['min'] }}</div>
-                        @endif
+                        <div style="position:absolute;top:14px;left:{{ $at }}%;font-size:11px;white-space:nowrap;opacity:.65;transform:translateX({{ $at > 0 ? ($at >= 90 ? '-100%' : '-50%') : '0' }})">{{ $lv['name'] }} ≥ {{ $at }}%</div>
                     @endforeach
                 </div>
             @endif
