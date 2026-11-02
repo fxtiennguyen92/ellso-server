@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Students\Pages;
 
 use App\Filament\Resources\PlacementAttempts\PlacementAttemptsTable;
+use App\Support\AbilityClassifications;
 use App\Filament\Resources\Students\EnrollCourseAction;
 use App\Filament\Resources\Students\StudentResource;
 use App\Filament\Resources\Students\Widgets\StudentOverview;
@@ -112,7 +113,7 @@ class StudentProfile extends ViewRecord
                             ->placeholder('Chưa có'),
                     ]),
                 Section::make('Năng lực')
-                    ->description('Theo bài kiểm tra đầu vào mới nhất')
+                    ->description('Theo bài làm mới nhất của từng bài kiểm tra đầu vào')
                     ->columnSpan(['lg' => 1])
                     ->schema([
                         Text::make(fn (User $record) => $this->abilityHtml($record)),
@@ -123,16 +124,26 @@ class StudentProfile extends ViewRecord
 
     private function abilityHtml(User $user): HtmlString
     {
-        $attempt = $user->placementAttempts()->latest('completed_at')->latest('id')->first();
-        if (! $attempt) {
+        $attempts = AbilityClassifications::latestAttemptsFor($user);
+        if ($attempts->isEmpty()) {
             return new HtmlString('<span style="color:var(--gray-500)">Chưa làm bài kiểm tra đầu vào.</span>');
         }
 
-        return new HtmlString(
-            PlacementAttemptsTable::resultChips($attempt)->toHtml()
-            . '<div style="margin-top:8px;font-size:12px;color:var(--gray-500)">Làm lúc ' . $attempt->completed_at->timezone(self::TZ)->format('H:i d/m/Y')
-            . ($user->placementAttempts()->count() > 1 ? ' · ' . $user->placementAttempts()->count() . ' lần làm' : '') . '</div>'
-        );
+        $counts = $user->placementAttempts()
+            ->join('placement_tests', 'placement_tests.id', '=', 'placement_attempts.placement_test_id')
+            ->selectRaw('placement_tests.key as test_key, count(*) as total')
+            ->groupBy('placement_tests.key')
+            ->pluck('total', 'test_key');
+
+        return new HtmlString($attempts->values()->map(function ($attempt) use ($counts) {
+            $count = (int) ($counts[$attempt->test->key] ?? 1);
+
+            return '<div style="margin-bottom:12px">'
+                . '<div style="font-size:13px;font-weight:600;margin-bottom:4px">' . e($attempt->test->title) . '</div>'
+                . PlacementAttemptsTable::resultChips($attempt)->toHtml()
+                . '<div style="margin-top:4px;font-size:12px;color:var(--gray-500)">Làm lúc ' . $attempt->completed_at->timezone(self::TZ)->format('H:i d/m/Y')
+                . ($count > 1 ? ' · ' . $count . ' lần làm' : '') . '</div></div>';
+        })->join(''));
     }
 
     private function student(): User

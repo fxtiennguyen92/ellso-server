@@ -32,11 +32,11 @@ class PlacementStatistics
         return ['test_id' => self::resolveTest(null)?->id, ...TimeBuckets::defaultFilters()];
     }
 
-    /** Bài được chọn → bài đang dùng → bài mới nhất. */
+    /** Bài được chọn → bài đang dùng đầu tiên → bài mới nhất. */
     public static function resolveTest(mixed $id): ?PlacementTest
     {
         return ($id ? PlacementTest::find($id) : null)
-            ?? PlacementTest::current()
+            ?? PlacementTest::query()->active()->ordered()->first()
             ?? PlacementTest::latest('id')->first();
     }
 

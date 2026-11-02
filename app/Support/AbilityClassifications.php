@@ -9,6 +9,7 @@ use App\Models\PlacementDimension;
 use App\Models\PlacementLevel;
 use App\Models\PlacementTest;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -16,10 +17,11 @@ use Illuminate\Support\Facades\DB;
  *
  * - Mỗi phân loại của bài kiểm tra (theo key ổn định) ↔ một Classification type=ability, dùng chung.
  *   Giá trị (ClassificationOption) ↔ các mức độ (theo key), thứ tự từ mức cao xuống thấp.
- * - Tên / mức lấy từ bài đang dùng; phân loại không có trong bài đang dùng → "không dùng" (is_active = false),
- *   mức đã xoá → giá trị ẩn. Không xoá để giữ điều kiện lộ trình cũ.
+ * - Có thể có nhiều bài đang dùng (mỗi bài một nhóm năng lực). Tên / mức lấy từ phiên bản đang dùng;
+ *   phân loại không có trong bài nào đang dùng → "không dùng" (is_active = false), mức đã xoá → giá trị ẩn.
+ *   Không xoá để giữ điều kiện lộ trình cũ.
  * - Tự đồng bộ khi sửa bài kiểm tra (xem booted() của các model Placement*).
- * - Giá trị năng lực của học viên = mức trong bài làm mới nhất.
+ * - Giá trị năng lực của học viên = mức trong bài làm mới nhất của TỪNG bài (theo key bài), gộp lại.
  */
 class AbilityClassifications
 {
@@ -53,7 +55,7 @@ class AbilityClassifications
     public static function sync(): void
     {
         DB::transaction(function () {
-            $activeId = PlacementTest::current()?->id;
+            $activeIds = PlacementTest::query()->active()->pluck('id')->map(fn ($id) => (int) $id)->all();
 
             // Nhóm theo key; đại diện = bản trong bài đang dùng, không có thì bài mới nhất
             $groups = PlacementDimension::query()
@@ -65,7 +67,8 @@ class AbilityClassifications
 
             foreach ($groups as $key => $dimensions) {
                 /** @var PlacementDimension $dimension */
-                $dimension = $dimensions->firstWhere('placement_test_id', $activeId) ?? $dimensions->first();
+                $dimension = $dimensions->first(fn (PlacementDimension $d) => in_array((int) $d->placement_test_id, $activeIds, true))
+                    ?? $dimensions->first();
 
                 $classification = Classification::query()->firstOrNew([
                     'type' => Classification::TYPE_ABILITY,
@@ -76,7 +79,7 @@ class AbilityClassifications
                     'name' => $dimension->name,
                     'question' => null,
                     'description' => $dimension->description,
-                    'is_active' => $activeId !== null && $dimension->placement_test_id === $activeId,
+                    'is_active' => in_array((int) $dimension->placement_test_id, $activeIds, true),
                 ]);
                 if (! $classification->exists) {
                     $classification->sort_order = (int) Classification::query()->max('sort_order') + 1;
@@ -107,23 +110,37 @@ class AbilityClassifications
     }
 
     /**
-     * Giá trị năng lực của học viên (id ClassificationOption) theo bài làm mới nhất.
+     * Bài làm mới nhất của học viên cho từng bài kiểm tra (theo key bài — mọi phiên bản tính chung).
+     *
+     * @return Collection<string, PlacementAttempt> key bài => bài làm
+     */
+    public static function latestAttemptsFor(User $user): Collection
+    {
+        return PlacementAttempt::query()
+            ->where('user_id', $user->id)
+            ->with('test')
+            ->orderByDesc('completed_at')
+            ->orderByDesc('id')
+            ->get()
+            ->filter(fn (PlacementAttempt $a) => $a->test !== null)
+            ->unique(fn (PlacementAttempt $a) => $a->test->key)
+            ->keyBy(fn (PlacementAttempt $a) => $a->test->key);
+    }
+
+    /**
+     * Giá trị năng lực của học viên (id ClassificationOption): mức trong bài làm mới nhất của từng bài.
      *
      * @return list<int>
      */
     public static function optionIdsFor(User $user): array
     {
-        $attempt = PlacementAttempt::query()
-            ->where('user_id', $user->id)
-            ->latest('completed_at')
-            ->latest('id')
-            ->first();
+        $attempts = self::latestAttemptsFor($user);
 
-        if (! $attempt) {
+        if ($attempts->isEmpty()) {
             return [];
         }
 
-        $results = collect($attempt->results ?? []);
+        $results = $attempts->flatMap(fn (PlacementAttempt $a) => $a->results ?? []);
         $keys = $results->pluck('level_key')->filter();
 
         // Bài làm trước khi có key: tra key theo level_id

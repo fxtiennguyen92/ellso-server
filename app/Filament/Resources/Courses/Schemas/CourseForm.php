@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Filament\Resources\Classifications\ClassificationResource;
 use App\Models\Classification;
 use App\Models\Course;
+use App\Models\PlacementTest;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
@@ -16,7 +17,6 @@ use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Group;
@@ -166,13 +166,17 @@ class CourseForm
                         ]),
                     Section::make('Bài kiểm tra đầu vào')
                         ->schema([
-                            Toggle::make('requires_placement_test')
+                            Select::make('placement_test_keys')
                                 ->label('Bắt buộc làm trước khi học')
-                                ->helperText(fn (Get $get) => $get('requires_placement_test')
-                                    ? 'Học viên chưa làm bài kiểm tra đầu vào phải làm trước khi bắt đầu bài học đầu tiên.'
-                                    : (self::usesAbility($get)
-                                        ? 'Không bắt buộc: học viên chưa làm bài thì điều kiện Năng lực của lộ trình không khớp → thường vào lộ trình mặc định.'
-                                        : 'Không bắt buộc: học viên học ngay, không cần làm bài kiểm tra.'))
+                                ->multiple()
+                                ->options(fn () => PlacementTest::keyOptions())
+                                ->placeholder('Không bắt buộc')
+                                ->afterStateHydrated(function (Select $component, ?Course $record) {
+                                    $component->state($record?->placementTestRequirements()->pluck('placement_test_key')->all() ?? []);
+                                })
+                                ->dehydrated(false)
+                                ->saveRelationshipsUsing(fn (Course $record, ?array $state) => $record->syncPlacementTestKeys($state ?? []))
+                                ->helperText(fn (Get $get) => self::placementHelper($get))
                                 ->live(),
                         ]),
                     Section::make('Ảnh bìa')
@@ -195,6 +199,24 @@ class CourseForm
         $record = $livewire->record ?? null;
 
         return $record instanceof Course ? $record : null;
+    }
+
+    /** Gợi ý dưới ô chọn bài kiểm tra bắt buộc. */
+    private static function placementHelper(Get $get): string
+    {
+        $keys = array_filter($get('placement_test_keys') ?? []);
+
+        if ($keys !== []) {
+            $off = PlacementTest::query()->whereIn('key', $keys)->get()->groupBy('key')
+                ->filter(fn ($versions) => ! $versions->contains('is_active', true))->count();
+
+            return 'Học viên chưa làm các bài này phải làm trước khi bắt đầu bài học đầu tiên. Đã làm một phiên bản bất kỳ của bài là đủ.'
+                . ($off ? " {$off} bài đang tắt nên tạm thời không bắt buộc." : '');
+        }
+
+        return self::usesAbility($get)
+            ? 'Không bắt buộc: học viên chưa làm bài thì điều kiện Năng lực của lộ trình không khớp → thường vào lộ trình mặc định.'
+            : 'Không bắt buộc: học viên học ngay, không cần làm bài kiểm tra.';
     }
 
     /** Khoá đang chọn phân loại Năng lực nào không (theo dữ liệu đang nhập). */

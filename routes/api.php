@@ -75,7 +75,12 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::get('my/documents', [DocumentController::class, 'mine']);
 
     // Bài kiểm tra đầu vào: đề đang dùng, nộp bài (chấm tự động), kết quả gần nhất
-    Route::get('placement-test', [PlacementTestController::class, 'show']);
+    Route::get('placement-tests', [PlacementTestController::class, 'index']);
+    Route::get('placement-tests/{id}', [PlacementTestController::class, 'show'])->whereNumber('id');
+    Route::post('placement-tests/{id}/attempts', [PlacementTestController::class, 'submitTo'])->whereNumber('id')->middleware('throttle:10,1');
+    Route::get('placement-tests/{id}/result', [PlacementTestController::class, 'resultOf'])->whereNumber('id');
+    // Bản app cũ (một bài kiểm tra)
+    Route::get('placement-test', [PlacementTestController::class, 'legacyShow']);
     Route::post('placement-test/attempts', [PlacementTestController::class, 'submit'])->middleware('throttle:10,1');
     Route::get('placement-test/result', [PlacementTestController::class, 'result']);
 });

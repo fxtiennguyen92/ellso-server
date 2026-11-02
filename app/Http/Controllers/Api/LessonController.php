@@ -88,11 +88,9 @@ class LessonController extends Controller
         }
 
         // Khoá bắt buộc làm bài kiểm tra đầu vào trước khi học
-        if ($access['enrollment']?->course?->needsPlacementTest($user)) {
-            abort(response()->json([
-                'message' => 'Bạn cần làm bài kiểm tra đầu vào trước khi bắt đầu khoá học này.',
-                'code' => 'placement_test_required',
-            ], 409));
+        $course = $access['enrollment']?->course;
+        if ($course?->needsPlacementTest($user)) {
+            abort(response()->json(MyCourseController::placementRequiredBody($course, $user), 409));
         }
 
         return [$user, $lesson, $access];

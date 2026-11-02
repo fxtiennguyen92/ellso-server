@@ -13,7 +13,7 @@ class ListPlacementTests extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Học viên làm bài sau khi đăng ký. Mỗi câu trả lời cộng điểm vào các năng lực (VD: Khả năng tiếp thu); tổng điểm quyết định mức độ (VD: Xuất sắc, Tốt…).';
+        return 'Có thể dùng nhiều bài cùng lúc, mỗi bài đánh giá một nhóm năng lực (VD: Khả năng tiếp thu). Mỗi câu trả lời cộng điểm vào năng lực; tổng điểm quyết định mức độ (VD: Xuất sắc, Tốt…). Khoá học chọn bài nào bắt buộc làm trước khi học. Kéo thả để đổi thứ tự hiện trên app.';
     }
 
     protected function getHeaderActions(): array

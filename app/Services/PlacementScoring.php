@@ -288,6 +288,7 @@ class PlacementScoring
         return [
             'id' => $attempt->id,
             'test_id' => $attempt->placement_test_id,
+            'test_title' => $attempt->test?->title,
             'completed_at' => $attempt->completed_at->toIso8601String(),
             'dimensions' => array_map(fn (array $r) => [
                 'id' => $r['dimension_id'],

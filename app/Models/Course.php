@@ -8,6 +8,7 @@ use App\Models\Concerns\CleansUpFiles;
 use App\Models\Concerns\HasUniqueSlug;
 use App\Support\AbilityClassifications;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -34,7 +35,6 @@ class Course extends Model
         'cover_image',
         'price',
         'type',
-        'requires_placement_test',
         'status',
         'published_at',
     ];
@@ -44,7 +44,6 @@ class Course extends Model
         return [
             'price' => 'integer',
             'type' => CourseType::class,
-            'requires_placement_test' => 'boolean',
             'status' => CourseStatus::class,
             'published_at' => 'datetime',
         ];
@@ -146,20 +145,72 @@ class Course extends Model
         return $this->hasMany(Classification::class);
     }
 
+    /** Các bài kiểm tra đầu vào bắt buộc (theo key bài, có thứ tự). */
+    public function placementTestRequirements(): HasMany
+    {
+        return $this->hasMany(CoursePlacementTest::class)->orderBy('sort_order')->orderBy('id');
+    }
+
     /**
-     * Học viên phải làm bài kiểm tra đầu vào trước khi bắt đầu bài học đầu tiên của khoá này không?
-     * (khoá bật "Bắt buộc làm bài kiểm tra đầu vào" và học viên chưa có bài làm nào).
+     * Phiên bản đang dùng của các bài bắt buộc. Bài đang tắt bị bỏ qua (học viên không làm được thì không chặn).
+     *
+     * @return Collection<int, PlacementTest>
      */
+    public function requiredPlacementTests(): Collection
+    {
+        $keys = $this->placementTestRequirements->pluck('placement_test_key')->all();
+        if ($keys === []) {
+            return new Collection;
+        }
+
+        $active = PlacementTest::query()->active()->whereIn('key', $keys)->get()->keyBy('key');
+
+        return new Collection(array_values(array_filter(array_map(fn ($key) => $active[$key] ?? null, $keys))));
+    }
+
+    /**
+     * Bài bắt buộc mà học viên chưa làm (đã làm một phiên bản bất kỳ của bài = đã làm).
+     *
+     * @return Collection<int, PlacementTest>
+     */
+    public function pendingPlacementTests(User $user): Collection
+    {
+        $required = $this->requiredPlacementTests();
+        if ($required->isEmpty()) {
+            return $required;
+        }
+
+        $done = PlacementAttempt::query()
+            ->where('user_id', $user->id)
+            ->join('placement_tests', 'placement_tests.id', '=', 'placement_attempts.placement_test_id')
+            ->whereIn('placement_tests.key', $required->pluck('key')->all())
+            ->distinct()
+            ->pluck('placement_tests.key')
+            ->all();
+
+        return $required->reject(fn (PlacementTest $test) => in_array($test->key, $done, true))->values();
+    }
+
+    /** Học viên phải làm bài kiểm tra đầu vào (ít nhất một bài bắt buộc chưa làm) trước bài học đầu tiên không? */
     public function needsPlacementTest(User $user): bool
     {
-        return $this->requires_placement_test
-            && PlacementTest::current() !== null
-            && $user->placementAttempts()->doesntExist();
+        return $this->pendingPlacementTests($user)->isNotEmpty();
+    }
+
+    /** Đặt danh sách bài bắt buộc (key bài, theo thứ tự). */
+    public function syncPlacementTestKeys(array $keys): void
+    {
+        $keys = array_values(array_unique(array_filter($keys)));
+        $this->placementTestRequirements()->whereNotIn('placement_test_key', $keys)->delete();
+        foreach ($keys as $i => $key) {
+            $this->placementTestRequirements()->updateOrCreate(['placement_test_key' => $key], ['sort_order' => $i + 1]);
+        }
+        $this->unsetRelation('placementTestRequirements');
     }
 
     /**
      * Gợi ý lộ trình cho học viên: câu trả lời phân loại "Câu hỏi" + giá trị "Năng lực" lấy tự động
-     * từ bài kiểm tra đầu vào mới nhất. Chưa làm bài → điều kiện năng lực không khớp với ai
+     * từ bài làm mới nhất của từng bài kiểm tra đầu vào. Chưa làm bài → điều kiện năng lực không khớp với ai
      * (lộ trình không đặt điều kiện năng lực vẫn khớp bình thường).
      *
      * @param  array<int>  $answeredOptionIds

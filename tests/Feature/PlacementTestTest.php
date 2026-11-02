@@ -228,15 +228,67 @@ class PlacementTestTest extends TestCase
         $this->withToken($token)->getJson('/v1/placement-test')->assertJsonPath('data.completed', true);
         $this->withToken($token)->getJson('/v1/placement-test/result')->assertJsonPath('data.id', $attempt->id);
 
-        // Admin đổi bài đang dùng trong lúc học viên làm bài
-        PlacementTest::create(['title' => 'Bài mới', 'is_active' => true]);
+        // Bài khác chạy song song → bài này vẫn nộp được
+        $other = PlacementTest::create(['title' => 'Bài mới', 'is_active' => true]);
         $this->withToken($token)->postJson('/v1/placement-test/attempts', [
             'test_id' => $this->test->id,
             'answers' => $this->answers(['A'], ['M1'], ['O1', 'O2', 'O3']),
-        ])->assertStatus(409)->assertJsonPath('code', 'test_changed');
+        ])->assertCreated();
+
+        // Admin bật phiên bản mới trong lúc học viên làm bài → 409 kèm id phiên bản mới
+        $v2 = $this->test->duplicate();
+        $v2->update(['is_active' => true]);
+        $this->withToken($token)->postJson('/v1/placement-test/attempts', [
+            'test_id' => $this->test->id,
+            'answers' => $this->answers(['A'], ['M1'], ['O1', 'O2', 'O3']),
+        ])->assertStatus(409)->assertJsonPath('code', 'test_changed')->assertJsonPath('replacement_test_id', $v2->id);
 
         PlacementTest::query()->update(['is_active' => false]);
         $this->withToken($token)->getJson('/v1/placement-test')->assertOk()->assertJsonPath('data', null);
+    }
+
+    public function test_api_multiple_tests(): void
+    {
+        $this->getJson('/v1/placement-tests')->assertUnauthorized();
+        $token = $this->student->createToken('app')->plainTextToken;
+
+        $second = PlacementTest::create(['title' => 'Tư duy', 'intro' => 'Bài 2', 'is_active' => true]);
+        $dim = $second->dimensions()->create(['name' => 'Logic']);
+        $dim->levels()->create(['name' => 'Tốt', 'min_score' => 0]);
+        $q = $second->questions()->create(['type' => PlacementQuestionType::Single, 'prompt' => 'Câu 1']);
+        $x = $q->options()->create(['label' => 'X', 'scores' => [$dim->id => 1]]);
+        PlacementTest::create(['title' => 'Đang tắt']);
+
+        // Danh sách: chỉ bài đang dùng, theo thứ tự
+        $second->update(['sort_order' => 0]);
+        $this->withToken($token)->getJson('/v1/placement-tests')->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $second->id)
+            ->assertJsonPath('data.0.question_count', 1)
+            ->assertJsonPath('data.0.completed', false)
+            ->assertJsonPath('data.1.id', $this->test->id);
+
+        $this->withToken($token)->getJson("/v1/placement-tests/{$second->id}")->assertOk()
+            ->assertJsonPath('data.title', 'Tư duy')
+            ->assertJsonPath('data.questions.0.options.0.label', 'X');
+        $this->withToken($token)->getJson("/v1/placement-tests/{$second->id}/result")->assertOk()->assertJsonPath('data', null);
+
+        $this->withToken($token)->postJson("/v1/placement-tests/{$second->id}/attempts", [
+            'answers' => [['question_id' => $q->id, 'option_ids' => [$x->id]]],
+        ])->assertCreated()->assertJsonPath('data.test_title', 'Tư duy')->assertJsonPath('data.dimensions.0.level.name', 'Tốt');
+
+        $this->withToken($token)->getJson('/v1/placement-tests')
+            ->assertJsonPath('data.0.completed', true)
+            ->assertJsonPath('data.1.completed', false);
+        $this->withToken($token)->getJson("/v1/placement-tests/{$this->test->id}/result")->assertJsonPath('data', null);
+
+        // Phiên bản mới: id cũ → 404 kèm id mới; kết quả / đã làm tính theo bài
+        $v2 = $second->duplicate();
+        $v2->update(['is_active' => true]);
+        $this->withToken($token)->getJson("/v1/placement-tests/{$second->id}")->assertNotFound()
+            ->assertJsonPath('replacement_test_id', $v2->id);
+        $this->withToken($token)->getJson("/v1/placement-tests/{$v2->id}")->assertOk()->assertJsonPath('data.completed', true);
+        $this->withToken($token)->getJson("/v1/placement-tests/{$v2->id}/result")->assertJsonPath('data.test_id', $second->id);
     }
 
     // ---------- CMS ----------
@@ -325,21 +377,36 @@ class PlacementTestTest extends TestCase
             ->assertMountedActionModalSee(['Xuất sắc', 'Rất nhanh', 'Nâng cao', '6 điểm']);
         $this->assertSame(0, PlacementAttempt::count()); // làm thử không lưu
 
-        // Bật bài khác → bài này tắt
+        // Bật bài khác → chạy song song, bài này vẫn dùng
         $other = PlacementTest::create(['title' => 'Khác']);
         Livewire::test(ListPlacementTests::class)->callAction(TestAction::make('activate')->table($other));
         $this->assertTrue($other->fresh()->is_active);
-        $this->assertFalse($this->test->fresh()->is_active);
+        $this->assertTrue($this->test->fresh()->is_active);
 
-        // Nhân bản: điểm gắn sang phân loại mới
+        // Ngừng dùng
+        Livewire::test(ListPlacementTests::class)->callAction(TestAction::make('deactivate')->table($other));
+        $this->assertFalse($other->fresh()->is_active);
+
+        // Nhân bản thành bài mới → key khác
+        Livewire::test(ListPlacementTests::class)->callAction(TestAction::make('duplicate')->table($other), ['mode' => 'new']);
+        $this->assertNotSame($other->key, PlacementTest::where('title', 'Khác (bản sao)')->sole()->key);
+
+        // Nhân bản thành phiên bản mới (mặc định): điểm gắn sang phân loại mới, cùng key bài
         Livewire::test(ListPlacementTests::class)->callAction(TestAction::make('duplicate')->table($this->test));
         $copy = PlacementTest::where('title', 'Đầu vào (bản sao)')->sole()->loadStructure();
         $this->assertFalse($copy->is_active);
+        $this->assertSame($this->test->key, $copy->key);
+        Livewire::test(ListPlacementTests::class)->assertSee('Phiên bản khác của &quot;Đầu vào&quot; (đang dùng)', false);
         $this->assertCount(3, $copy->questions);
         $newTt = $copy->dimensions->firstWhere('name', 'Tiếp thu');
         $this->assertNotSame($this->dim['tt'], $newTt->id);
         $this->assertSame(3, $copy->questions[0]->options[0]->scoreFor($newTt->id));
         $this->assertSame([$this->course->id, $this->draftCourse->id], $newTt->levels->first()->courses->pluck('id')->sort()->values()->all());
+
+        // Bật phiên bản mới → phiên bản cũ tự tắt
+        Livewire::test(ListPlacementTests::class)->callAction(TestAction::make('activate')->table($copy));
+        $this->assertTrue($copy->fresh()->is_active);
+        $this->assertFalse($this->test->fresh()->is_active);
 
         // Đã có bài làm → không xoá được
         app(PlacementScoring::class)->submit($this->student, $this->test, $this->answers(['A'], ['M1'], ['O1', 'O2', 'O3']));

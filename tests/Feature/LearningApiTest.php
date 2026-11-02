@@ -180,14 +180,23 @@ class LearningApiTest extends TestCase
     public function test_placement_test_required_blocks_learning(): void
     {
         $test = \App\Models\PlacementTest::create(['title' => 'Đầu vào', 'is_active' => true]);
-        $this->course->update(['requires_placement_test' => true]);
+        $this->course->syncPlacementTestKeys([$test->key]);
         app(LearningProgress::class)->enroll($this->student, $this->course->fresh(), EnrollmentSource::Admin, $this->pathMarketing);
         $token = $this->student->createToken('app', ['app'])->plainTextToken;
 
-        $this->withToken($token)->getJson('/v1/my/courses')->assertJsonPath('data.0.needs_placement_test', true)->assertJsonPath('data.0.needs_path', false);
-        $this->withToken($token)->getJson("/v1/lessons/{$this->lessons['intro']->id}")->assertStatus(409)->assertJsonPath('code', 'placement_test_required');
+        $this->withToken($token)->getJson('/v1/my/courses')
+            ->assertJsonPath('data.0.requires_placement_test', true)
+            ->assertJsonPath('data.0.needs_placement_test', true)
+            ->assertJsonPath('data.0.placement_tests', [['id' => $test->id, 'title' => 'Đầu vào', 'completed' => false]])
+            ->assertJsonPath('data.0.needs_path', false);
+        $this->withToken($token)->getJson("/v1/lessons/{$this->lessons['intro']->id}")->assertStatus(409)
+            ->assertJsonPath('code', 'placement_test_required')
+            ->assertJsonPath('placement_tests', [['id' => $test->id, 'title' => 'Đầu vào']]);
 
         \App\Models\PlacementAttempt::create(['user_id' => $this->student->id, 'placement_test_id' => $test->id, 'answers' => [], 'results' => [], 'completed_at' => now()]);
         $this->withToken($token)->getJson("/v1/lessons/{$this->lessons['intro']->id}")->assertOk();
+        $this->withToken($token)->getJson('/v1/my/courses')
+            ->assertJsonPath('data.0.needs_placement_test', false)
+            ->assertJsonPath('data.0.placement_tests.0.completed', true);
     }
 }
