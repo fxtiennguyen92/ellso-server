@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
  *
  * TRUSTED_PROXIES (config app.trusted_proxies): trống = không tin (local), "all" (hoặc "*") = tin máy gọi trực tiếp
  * (CloudFront → máy chủ, không qua load balancer), hoặc danh sách IP / CIDR cách nhau dấu phẩy.
- * Elastic Beanstalk không cho ký tự * trong giá trị biến môi trường → production đặt "all".
+ * Một số nơi đặt biến môi trường không cho ký tự * → có thể đặt "all".
  * Chỉ tin X-Forwarded-For: Host / Proto không lấy từ header (người dùng có thể tự gửi qua CloudFront);
  * https do FORCE_HTTPS quyết định (xem ForceHttps).
  */
