@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PlacementTests\Pages;
 
 use App\Filament\Resources\PlacementTests\Pages\Concerns\SimulatesPlacementTest;
+use App\Filament\Resources\PlacementTests\Pages\Concerns\HandlesPlacementDrafts;
 use App\Filament\Resources\PlacementTests\PlacementTestResource;
 use App\Models\Classification;
 use App\Models\PlacementDimension;
@@ -33,7 +34,7 @@ use Illuminate\Support\HtmlString;
  */
 class ManagePlacementDimensions extends ManageRelatedRecords
 {
-    use SimulatesPlacementTest;
+    use HandlesPlacementDrafts, SimulatesPlacementTest;
 
     protected static string $resource = PlacementTestResource::class;
 
@@ -54,12 +55,12 @@ class ManagePlacementDimensions extends ManageRelatedRecords
 
     public function getSubheading(): ?string
     {
-        return $this->test()->title . ' — mỗi năng lực có nhiều mức độ. Ngưỡng tính theo %: 0% = điểm thấp nhất, 100% = điểm cao nhất có thể đạt với các câu học viên nhận được; học viên đạt mức có ngưỡng cao nhất mà % của họ chạm tới.';
+        return $this->draftNotice() . $this->test()->title . ' — mỗi năng lực có nhiều mức độ. Ngưỡng tính theo %: 0% = điểm thấp nhất, 100% = điểm cao nhất có thể đạt với các câu học viên nhận được; học viên đạt mức có ngưỡng cao nhất mà % của họ chạm tới.';
     }
 
     protected function getHeaderActions(): array
     {
-        return [$this->simulateAction()];
+        return [...$this->draftActions(), $this->simulateAction()];
     }
 
     public function form(Schema $schema): Schema

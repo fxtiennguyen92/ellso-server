@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PlacementTests\Pages;
 
 use App\Filament\Resources\PlacementAttempts\PlacementAttemptResource;
 use App\Filament\Resources\PlacementAttempts\PlacementAttemptsTable;
+use App\Filament\Resources\PlacementTests\Pages\Concerns\HandlesPlacementDrafts;
 use App\Filament\Resources\PlacementTests\PlacementTestResource;
 use App\Support\SeenMarker;
 use BackedEnum;
@@ -14,6 +15,8 @@ use Filament\Tables\Table;
 /** Tab "Bài làm": kết quả từng lần làm bài của học viên (bản chụp lúc nộp). */
 class ManagePlacementAttempts extends ManageRelatedRecords
 {
+    use HandlesPlacementDrafts;
+
     protected static string $resource = PlacementTestResource::class;
 
     protected static string $relationship = 'attempts';
@@ -30,7 +33,7 @@ class ManagePlacementAttempts extends ManageRelatedRecords
 
     public function getSubheading(): ?string
     {
-        return $this->getOwnerRecord()->title . ' — học viên có thể làm lại; kết quả mới nhất được dùng để gợi ý.';
+        return $this->draftNotice() . $this->getOwnerRecord()->title . ' — học viên có thể làm lại; kết quả mới nhất được dùng để gợi ý.';
     }
 
     public static function getNavigationBadge(): ?string

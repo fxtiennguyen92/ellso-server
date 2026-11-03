@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PlacementTests\Pages;
 
 use App\Enums\PlacementQuestionType;
 use App\Filament\Resources\PlacementTests\Pages\Concerns\SimulatesPlacementTest;
+use App\Filament\Resources\PlacementTests\Pages\Concerns\HandlesPlacementDrafts;
 use App\Filament\Resources\PlacementTests\PlacementTestResource;
 use App\Models\PlacementQuestion;
 use App\Models\PlacementTest;
@@ -35,7 +36,7 @@ use Illuminate\Support\HtmlString;
  */
 class ManagePlacementQuestions extends ManageRelatedRecords
 {
-    use SimulatesPlacementTest;
+    use HandlesPlacementDrafts, SimulatesPlacementTest;
 
     protected static string $resource = PlacementTestResource::class;
 
@@ -56,7 +57,7 @@ class ManagePlacementQuestions extends ManageRelatedRecords
         $test = $this->test();
         $total = $test->questions()->count();
 
-        return $test->title . ($test->drawsQuestions() && $total
+        return $this->draftNotice() . $test->title . ($test->drawsQuestions() && $total
             ? ' — ngân hàng ' . $total . ' câu, mỗi lần làm rút ngẫu nhiên ' . $test->questionsPerAttempt($total) . ' câu'
                 . ($test->question_count > $total ? ' (đang thiếu ' . ($test->question_count - $total) . ' câu so với số đã đặt)' : '')
             : '');
@@ -64,7 +65,7 @@ class ManagePlacementQuestions extends ManageRelatedRecords
 
     protected function getHeaderActions(): array
     {
-        return [$this->simulateAction()];
+        return [...$this->draftActions(), $this->simulateAction()];
     }
 
     public function form(Schema $schema): Schema

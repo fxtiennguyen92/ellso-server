@@ -110,8 +110,8 @@ class PlacementTestResource extends Resource
                 TextColumn::make('is_active')
                     ->label('Trạng thái')
                     ->badge()
-                    ->formatStateUsing(fn (bool $state) => $state ? 'Đang dùng' : 'Không dùng')
-                    ->color(fn (bool $state) => $state ? 'success' : 'gray'),
+                    ->formatStateUsing(fn (bool $state, PlacementTest $record) => $state ? 'Đang dùng' : ($record->isDraft() ? 'Bản nháp' : 'Không dùng'))
+                    ->color(fn (bool $state, PlacementTest $record) => $state ? 'success' : ($record->isDraft() ? 'warning' : 'gray')),
                 TextColumn::make('questions_count')
                     ->label('Câu hỏi')
                     ->alignCenter()
@@ -136,16 +136,23 @@ class PlacementTestResource extends Resource
                     ->color('gray'),
             ])
             ->recordActions([
+                Action::make('openDraft')
+                    ->label('Xem bản nháp')
+                    ->icon(Heroicon::PencilSquare)
+                    ->link()
+                    ->color('warning')
+                    ->visible(fn (PlacementTest $record) => $record->is_active && $record->siblings_count > 0 && $record->drafts()->isNotEmpty())
+                    ->url(fn (PlacementTest $record) => ManagePlacementQuestions::getUrl(['record' => $record->drafts()->first()])),
                 ActionGroup::make([
                     EditAction::make()->label('Sửa thông tin'),
                     Action::make('activate')
-                        ->label('Dùng bài này')
+                        ->label(fn (PlacementTest $record) => $record->isDraft() ? 'Dùng bản nháp này' : 'Dùng bài này')
                         ->icon(Heroicon::CheckBadge)
                         ->color('success')
                         ->visible(fn (PlacementTest $record) => ! $record->is_active)
                         ->requiresConfirmation()
                         ->modalDescription(fn (PlacementTest $record) => ($old = PlacementTest::activeFor($record->key))
-                            ? 'Đây là phiên bản mới của "' . $old->title . '" — phiên bản đó sẽ được tắt. Khoá học bắt buộc bài này chuyển sang phiên bản mới; học viên đã làm phiên bản cũ vẫn được tính là đã làm.'
+                            ? 'Bản nháp này sẽ thay "' . $old->title . '" đang dùng (bản đó được tắt, vẫn giữ để xem lại). Khoá học bắt buộc bài này chuyển sang bản mới; học viên đã làm bản cũ vẫn được tính là đã làm.'
                             : 'Học viên sẽ thấy và làm được bài này trên app. Các bài đang dùng khác vẫn giữ nguyên.')
                         ->action(function (PlacementTest $record) {
                             $record->update(['is_active' => true]);
@@ -173,11 +180,11 @@ class PlacementTestResource extends Resource
                             Radio::make('mode')
                                 ->hiddenLabel()
                                 ->options([
-                                    'version' => 'Phiên bản mới của bài này',
+                                    'version' => 'Bản nháp để sửa đề',
                                     'new' => 'Bài kiểm tra mới',
                                 ])
                                 ->descriptions([
-                                    'version' => 'Để sửa đề mà không ảnh hưởng bài đang chạy. Khi bật bản sao, bản cũ tự tắt; khoá học bắt buộc, điều kiện lộ trình và bài đã làm của học viên vẫn giữ.',
+                                    'version' => 'Sửa đề trên bản nháp mà không ảnh hưởng bài đang chạy. Xong thì bấm "Dùng bản nháp này" để thay bản cũ; khoá học bắt buộc, điều kiện lộ trình và bài đã làm của học viên vẫn giữ.',
                                     'new' => 'Dùng đề này làm mẫu cho một bài khác, với nhóm năng lực riêng. Hai bài chạy song song được.',
                                 ])
                                 ->default('version')
@@ -186,8 +193,9 @@ class PlacementTestResource extends Resource
                         ->modalSubmitActionLabel('Nhân bản')
                         ->authorize('replicate')
                         ->action(function (PlacementTest $record, array $data, $livewire) {
-                            $copy = $record->duplicate(($data['mode'] ?? 'version') === 'version');
-                            Notification::make()->title('Đã tạo bản sao')->success()->send();
+                            $asDraft = ($data['mode'] ?? 'version') === 'version';
+                            $copy = $record->duplicate($asDraft);
+                            Notification::make()->title($asDraft ? 'Đã tạo bản nháp' : 'Đã tạo bài kiểm tra mới')->success()->send();
                             $livewire->redirect(ManagePlacementQuestions::getUrl(['record' => $copy]));
                         }),
                     DeleteAction::make()
@@ -196,17 +204,22 @@ class PlacementTestResource extends Resource
             ]);
     }
 
-    /** "Phiên bản mới của …" / "Có 2 phiên bản" — để phân biệt các bản nhân bản. */
+    /** Ghi chú dưới tên bài: "Đang có bản nháp" / "Bản nháp của …". */
     private static function versionNote(PlacementTest $record): ?string
     {
         if (! $record->siblings_count) {
             return null;
         }
-        if (! $record->is_active && ($active = PlacementTest::activeFor($record->key))) {
-            return 'Phiên bản khác của "' . $active->title . '" (đang dùng)';
+        if ($record->is_active) {
+            $drafts = $record->drafts()->count();
+
+            return $drafts > 1 ? "Đang có {$drafts} bản nháp" : ($drafts ? 'Đang có bản nháp' : null);
+        }
+        if ($active = PlacementTest::activeFor($record->key)) {
+            return 'Bản nháp của "' . $active->title . '" (học viên chưa thấy)';
         }
 
-        return 'Có ' . ($record->siblings_count + 1) . ' phiên bản';
+        return 'Có ' . ($record->siblings_count + 1) . ' bản của cùng bài, chưa bản nào đang dùng';
     }
 
     public static function getRecordSubNavigation(Page $page): array

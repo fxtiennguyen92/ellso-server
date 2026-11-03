@@ -108,6 +108,26 @@ class PlacementTest extends Model
         return $this->hasMany(self::class, 'key', 'key')->whereKeyNot($this->getKey());
     }
 
+    /**
+     * Bản nháp = phiên bản chưa dùng của một bài đang có phiên bản khác đang dùng
+     * (tạo bằng Nhân bản › Phiên bản mới; bật bản nháp thì nó thay bản đang dùng).
+     */
+    public function isDraft(): bool
+    {
+        return ! $this->is_active && static::activeFor($this->key) !== null;
+    }
+
+    /** Các bản nháp của bài này (khi bài đang dùng), mới nhất trước. */
+    public function drafts(): Collection
+    {
+        if (! $this->is_active) {
+            return new Collection;
+        }
+
+        return static::query()->where('key', $this->key)->whereKeyNot($this->getKey())
+            ->where('is_active', false)->latest('id')->get();
+    }
+
     /** Các khoá học bắt buộc làm bài này (theo key). */
     public function requiringCourses(): BelongsToMany
     {

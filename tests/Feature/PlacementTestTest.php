@@ -531,15 +531,28 @@ class PlacementTestTest extends TestCase
         $copy = PlacementTest::where('title', 'Đầu vào (bản sao)')->sole()->loadStructure();
         $this->assertFalse($copy->is_active);
         $this->assertSame($this->test->key, $copy->key);
-        Livewire::test(ListPlacementTests::class)->assertSee('Phiên bản khác của &quot;Đầu vào&quot; (đang dùng)', false);
+        $this->assertTrue($copy->isDraft());
+        $this->assertSame([$copy->id], $this->test->fresh()->drafts()->pluck('id')->all());
+        Livewire::test(ListPlacementTests::class)
+            ->assertSee('Đang có bản nháp')
+            ->assertSee('Bản nháp của &quot;Đầu vào&quot; (học viên chưa thấy)', false)
+            ->assertActionVisible(TestAction::make('openDraft')->table($this->test))
+            ->assertActionHidden(TestAction::make('openDraft')->table($copy));
+
+        // Tab của bản nháp: dòng nhắc + nút xem bản đang dùng / dùng bản nháp; tab của bản đang dùng: nút xem bản nháp
+        Livewire::test(ManagePlacementQuestions::class, ['record' => $this->test->getRouteKey()])
+            ->assertActionVisible('openDraft')->assertActionHidden('publishDraft');
+        Livewire::test(ManagePlacementQuestions::class, ['record' => $copy->getRouteKey()])
+            ->assertSee('Bản nháp của &quot;Đầu vào&quot; — học viên chưa thấy', false)
+            ->assertActionHidden('openDraft')->assertActionVisible('openActive')->assertActionVisible('publishDraft');
         $this->assertCount(3, $copy->questions);
         $newTt = $copy->dimensions->firstWhere('name', 'Tiếp thu');
         $this->assertNotSame($this->dim['tt'], $newTt->id);
         $this->assertSame(3, $copy->questions[0]->options[0]->scoreFor($newTt->id));
         $this->assertSame([$this->course->id, $this->draftCourse->id], $newTt->levels->first()->courses->pluck('id')->sort()->values()->all());
 
-        // Bật phiên bản mới → phiên bản cũ tự tắt
-        Livewire::test(ListPlacementTests::class)->callAction(TestAction::make('activate')->table($copy));
+        // Dùng bản nháp (từ tab của bản nháp) → bản cũ tự tắt
+        Livewire::test(ManagePlacementQuestions::class, ['record' => $copy->getRouteKey()])->callAction('publishDraft');
         $this->assertTrue($copy->fresh()->is_active);
         $this->assertFalse($this->test->fresh()->is_active);
 
