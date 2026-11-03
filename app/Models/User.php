@@ -167,10 +167,28 @@ class User extends Authenticatable implements FilamentUser
         return $this->belongsToMany(Document::class, 'document_saves')->withPivot('created_at');
     }
 
-    /** Khoá huấn luyện mà giáo viên này hướng dẫn. */
+    /** Chương trình huấn luyện mà giảng viên này hướng dẫn. */
     public function trainingCourses(): HasMany
     {
         return $this->hasMany(TrainingCourse::class, 'trainer_id');
+    }
+
+    /** Workshop mà giảng viên này hướng dẫn. */
+    public function workshops(): HasMany
+    {
+        return $this->hasMany(Workshop::class, 'trainer_id');
+    }
+
+    /** Chương trình huấn luyện học viên đã đăng ký. */
+    public function trainingRegistrations(): HasMany
+    {
+        return $this->hasMany(TrainingRegistration::class);
+    }
+
+    /** Buổi workshop học viên đã đăng ký. */
+    public function workshopRegistrations(): HasMany
+    {
+        return $this->hasMany(WorkshopRegistration::class);
     }
 
     /** Các lần làm bài kiểm tra đầu vào. */
