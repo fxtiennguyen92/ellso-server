@@ -6,9 +6,10 @@ use App\Enums\DocumentType;
 use App\Enums\VideoStatus;
 use App\Jobs\ProcessDocumentVideo;
 use App\Models\Document;
+use App\Support\BookPreview;
 use App\Support\DocumentStorage;
 
-/** Xử lý chung khi tạo / sửa tài liệu: giá bán, thông tin file, đưa video vào hàng đợi cắt HLS. */
+/** Xử lý chung khi tạo / sửa tài liệu: giá bán, thông tin file, đưa video vào hàng đợi cắt HLS, bản đọc thử sách. */
 trait SavesDocument
 {
     protected function normalizeData(array $data): array
@@ -38,6 +39,10 @@ trait SavesDocument
     /** Sau khi lưu: cập nhật dung lượng / định dạng file; video mới → chờ xử lý + đưa vào hàng đợi. */
     protected function afterDocumentSaved(Document $doc): void
     {
+        // Lấy danh sách trường vừa đổi trước khi saveQuietly() bên dưới ghi đè
+        $changed = array_keys($doc->getChanges());
+        $isNew = $doc->wasRecentlyCreated;
+
         if ($doc->file_path && ($doc->wasChanged('file_path') || $doc->wasRecentlyCreated || ! $doc->file_size)) {
             $disk = DocumentStorage::disk();
             $doc->forceFill([
@@ -50,6 +55,13 @@ trait SavesDocument
             && ($doc->wasRecentlyCreated || $doc->wasChanged('video_source_path'))) {
             $doc->forceFill(['video_status' => VideoStatus::Pending, 'video_error' => null])->saveQuietly();
             ProcessDocumentVideo::dispatch($doc->id);
+        }
+
+        // Sách: tạo lại bản đọc thử khi đổi file / cài đặt đọc thử (hoặc chưa có bản nào); tắt → xoá
+        if ($doc->type === DocumentType::Book
+            && ($isNew || array_intersect($changed, BookPreview::TRIGGERS)
+                || ($doc->preview_enabled && $doc->file_path && ! $doc->preview_path && ! $doc->preview_status))) {
+            BookPreview::refresh($doc);
         }
     }
 }
