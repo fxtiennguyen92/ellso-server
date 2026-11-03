@@ -56,7 +56,7 @@ class UserResource extends Resource
 
     /**
      * Vai trò hiển thị ở màn này. Hệ thống › Người dùng: Admin + Giảng viên.
-     * Học viên quản lý ở Tài khoản › Học viên (StudentResource kế thừa màn này).
+     * Học viên quản lý ở Học viên › Tài khoản (StudentResource kế thừa màn này).
      *
      * @var list<UserRole>
      */

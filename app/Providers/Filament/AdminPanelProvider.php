@@ -23,7 +23,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
 {
-    public const NAV_GROUPS = ['Tài khoản', 'Đào tạo', 'Thiết lập', 'Marketing', 'Thống kê', 'Hệ thống'];
+    public const NAV_GROUPS = ['Học viên', 'Đào tạo', 'Thiết lập', 'Marketing', 'Thống kê', 'Hệ thống'];
 
     public function panel(Panel $panel): Panel
     {

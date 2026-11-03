@@ -38,16 +38,39 @@
             </div>
 
             @if ($percent !== null)
-                <div style="position:relative;height:8px;border-radius:999px;margin:16px 0 {{ $dimLevels ? '22px' : '6px' }};background:color-mix(in oklab, var(--gray-500) 18%, transparent)">
-                    <div style="position:absolute;left:0;top:0;bottom:0;width:{{ $percent }}%;border-radius:999px;background:var(--primary-500)"></div>
-                    @foreach ($dimLevels as $lv)
-                        @php $at = max(0, min(100, (int) $lv['min'])); @endphp
-                        @if ($at > 0)
-                            <div title="{{ $lv['name'] }} từ {{ $at }}%" style="position:absolute;top:-4px;bottom:-4px;width:2px;left:{{ $at }}%;background:var(--gray-600)"></div>
+                @php
+                    // Vùng của từng mức: [từ %, đến %), tăng dần; mức thấp nhất luôn bắt đầu từ 0%
+                    $zones = [];
+                    $sorted = collect($dimLevels)->map(fn ($lv) => ['name' => $lv['name'], 'from' => max(0, min(100, (int) $lv['min']))])->sortBy('from')->values()->all();
+                    foreach ($sorted as $i => $lv) {
+                        $from = $i === 0 ? 0 : $lv['from'];
+                        $to = $sorted[$i + 1]['from'] ?? 100;
+                        $zones[] = ['name' => $lv['name'], 'from' => $from, 'to' => max($from, $to), 'reached' => $lv['name'] === ($r['level'] ?? null)];
+                    }
+                @endphp
+                <div style="position:relative;height:10px;border-radius:999px;margin:16px 0 8px;overflow:hidden;background:color-mix(in oklab, var(--gray-500) 14%, transparent)">
+                    @foreach ($zones as $i => $z)
+                        @if ($i % 2 === 1)
+                            <div style="position:absolute;top:0;bottom:0;left:{{ $z['from'] }}%;width:{{ $z['to'] - $z['from'] }}%;background:color-mix(in oklab, var(--gray-500) 12%, transparent)"></div>
                         @endif
-                        <div style="position:absolute;top:14px;left:{{ $at }}%;font-size:11px;white-space:nowrap;opacity:.65;transform:translateX({{ $at > 0 ? ($at >= 90 ? '-100%' : '-50%') : '0' }})">{{ $lv['name'] }} ≥ {{ $at }}%</div>
+                    @endforeach
+                    <div style="position:absolute;left:0;top:0;bottom:0;width:{{ $percent }}%;border-radius:999px;background:var(--primary-500)"></div>
+                    @foreach ($zones as $i => $z)
+                        @if ($i > 0 && $z['from'] > 0 && $z['from'] < 100)
+                            <div title="{{ $z['name'] }} từ {{ $z['from'] }}%" style="position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;left:{{ $z['from'] }}%;background:color-mix(in oklab, var(--gray-600) 70%, transparent)"></div>
+                        @endif
                     @endforeach
                 </div>
+                @if ($zones)
+                    <div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;margin-bottom:4px">
+                        @foreach (array_reverse($zones) as $z)
+                            <span style="{{ $z['reached'] ? 'font-weight:600;color:var(--primary-700)' : 'opacity:.65' }}">
+                                {{ $z['name'] }}
+                                <span style="font-variant-numeric:tabular-nums">{{ $z['to'] >= 100 ? '≥ ' . $z['from'] . '%' : $z['from'] . '–' . $z['to'] . '%' }}</span>
+                            </span>
+                        @endforeach
+                    </div>
+                @endif
             @endif
 
             @if (filled($r['level_description'] ?? null))

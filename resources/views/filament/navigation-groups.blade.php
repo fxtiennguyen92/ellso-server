@@ -22,9 +22,9 @@
     (function () {
         try {
             var key = 'collapsedGroups';
-            if (localStorage.getItem('ellsoNavDefaults') !== '1') {
+            if (localStorage.getItem('ellsoNavDefaults') !== '2') {
                 localStorage.removeItem(key);
-                localStorage.setItem('ellsoNavDefaults', '1');
+                localStorage.setItem('ellsoNavDefaults', '2');
             }
             var collapsed = JSON.parse(localStorage.getItem(key));
             if (! Array.isArray(collapsed)) {
