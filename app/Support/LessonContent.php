@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Enums\VideoStatus;
+use App\Models\LessonVideo;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
@@ -19,7 +21,7 @@ use Illuminate\Validation\ValidationException;
  */
 class LessonContent
 {
-    public const BLOCK_TYPES = ['paragraph', 'header', 'list', 'quote', 'delimiter', 'image', 'table', 'code', 'warning', 'quiz'];
+    public const BLOCK_TYPES = ['paragraph', 'header', 'list', 'quote', 'delimiter', 'image', 'table', 'code', 'warning', 'quiz', 'video'];
 
     public const QUIZ_MAX_OPTIONS = 8;
 
@@ -36,7 +38,10 @@ class LessonContent
      *
      * @throws ValidationException
      */
-    public static function sanitize(array $data, string $allowedImageUrlPrefix): array
+    /**
+     * @param  list<int>|null  $allowedVideoIds  id video của chính bài (LessonVideo); null = không kiểm tra
+     */
+    public static function sanitize(array $data, string $allowedImageUrlPrefix, ?array $allowedVideoIds = null): array
     {
         $blocks = $data['blocks'] ?? null;
 
@@ -73,7 +78,11 @@ class LessonContent
             $clean[] = array_filter([
                 'id' => isset($block['id']) ? substr((string) $block['id'], 0, 32) : null,
                 'type' => $type,
-                'data' => $type === 'quiz' ? self::cleanQuiz($blockData) : self::cleanValue($blockData, null),
+                'data' => match ($type) {
+                    'quiz' => self::cleanQuiz($blockData),
+                    'video' => self::cleanVideo($blockData, $allowedVideoIds),
+                    default => self::cleanValue($blockData, null),
+                },
                 'tunes' => is_array($block['tunes'] ?? null) ? $block['tunes'] : null,
             ], fn ($value) => $value !== null);
         }
@@ -113,6 +122,75 @@ class LessonContent
             'options' => $options,
             'explanation' => $plain($data['explanation'] ?? '', 2000),
         ];
+    }
+
+    /**
+     * Khối video: id video của bài, chú thích, mốc thời gian (văn bản mỗi dòng "mm:ss Nội dung" — giữ nguyên để sửa tiếp,
+     * kiểm tra khi xuất bản, chuyển thành [{start, time, title}] khi gửi app).
+     *
+     * @return array{video_id: int|null, caption: string, chapters: string}
+     */
+    public static function cleanVideo(array $data, ?array $allowedVideoIds = null): array
+    {
+        $id = isset($data['video_id']) && is_numeric($data['video_id']) ? (int) $data['video_id'] : null;
+        if ($id !== null && $allowedVideoIds !== null && ! in_array($id, $allowedVideoIds, true)) {
+            $id = null;
+        }
+
+        return [
+            'video_id' => $id,
+            'caption' => mb_substr(trim(strip_tags((string) ($data['caption'] ?? ''))), 0, 300),
+            'chapters' => mb_substr(trim(strip_tags((string) ($data['chapters'] ?? ''))), 0, 10000),
+        ];
+    }
+
+    /**
+     * Lỗi của các khối video (dùng khi xuất bản): chưa tải video, video chưa xử lý xong / lỗi, mốc thời gian sai.
+     *
+     * @param  array<int, LessonVideo>  $videos  video của bài, theo id
+     * @return list<string>
+     */
+    public static function videoProblems(?array $content, array $videos): array
+    {
+        $problems = [];
+        $number = 0;
+
+        foreach ($content['blocks'] ?? [] as $block) {
+            if (($block['type'] ?? null) !== 'video') {
+                continue;
+            }
+            $number++;
+            $data = self::cleanVideo($block['data'] ?? []);
+            $video = $data['video_id'] ? ($videos[$data['video_id']] ?? null) : null;
+
+            if (! $video) {
+                $problems[] = "Video {$number}: chưa tải video lên.";
+
+                continue;
+            }
+            if ($video->video_status === VideoStatus::Failed) {
+                $problems[] = "Video {$number}: xử lý lỗi — tải lại video khác.";
+            } elseif (! $video->isReady()) {
+                $problems[] = "Video {$number}: đang xử lý, chờ xong rồi xuất bản.";
+            }
+            foreach (VideoChapters::parse($data['chapters'], $video->isReady() ? $video->duration_seconds : null)['errors'] as $error) {
+                $problems[] = "Video {$number} – mốc thời gian: {$error}";
+            }
+        }
+
+        return $problems;
+    }
+
+    /** Id video được dùng trong nội dung. @return list<int> */
+    public static function videoIds(?array $content): array
+    {
+        return collect($content['blocks'] ?? [])
+            ->where('type', 'video')
+            ->map(fn ($b) => isset($b['data']['video_id']) ? (int) $b['data']['video_id'] : null)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**
@@ -178,7 +256,7 @@ class LessonContent
      *
      * @param  list<string>  $answeredBlockIds  câu hỏi học viên đã trả lời đúng → answered = true
      */
-    public static function forApp(?array $content, array $answeredBlockIds = []): array
+    public static function forApp(?array $content, array $answeredBlockIds = [], array $videos = []): array
     {
         $valid = self::quizzes($content);
         $blocks = [];
@@ -197,6 +275,19 @@ class LessonContent
                     'question' => $quiz['question'],
                     'options' => array_map(fn ($o) => ['id' => $o['id'], 'text' => $o['text']], $quiz['options']),
                     'answered' => in_array($id, $answeredBlockIds, true),
+                ];
+            } elseif ($type === 'video') {
+                // Video bài học: chỉ gửi khi đã xử lý xong; app gọi POST /lessons/{id}/videos/{video}/play để lấy link phát
+                $data = self::cleanVideo($block['data'] ?? []);
+                $video = $data['video_id'] ? ($videos[$data['video_id']] ?? null) : null;
+                if (! $video?->isReady()) {
+                    continue;
+                }
+                $block['data'] = [
+                    'video_id' => $video->id,
+                    'duration_seconds' => $video->duration_seconds,
+                    'caption' => $data['caption'],
+                    'chapters' => VideoChapters::present(VideoChapters::parse($data['chapters'], $video->duration_seconds)['chapters']),
                 ];
             } elseif ($type === 'image' && is_string($block['data']['file']['url'] ?? null)) {
                 // Ảnh của hệ thống → dựng lại link theo ổ ảnh hiện tại (local: domain đang gọi; S3: CloudFront).

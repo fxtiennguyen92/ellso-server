@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\LessonContent;
 use App\Enums\ContentStatus;
 use App\Models\Concerns\CleansUpFiles;
 use Illuminate\Database\Eloquent\Builder;
@@ -72,6 +73,11 @@ class Lesson extends Model
         });
 
         // Xóa bài khỏi thư viện → gỡ khỏi mọi lộ trình
+        // Xoá vĩnh viễn → xoá video bài học (file trên ổ tài liệu)
+        static::forceDeleted(function (Lesson $lesson) {
+            $lesson->videos()->get()->each->delete();
+        });
+
         static::deleted(function (Lesson $lesson) {
             $lesson->pathLessons()->delete();
         });
@@ -162,6 +168,26 @@ class Lesson extends Model
         $copy->owner_id = auth()->id() ?? $this->owner_id;
         $copy->save();
 
+        // Video bài học: bản sao dùng chung file đã xử lý (không cắt lại), đổi id trong khối video của bản nháp
+        $map = [];
+        // (chỉ video đã xử lý xong — video đang xử lý thì bản sao phải tải lại)
+        foreach ($this->videos()->whereIn('id', LessonContent::videoIds($this->content_draft) ?: [0])->get()->filter->isReady() as $video) {
+            $newVideo = $video->replicate(['lesson_id']);
+            $newVideo->lesson_id = $copy->id;
+            $newVideo->hls_key = $video->hls_key;
+            $newVideo->save();
+            $map[$video->id] = $newVideo->id;
+        }
+        if ($map) {
+            $content = $copy->content_draft;
+            foreach ($content['blocks'] ?? [] as $i => $block) {
+                if (($block['type'] ?? null) === 'video' && isset($map[$block['data']['video_id'] ?? 0])) {
+                    $content['blocks'][$i]['data']['video_id'] = $map[$block['data']['video_id']];
+                }
+            }
+            $copy->forceFill(['content_draft' => $content])->saveQuietly();
+        }
+
         return $copy;
     }
 
@@ -175,6 +201,12 @@ class Lesson extends Model
     public function pathLessons(): HasMany
     {
         return $this->hasMany(PathLesson::class);
+    }
+
+    /** Video tải riêng cho bài (khối "Video" trong nội dung). */
+    public function videos(): HasMany
+    {
+        return $this->hasMany(LessonVideo::class);
     }
 
     /** Các khóa học đang dùng bài này (qua lộ trình). */

@@ -51,6 +51,11 @@ Route::middleware('signed')->prefix('hls/{document}')->whereNumber('document')->
     Route::get('{height}/index.m3u8', [HlsController::class, 'variant'])->whereNumber('height')->name('hls.variant');
     Route::get('key', [HlsController::class, 'key'])->name('hls.key');
 });
+Route::middleware('signed')->prefix('hls/lesson-videos/{video}')->whereNumber('video')->group(function () {
+    Route::get('master.m3u8', [HlsController::class, 'lessonMaster'])->name('hls.lesson.master');
+    Route::get('{height}/index.m3u8', [HlsController::class, 'lessonVariant'])->whereNumber('height')->name('hls.lesson.variant');
+    Route::get('key', [HlsController::class, 'lessonKey'])->name('hls.lesson.key');
+});
 
 // ---- Đã đăng nhập (token đầy đủ; token đổi mật khẩu không vào được) ----
 Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
@@ -79,6 +84,7 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::get('lessons/{id}', [LessonController::class, 'show'])->whereNumber('id');
     Route::post('lessons/{id}/read', [LessonController::class, 'read'])->whereNumber('id');
     Route::post('lessons/{id}/quiz', [LessonController::class, 'answer'])->whereNumber('id')->middleware('throttle:60,1');
+    Route::post('lessons/{id}/videos/{videoId}/play', [LessonController::class, 'playVideo'])->whereNumber(['id', 'videoId'])->middleware('throttle:60,1');
 
     // Tài liệu: Video (HLS), PDF, Sách
     Route::get('documents', [DocumentController::class, 'index']);

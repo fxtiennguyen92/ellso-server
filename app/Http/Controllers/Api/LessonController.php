@@ -13,6 +13,7 @@ use App\Support\MediaStorage;
 
 /**
  * Học bài (học viên đã đăng nhập).
+ * - POST /lessons/{id}/videos/{video}/play : link phát video bài học (HLS có chữ ký, 5 phút)
  * - GET  /lessons/{id}        : nội dung đã xuất bản (câu hỏi không kèm đáp án) + tiến độ; coaching → type coaching, không nội dung
  * - POST /lessons/{id}/read   : đã đọc đến cuối bài
  * - POST /lessons/{id}/quiz   : trả lời một câu hỏi {block_id, option_ids[]} → đúng/sai + giải thích
@@ -49,7 +50,7 @@ class LessonController extends Controller
                 'summary' => $lesson->summary,
                 'icon_url' => $lesson->icon ? MediaStorage::disk()->url($lesson->icon) : null,
                 'course_id' => $access['enrollment']?->course_id,
-                'content' => LessonContent::forApp($lesson->content_published, $answered),
+                'content' => LessonContent::forApp($lesson->content_published, $answered, $lesson->videos()->get()->keyBy('id')->all()),
                 'quiz_count' => count(LessonContent::quizzes($lesson->content_published)),
                 'progress' => $this->progressData($progress, $lesson, $answered),
             ],
@@ -88,6 +89,28 @@ class LessonController extends Controller
     }
 
     /** @return array{0: \App\Models\User, 1: Lesson, 2: array} */
+    /**
+     * Link phát video bài học (HLS, hạn 5 phút — hết hạn thì gọi lại). Chỉ video nằm trong nội dung đã xuất bản.
+     * Mốc thời gian nằm trong khối video của content (data.chapters).
+     */
+    public function playVideo(Request $request, int $id, int $videoId): JsonResponse
+    {
+        [$user, $lesson] = $this->authorizeLesson($request, $id);
+        $video = $lesson->videos()->find($videoId);
+        abort_unless(
+            $video && $video->isReady() && in_array($video->id, LessonContent::videoIds($lesson->content_published), true),
+            404,
+            'Video không có trong bài học.',
+        );
+
+        return response()->json(['data' => [
+            'url' => HlsController::lessonMasterUrl($video, $user),
+            'expires_at' => now()->addMinutes((int) config('ellso.documents.link_ttl_minutes'))->toIso8601String(),
+            'duration_seconds' => $video->duration_seconds,
+            'qualities' => collect($video->hls_variants)->pluck('height')->values(),
+        ]]);
+    }
+
     private function authorizeLesson(Request $request, int $id): array
     {
         $user = $request->user();

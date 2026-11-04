@@ -18,6 +18,7 @@ import InlineCode from '@editorjs/inline-code'
 import Marker from '@editorjs/marker'
 import Warning from '@editorjs/warning'
 import QuizTool from './quiz-tool.js'
+import VideoTool from './video-tool.js'
 
 /** Bản dịch tiếng Việt cho giao diện Editor.js và các tool. */
 const vietnamese = {
@@ -59,6 +60,7 @@ const vietnamese = {
             InlineCode: 'Code trong dòng',
             Marker: 'Tô sáng',
             'Câu hỏi': 'Câu hỏi',
+            Video: 'Video',
         },
         tools: {
             link: { 'Add a link': 'Dán liên kết' },
@@ -182,6 +184,14 @@ export default function lessonEditor({ initialData, autosaveDelay = 1500 }) {
                         config: { titlePlaceholder: 'Tiêu đề lưu ý', messagePlaceholder: 'Nội dung lưu ý' },
                     },
                     quiz: QuizTool,
+                    video: {
+                        class: VideoTool,
+                        config: {
+                            upload: (file, onProgress) => this.uploadVideo(file, onProgress),
+                            status: (id) => this.$wire.videoState(id),
+                            onChange: () => this.queueSave(),
+                        },
+                    },
                     inlineCode: InlineCode,
                     marker: Marker,
                 },
@@ -260,6 +270,25 @@ export default function lessonEditor({ initialData, autosaveDelay = 1500 }) {
                         }
                     },
                     () => resolve({ success: 0 }),
+                )
+            })
+        },
+
+        /** Tải video bài học qua Livewire (file tạm `editorVideo`) → server tạo LessonVideo + đưa vào hàng đợi cắt HLS. */
+        uploadVideo(file, onProgress) {
+            return new Promise((resolve, reject) => {
+                this.$wire.upload(
+                    'editorVideo',
+                    file,
+                    async () => {
+                        try {
+                            resolve(await this.$wire.storeEditorVideo())
+                        } catch (error) {
+                            reject(error)
+                        }
+                    },
+                    (error) => reject(error),
+                    (event) => onProgress?.(event.detail.progress),
                 )
             })
         },
