@@ -19,6 +19,7 @@ use App\Models\PlacementQuestion;
 use App\Models\PlacementTest;
 use App\Models\User;
 use App\Services\PlacementScoring;
+use App\Support\PlacementStatistics;
 use App\Support\SeenMarker;
 use Filament\Actions\Testing\TestAction;
 use Filament\Forms\Components\Repeater;
@@ -427,6 +428,40 @@ class PlacementTestTest extends TestCase
     }
 
     // ---------- CMS ----------
+
+    public function test_statistics_merge_versions_by_test_key(): void
+    {
+        $scoring = app(PlacementScoring::class);
+        // Bản cũ: học viên 1 đạt Xuất sắc
+        $scoring->submit($this->student, $this->test, $this->answers(['A'], ['M1'], ['O1', 'O2', 'O3']));
+
+        // Bản nháp được dùng thay bản cũ; học viên 2 làm bản mới
+        $v2 = $this->test->duplicate();
+        $v2->update(['is_active' => true]);
+        $other = User::factory()->create(['role' => UserRole::Student, 'is_active' => true]);
+        $v2 = $v2->fresh()->loadStructure();
+        $q = $v2->questions->values();
+        $answers = [
+            ['question_id' => $q[0]->id, 'option_ids' => [$q[0]->options->firstWhere('label', 'B')->id]],
+            ['question_id' => $q[1]->id, 'option_ids' => [$q[1]->options->firstWhere('label', 'M3')->id]],
+            ['question_id' => $q[2]->id, 'option_ids' => $q[2]->options->pluck('id')->all()],
+        ];
+        $scoring->submit($other, $v2, $answers);
+
+        $filters = PlacementStatistics::defaultFilters();
+        $this->assertSame($this->test->key, $filters['test_key']);
+        $stats = new PlacementStatistics($filters);
+        $this->assertSame($v2->id, $stats->test()->id); // tên mức theo bản đang dùng
+        $this->assertSame(2, $stats->summary()['attempts']); // gộp cả 2 phiên bản
+
+        $dist = collect($stats->distribution($this->test->dimensions()->where('id', $this->dim['tt'])->value('key')))->pluck('count', 'name')->filter()->all();
+        $this->assertSame(2, array_sum($dist));
+        $this->assertArrayHasKey('Xuất sắc', $dist);
+        $this->assertNotNull($stats->averagePercent($this->test->dimensions()->where('id', $this->dim['tt'])->value('key')));
+
+        // Danh sách bài trong bộ lọc: 1 dòng cho cả 2 phiên bản
+        $this->assertCount(1, PlacementTest::keyOptions());
+    }
 
     public function test_cms_pages_render_and_instructor_forbidden(): void
     {
