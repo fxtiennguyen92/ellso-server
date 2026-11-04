@@ -11,6 +11,7 @@ Hướng dẫn đầy đủ từng bước (mua dịch vụ, cài server, đổi
 | Simple Storage | `ellso-media` (Public), `ellso-documents` (Private), endpoint `https://hcm.ss.bfcplatform.vn` |
 | Web | nginx + PHP 8.4-FPM (user `deploy`), HTTPS Let's Encrypt (certbot tự gia hạn) |
 | Queue worker | systemd `ellso-queue` (user `deploy`) |
+| Chương trình ngoài | `ffmpeg` + `ffprobe` (cắt video HLS), `qpdf` (cắt trang đầu sách PDF làm bản đọc thử): `apt-get install -y ffmpeg qpdf` |
 
 ## Thư mục trên server
 

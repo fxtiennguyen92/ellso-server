@@ -125,6 +125,40 @@ class DocumentForm
                             ->helperText('Học viên có quyền xem thì tải được file sách về máy.')
                             ->default(true)
                             ->visible(fn (Get $get) => self::type($get) === DocumentType::Book),
+
+                        // Sách: đọc thử vài trang / chương đầu (file riêng, ai đăng nhập cũng mở được)
+                        Toggle::make('preview_enabled')
+                            ->label('Cho đọc thử')
+                            ->helperText('Hệ thống cắt phần đầu sách thành một file riêng. Học viên chưa mua vẫn đọc được phần này.')
+                            ->default(true)
+                            ->live()
+                            ->visible(fn (Get $get) => self::type($get) === DocumentType::Book),
+                        Grid::make(2)
+                            ->visible(fn (Get $get) => self::type($get) === DocumentType::Book && $get('preview_enabled'))
+                            ->schema([
+                                TextInput::make('preview_pages')
+                                    ->label('Số trang đọc thử (PDF)')
+                                    ->integer()
+                                    ->minValue(1)
+                                    ->maxValue(200)
+                                    ->default((int) config('ellso.documents.preview_pages'))
+                                    ->suffix('trang')
+                                    ->required()
+                                    ->visible(fn (?Document $record) => $record?->file_format !== 'epub'),
+                                TextInput::make('preview_chapters')
+                                    ->label('Số chương đọc thử (EPUB)')
+                                    ->integer()
+                                    ->minValue(1)
+                                    ->maxValue(50)
+                                    ->default((int) config('ellso.documents.preview_chapters'))
+                                    ->suffix('chương')
+                                    ->required()
+                                    ->helperText('Chương = mục trong danh sách đọc của file EPUB; trang bìa / mục lục cũng có thể tính là một chương.')
+                                    ->visible(fn (?Document $record) => $record?->file_format !== 'pdf'),
+                            ]),
+                        Callout::make(fn (?Document $record) => self::previewStatus($record))
+                            ->visible(fn (Get $get, ?Document $record) => self::type($get) === DocumentType::Book && $get('preview_enabled') && $record?->preview_status)
+                            ->color(fn (?Document $record) => self::previewColor($record)),
                     ]),
 
                 Section::make('Ai được xem')
@@ -223,6 +257,36 @@ class DocumentForm
         $type = $get('type');
 
         return $type instanceof DocumentType ? $type : DocumentType::tryFrom((string) $type);
+    }
+
+    /** Trạng thái bản đọc thử: sẵn sàng (N / tổng trang · chương), đang xử lý, lỗi. */
+    private static function previewStatus(?Document $record): HtmlString | string
+    {
+        if (! $record?->preview_status) {
+            return '';
+        }
+        $unit = $record->file_format === 'epub' ? 'chương' : 'trang';
+        $wanted = $record->file_format === 'epub' ? $record->preview_chapters : $record->preview_pages;
+
+        return match ($record->preview_status) {
+            VideoStatus::Ready => 'Bản đọc thử sẵn sàng · ' . $record->preview_count . ' ' . $unit . ' đầu'
+                . ($record->source_count ? ' / ' . $record->source_count . ' ' . $unit : '')
+                . ($record->source_count !== null && $record->source_count <= $wanted
+                    ? '. Lưu ý: sách chỉ có ' . $record->source_count . ' ' . $unit . ' nên bản đọc thử là toàn bộ sách — nên giảm số ' . $unit . ' đọc thử.'
+                    : ''),
+            VideoStatus::Failed => new HtmlString('Lỗi tạo bản đọc thử: ' . e((string) $record->preview_error) . '<br>Bấm "Tạo lại bản đọc thử" hoặc tải lại file sách.'),
+            default => 'Bản đọc thử: ' . mb_strtolower($record->preview_status->getLabel()) . '… (tải lại trang để xem).',
+        };
+    }
+
+    private static function previewColor(?Document $record): string
+    {
+        $wanted = $record?->file_format === 'epub' ? $record?->preview_chapters : $record?->preview_pages;
+
+        return match (true) {
+            $record?->preview_status === VideoStatus::Ready && $record->source_count !== null && $record->source_count <= $wanted => 'warning',
+            default => $record?->preview_status?->getColor() ?? 'gray',
+        };
     }
 
     private static function videoStatus(?Document $record): HtmlString | string

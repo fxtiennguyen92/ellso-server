@@ -82,6 +82,7 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::get('documents/{id}', [DocumentController::class, 'show'])->whereNumber('id');
     Route::post('documents/{id}/play', [DocumentController::class, 'play'])->whereNumber('id')->middleware('throttle:30,1');
     Route::post('documents/{id}/open', [DocumentController::class, 'open'])->whereNumber('id')->middleware('throttle:30,1');
+    Route::post('documents/{id}/preview', [DocumentController::class, 'preview'])->whereNumber('id')->middleware('throttle:30,1');
     Route::post('documents/{id}/save', [DocumentController::class, 'save'])->whereNumber('id');
     Route::delete('documents/{id}/save', [DocumentController::class, 'unsave'])->whereNumber('id');
     Route::get('my/documents', [DocumentController::class, 'mine']);

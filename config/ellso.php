@@ -45,5 +45,8 @@ return [
         'hls_segment_seconds' => 6,
         'ffmpeg' => env('FFMPEG_BINARY', 'ffmpeg'),
         'ffprobe' => env('FFPROBE_BINARY', 'ffprobe'),
+        'qpdf' => env('QPDF_BINARY', 'qpdf'),     // cắt trang đầu PDF làm bản đọc thử sách
+        'preview_pages' => 10,            // mặc định: số trang đọc thử (sách PDF)
+        'preview_chapters' => 2,          // mặc định: số chương đọc thử (sách EPUB)
     ],
 ];

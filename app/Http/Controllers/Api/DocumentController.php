@@ -9,6 +9,7 @@ use App\Models\Document;
 use App\Models\DocumentTopic;
 use App\Models\User;
 use App\Services\DocumentAccess;
+use App\Support\BookPreview;
 use App\Support\DocumentStorage;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +22,7 @@ use Illuminate\Http\Request;
  * - GET    /documents/{id}                             chi tiết + điều kiện mở
  * - POST   /documents/{id}/play                        video: link HLS (5 phút)
  * - POST   /documents/{id}/open                        PDF / sách: link xem (5 phút) + link tải (sách cho tải)
+ * - POST   /documents/{id}/preview                     sách: link bản đọc thử (5 phút), không cần quyền xem
  * - POST   /documents/{id}/save · DELETE …/save        lưu / bỏ lưu
  * - GET    /my/documents                               đã lưu + đã mua
  */
@@ -104,6 +106,24 @@ class DocumentController extends Controller
         ]]);
     }
 
+    /** Sách: link bản đọc thử (5 phút). Ai đăng nhập cũng mở được, kể cả khi sách đang khoá. */
+    public function preview(Request $request, int $id): JsonResponse
+    {
+        $doc = $this->find($id);
+        if (! BookPreview::available($doc)) {
+            return response()->json(['message' => 'Sách này chưa có bản đọc thử.', 'code' => 'no_preview'], 404);
+        }
+
+        $ttl = (int) config('ellso.documents.link_ttl_minutes');
+
+        return response()->json(['data' => [
+            'url' => DocumentStorage::url($doc->preview_path, $ttl),
+            'format' => $doc->file_format,
+            ...array_diff_key(BookPreview::present($doc), ['available' => true]),
+            'expires_at' => now()->addMinutes($ttl)->toIso8601String(),
+        ]]);
+    }
+
     public function save(Request $request, int $id): JsonResponse
     {
         $doc = $this->find($id);
@@ -176,6 +196,8 @@ class DocumentController extends Controller
             'bought_at' => $purchases->get($d->id)?->purchased_at?->toIso8601String(),
             'saved' => in_array($d->id, $saved, true),
             'duration' => $d->durationLabel(),
+            // Sách: {available, pages (PDF) | chapters (EPUB)}; video / PDF: null
+            'preview' => BookPreview::present($d),
             'published_at' => $d->published_at?->toIso8601String(),
         ])->values()->all();
     }
