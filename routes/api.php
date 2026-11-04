@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\HlsController;
 use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\MyCourseController;
+use App\Http\Controllers\Api\PartnerEventController;
 use App\Http\Controllers\Api\PlacementTestController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\ReferralController;
@@ -31,6 +32,10 @@ Route::get('referrals/{code}', [ReferralController::class, 'show'])->middleware(
 // Chiến dịch marketing: banner trên Home + trang chi tiết
 Route::get('campaigns', [CampaignController::class, 'index']);
 Route::get('campaigns/{id}', [CampaignController::class, 'show'])->whereNumber('id');
+
+// Sự kiện ngoài lề: tin về sự kiện của đối tác bên ngoài (không đăng ký trong app)
+Route::get('partner-events', [PartnerEventController::class, 'index']);
+Route::get('partner-events/{id}', [PartnerEventController::class, 'show'])->whereNumber('id');
 
 // Khoá huấn luyện offline: danh sách + chi tiết (lịch, địa điểm)
 Route::get('trainings', [TrainingController::class, 'index']);
