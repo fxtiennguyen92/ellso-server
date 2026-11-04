@@ -8,6 +8,7 @@ use App\Jobs\ProcessDocumentVideo;
 use App\Models\Document;
 use App\Support\BookPreview;
 use App\Support\DocumentStorage;
+use App\Support\VideoChapters;
 
 /** Xử lý chung khi tạo / sửa tài liệu: giá bán, thông tin file, đưa video vào hàng đợi cắt HLS, bản đọc thử sách. */
 trait SavesDocument
@@ -24,6 +25,14 @@ trait SavesDocument
             $data['requires_membership'] = false;
         }
         unset($data['sell']);
+
+        // Mốc thời gian video: văn bản → [{start, title}] (đã kiểm tra ở form)
+        if (array_key_exists('video_chapters_text', $data)) {
+            $data['video_chapters'] = $type === DocumentType::Video
+                ? (VideoChapters::parse($data['video_chapters_text'])['chapters'] ?: null)
+                : null;
+            unset($data['video_chapters_text']);
+        }
 
         // Tác giả: giảng viên (author_id) hoặc tác giả ngoài (tên) — chỉ giữ một
         $kind = $this->data['author_kind'] ?? 'teacher';

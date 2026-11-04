@@ -33,7 +33,7 @@ class Document extends Model
         'is_free', 'requires_membership', 'price', 'allow_download',
         'preview_enabled', 'preview_pages', 'preview_chapters', 'preview_path', 'preview_status', 'preview_error', 'preview_count', 'source_count',
         'file_path', 'file_name', 'file_format', 'file_size',
-        'video_source_path', 'video_status', 'video_error', 'hls_path', 'hls_key', 'hls_variants', 'duration_seconds',
+        'video_source_path', 'video_status', 'video_error', 'hls_path', 'hls_key', 'hls_variants', 'duration_seconds', 'video_chapters',
         'status', 'published_at', 'created_by_id',
     ];
 
@@ -47,6 +47,7 @@ class Document extends Model
             'is_free' => 'boolean',
             'requires_membership' => 'boolean',
             'allow_download' => 'boolean',
+            'video_chapters' => 'array',
             'preview_enabled' => 'boolean',
             'preview_pages' => 'integer',
             'preview_chapters' => 'integer',

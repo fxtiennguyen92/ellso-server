@@ -9,6 +9,7 @@ use App\Enums\VideoStatus;
 use App\Models\Document;
 use App\Models\DocumentTopic;
 use App\Support\DocumentStorage;
+use App\Support\VideoChapters;
 use Closure;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -102,6 +103,19 @@ class DocumentForm
                             ->previewable(false)
                             ->required(fn (Get $get, ?Document $record) => self::type($get) === DocumentType::Video && ! $record?->hls_path)
                             ->helperText('MP4 / MOV / MKV / WebM, tối đa ' . config('ellso.documents.video_max_upload_mb') . ' MB. Sau khi lưu, hệ thống tự cắt thành HLS 480p + 720p (mã hoá) và đẩy lên kho lưu trữ — mất vài phút tuỳ độ dài video.')
+                            ->visible(fn (Get $get) => self::type($get) === DocumentType::Video),
+                        Textarea::make('video_chapters_text')
+                            ->label('Mốc thời gian')
+                            ->rows(6)
+                            ->placeholder("00:00 Giới thiệu\n02:15 Cài đặt công cụ\n10:40 Thực hành\n1:05:00 Tổng kết")
+                            ->helperText('Mỗi dòng một mốc: "mm:ss Nội dung" (video dài hơn 1 giờ dùng "h:mm:ss"). Thứ tự tự sắp theo thời gian. Trên app, bấm vào mốc sẽ tua video tới đó.')
+                            ->afterStateHydrated(fn (Textarea $component, ?Document $record) => $component->state(VideoChapters::format($record?->video_chapters)))
+                            ->rule(fn (?Document $record) => function (string $attribute, $value, Closure $fail) use ($record) {
+                                foreach (VideoChapters::parse($value, $record?->duration_seconds)['errors'] as $error) {
+                                    $fail($error);
+                                }
+                            })
+                            ->dehydrateStateUsing(fn (?string $state) => $state)
                             ->visible(fn (Get $get) => self::type($get) === DocumentType::Video),
 
                         // PDF / Sách

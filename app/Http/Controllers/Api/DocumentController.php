@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\DocumentAccess;
 use App\Support\BookPreview;
 use App\Support\DocumentStorage;
+use App\Support\VideoChapters;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -85,6 +86,7 @@ class DocumentController extends Controller
             'url' => HlsController::masterUrl($doc, $request->user()),
             'expires_at' => now()->addMinutes($ttl)->toIso8601String(),
             'duration_seconds' => $doc->duration_seconds,
+            'chapters' => VideoChapters::present($doc->video_chapters),
             'qualities' => collect($doc->hls_variants)->pluck('height')->values(),
         ]]);
     }
@@ -196,6 +198,8 @@ class DocumentController extends Controller
             'bought_at' => $purchases->get($d->id)?->purchased_at?->toIso8601String(),
             'saved' => in_array($d->id, $saved, true),
             'duration' => $d->durationLabel(),
+            // Video: mốc thời gian [{start (giây), time ("02:15"), title}] — bấm để tua; tài liệu khác: []
+            'chapters' => $d->type === DocumentType::Video ? VideoChapters::present($d->video_chapters) : [],
             // Sách: {available, pages (PDF) | chapters (EPUB)}; video / PDF: null
             'preview' => BookPreview::present($d),
             'published_at' => $d->published_at?->toIso8601String(),
