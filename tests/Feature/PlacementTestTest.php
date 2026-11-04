@@ -257,7 +257,8 @@ class PlacementTestTest extends TestCase
         $this->getJson('/v1/placement-tests')->assertUnauthorized();
         $token = $this->student->createToken('app')->plainTextToken;
 
-        $second = PlacementTest::create(['title' => 'Tư duy', 'intro' => 'Bài 2', 'is_active' => true]);
+        // Không đảo đáp án: kiểm tra theo thứ tự soạn (đảo ngẫu nhiên theo APP_KEY → test chập chờn)
+        $second = PlacementTest::create(['title' => 'Tư duy', 'intro' => 'Bài 2', 'is_active' => true, 'shuffle_options' => false]);
         $dim = $second->dimensions()->create(['name' => 'Logic']);
         $dim->levels()->create(['name' => 'Tốt', 'min_percent' => 0]);
         $q = $second->questions()->create(['type' => PlacementQuestionType::Single, 'prompt' => 'Câu 1']);
@@ -313,7 +314,10 @@ class PlacementTestTest extends TestCase
 
     public function test_random_draw_covers_every_dimension_and_is_stable_until_submit(): void
     {
-        $this->bank(); // 15 câu
+        // Chỉ dùng ngân hàng 12 câu chọn 1 (mỗi câu tính một năng lực): bỏ 3 câu mẫu (chọn nhiều, sắp xếp) vì
+        // "chọn đáp án tổng điểm cao nhất" không cho 100% ở các câu đó → kết quả phụ thuộc bộ câu rút theo APP_KEY.
+        $this->test->questions()->each(fn ($q) => $q->delete());
+        $this->bank(); // 12 câu
         $this->test->update(['question_count' => 2, 'shuffle_options' => true]);
         $test = $this->test->fresh()->loadStructure();
         $this->assertSame(2, $test->questionsPerAttempt());
