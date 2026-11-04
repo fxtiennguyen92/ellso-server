@@ -20,6 +20,9 @@ class EmailTemplate extends Model
 
     public const TEMP_PASSWORD_INVITE = 'temp_password_invite';
 
+    /** Link tham gia buổi workshop (admin gửi cho người đăng ký). */
+    public const WORKSHOP_LINK = 'workshop_link';
+
     /** Các trường văn bản admin sửa được. */
     public const TEXT_FIELDS = [
         'subject', 'preheader', 'eyebrow', 'heading', 'intro',
@@ -75,6 +78,12 @@ class EmailTemplate extends Model
             $vars['so_phut'] = 'Số phút mật khẩu tạm còn hiệu lực (VD: 30)';
         }
 
+        if ($this->key === self::WORKSHOP_LINK) {
+            $vars['workshop'] = 'Tên workshop';
+            $vars['thoi_gian'] = 'Thời gian buổi workshop (VD: 19:00 – 21:00, T5 20/11/2026)';
+            $vars['link'] = 'Link tham gia (Zoom / Google Meet)';
+        }
+
         return $vars;
     }
 
@@ -92,6 +101,9 @@ class EmailTemplate extends Model
             'email' => 'an.nguyen@gmail.com',
             'han_dung' => now()->addMinutes($ttl)->timezone('Asia/Ho_Chi_Minh')->format('H:i, d/m/Y'),
             'so_phut' => (string) $ttl,
+            'workshop' => 'Giao tiếp tự tin khi thuyết trình',
+            'thoi_gian' => '19:00 – 21:00, T5 20/11/2026',
+            'link' => 'https://zoom.us/j/1234567890',
         ];
     }
 

@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\PlacementTestController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\ReferralController;
 use App\Http\Controllers\Api\TrainingController;
+use App\Http\Controllers\Api\WorkshopController;
 use Illuminate\Support\Facades\Route;
 
 // ---- Khách (chưa đăng nhập) ----
@@ -37,9 +38,12 @@ Route::get('campaigns/{id}', [CampaignController::class, 'show'])->whereNumber('
 Route::get('partner-events', [PartnerEventController::class, 'index']);
 Route::get('partner-events/{id}', [PartnerEventController::class, 'show'])->whereNumber('id');
 
-// Khoá huấn luyện offline: danh sách + chi tiết (lịch, địa điểm)
+// Chương trình huấn luyện offline (nhiều buổi) + workshop online: danh sách + chi tiết.
+// Token không bắt buộc; gửi kèm token app thì trả thêm "registered" (và link họp workshop khi tới giờ).
 Route::get('trainings', [TrainingController::class, 'index']);
 Route::get('trainings/{id}', [TrainingController::class, 'show'])->whereNumber('id');
+Route::get('workshops', [WorkshopController::class, 'index']);
+Route::get('workshops/{id}', [WorkshopController::class, 'show'])->whereNumber('id');
 
 // Phát video tài liệu (HLS): link có chữ ký + hạn dùng, không cần header đăng nhập (xem HlsController)
 Route::middleware('signed')->prefix('hls/{document}')->whereNumber('document')->group(function () {
@@ -86,6 +90,14 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::post('documents/{id}/save', [DocumentController::class, 'save'])->whereNumber('id');
     Route::delete('documents/{id}/save', [DocumentController::class, 'unsave'])->whereNumber('id');
     Route::get('my/documents', [DocumentController::class, 'mine']);
+
+    // Đăng ký chương trình huấn luyện (cả chương trình) / workshop (từng buổi). Cần gói thành viên còn hạn.
+    Route::post('trainings/{id}/register', [TrainingController::class, 'register'])->whereNumber('id')->middleware('throttle:20,1');
+    Route::delete('trainings/{id}/register', [TrainingController::class, 'cancel'])->whereNumber('id')->middleware('throttle:20,1');
+    Route::get('my/trainings', [TrainingController::class, 'mine']);
+    Route::post('workshop-sessions/{id}/register', [WorkshopController::class, 'register'])->whereNumber('id')->middleware('throttle:20,1');
+    Route::delete('workshop-sessions/{id}/register', [WorkshopController::class, 'cancel'])->whereNumber('id')->middleware('throttle:20,1');
+    Route::get('my/workshops', [WorkshopController::class, 'mine']);
 
     // Bài kiểm tra đầu vào: đề đang dùng, nộp bài (chấm tự động), kết quả gần nhất
     Route::get('placement-tests', [PlacementTestController::class, 'index']);

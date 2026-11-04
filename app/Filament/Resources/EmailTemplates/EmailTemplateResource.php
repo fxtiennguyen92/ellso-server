@@ -49,7 +49,9 @@ class EmailTemplateResource extends Resource
                     Text::make(fn (?EmailTemplate $record) => 'Biến dùng được: ' . collect($record?->variables() ?? [])
                         ->map(fn ($label, $name) => '{' . $name . '} – ' . $label)
                         ->join(' · ')),
-                    Text::make('Viết **chữ** để in đậm. Logo, mật khẩu tạm, hạn dùng, thông tin yêu cầu và chân trang công ty (sửa ở Cấu hình hệ thống) là phần cố định.'),
+                    Text::make(fn (?EmailTemplate $record) => 'Viết **chữ** để in đậm. Logo, '
+                        . ($record?->key === EmailTemplate::WORKSHOP_LINK ? 'ô tên workshop, thời gian và nút vào phòng' : 'mật khẩu tạm, hạn dùng, thông tin yêu cầu')
+                        . ' và chân trang công ty (sửa ở Cấu hình hệ thống) là phần cố định.'),
                 ]),
 
             Section::make('Hộp thư')
@@ -65,7 +67,7 @@ class EmailTemplateResource extends Resource
                 ->schema([
                     self::text('eyebrow', 'Nhãn nhỏ phía trên tiêu đề')->maxLength(60),
                     self::text('heading', 'Tiêu đề lớn')->required()->maxLength(120),
-                    self::textarea('intro', 'Đoạn mở đầu (phía trên ô mật khẩu)')->required(),
+                    self::textarea('intro', fn (?EmailTemplate $record) => 'Đoạn mở đầu (phía trên ' . self::boxName($record) . ')')->required(),
                     self::text('steps_title', 'Tiêu đề các bước')->maxLength(120),
                     Repeater::make('steps')
                         ->label('Các bước (đánh số tự động)')
@@ -73,7 +75,7 @@ class EmailTemplateResource extends Resource
                         ->addActionLabel('Thêm bước')
                         ->reorderable()
                         ->defaultItems(0),
-                    self::textarea('after_text', 'Đoạn sau ô mật khẩu'),
+                    self::textarea('after_text', fn (?EmailTemplate $record) => 'Đoạn sau ' . self::boxName($record)),
                     self::textarea('note', 'Ghi chú an toàn (chữ nhỏ)'),
                     self::textarea('sign_off', 'Lời chào cuối'),
                 ]),
@@ -120,9 +122,15 @@ class EmailTemplateResource extends Resource
         return TextInput::make($name)->label($label)->rule(self::knownVariables());
     }
 
-    private static function textarea(string $name, string $label): Textarea
+    private static function textarea(string $name, string | Closure $label): Textarea
     {
         return Textarea::make($name)->label($label)->rows(3)->autosize()->maxLength(2000)->rule(self::knownVariables());
+    }
+
+    /** Tên phần cố định giữa đoạn mở đầu và các bước. */
+    private static function boxName(?EmailTemplate $record): string
+    {
+        return $record?->key === EmailTemplate::WORKSHOP_LINK ? 'ô link workshop' : 'ô mật khẩu';
     }
 
     /** Báo lỗi khi dùng biến không có trong mẫu (VD gõ nhầm {tne}). */
