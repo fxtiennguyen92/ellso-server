@@ -5,8 +5,10 @@ namespace App\Filament\Resources\LearningPaths\Pages;
 use App\Enums\ChapterColor;
 use App\Enums\UnlockMode;
 use App\Filament\Resources\LearningPaths\LearningPathResource;
+use App\Filament\Resources\Exams\Pages\ManageExamQuestions;
 use App\Filament\Resources\Lessons\LessonResource;
 use App\Filament\Resources\Lessons\Schemas\LessonForm;
+use App\Models\Exam;
 use App\Models\LearningPath;
 use App\Models\Lesson;
 use App\Models\PathChapter;
@@ -26,8 +28,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Xây dựng lộ trình: chương (tên, màu), bài trong chương (thêm từ thư viện / tạo mới,
- * quy tắc mở khóa, học thử, kéo thả) + xem trước bản đồ kiểu Duolingo.
+ * Xây dựng lộ trình: chương (tên, màu), bài trong chương (thêm từ thư viện / tạo mới / coaching,
+ * quy tắc mở khóa, học thử, kéo thả), bài thi ngang cấp chương (chọn đề từ ngân hàng đề thi)
+ * + xem trước bản đồ kiểu Duolingo.
  */
 class BuildLearningPath extends Page
 {
@@ -64,7 +67,7 @@ class BuildLearningPath extends Page
     public function getChapters(): Collection
     {
         return $this->path()->chapters()
-            ->with(['pathLessons.lesson' => fn ($query) => $query->withTrashed()])
+            ->with(['pathLessons.lesson' => fn ($query) => $query->withTrashed(), 'exam' => fn ($query) => $query->withCount('questions')])
             ->get();
     }
 
@@ -73,8 +76,53 @@ class BuildLearningPath extends Page
     protected function getHeaderActions(): array
     {
         return [
+            $this->addExamAction(),
             $this->addChapterAction(),
         ];
+    }
+
+    // ── Bài thi (ngang cấp chương) ───────────────────────────
+
+    public function addExamAction(): Action
+    {
+        return Action::make('addExam')
+            ->label('Thêm bài thi')
+            ->icon(Heroicon::DocumentCheck)
+            ->color('gray')
+            ->modalHeading('Thêm bài thi')
+            ->modalDescription('Bài thi đứng ngang cấp chương (kéo thả để đặt giữa các chương). Học viên làm được khi đã học xong mọi bài đứng trước; đậu khi đúng ≥ ' . Exam::PASS_PERCENT . '%. Không tính vào % hoàn thành khoá, nhưng phải đậu mọi bài thi mới được cấp chứng chỉ.')
+            ->modalWidth('lg')
+            ->schema(self::examFields())
+            ->fillForm(fn () => ['title' => $this->path()->chapters()->where('kind', PathChapter::KIND_EXAM)->exists() ? 'Thi cuối kỳ' : 'Thi giữa kỳ'])
+            ->action(function (array $data) {
+                $this->authorizeEdit();
+                $this->path()->chapters()->create([...$data, 'kind' => PathChapter::KIND_EXAM, 'color' => null]);
+            });
+    }
+
+    public function editExamAction(): Action
+    {
+        return Action::make('editExam')
+            ->label('Sửa bài thi')
+            ->icon(Heroicon::PencilSquare)
+            ->modalHeading('Sửa bài thi')
+            ->modalWidth('lg')
+            ->schema(self::examFields())
+            ->fillForm(fn (array $arguments) => $this->chapter($arguments['chapter'])->only(['title', 'exam_id']))
+            ->action(function (array $data, array $arguments) {
+                $this->authorizeEdit();
+                $this->chapter($arguments['chapter'])->update($data);
+            });
+    }
+
+    public function openExamAction(): Action
+    {
+        return Action::make('openExam')
+            ->label('Xem đề thi')
+            ->icon(Heroicon::ArrowTopRightOnSquare)
+            ->url(fn (array $arguments) => ($exam = $this->chapter($arguments['chapter'])->exam) ? ManageExamQuestions::getUrl(['record' => $exam]) : null)
+            ->openUrlInNewTab()
+            ->visible(fn () => auth()->user()->isAdmin());
     }
 
     // ── Chương ───────────────────────────────────────────────
@@ -121,11 +169,17 @@ class BuildLearningPath extends Page
             ->icon(Heroicon::Trash)
             ->color('danger')
             ->requiresConfirmation()
-            ->modalHeading('Xóa chương?')
-            ->modalDescription('Các bài trong chương sẽ được gỡ khỏi lộ trình (bài vẫn còn trong thư viện).')
+            ->modalHeading(fn (array $arguments) => isset($arguments['chapter']) && $this->chapter($arguments['chapter'])->isExam() ? 'Gỡ bài thi?' : 'Xóa chương?')
+            ->modalDescription(fn (array $arguments) => isset($arguments['chapter']) && $this->chapter($arguments['chapter'])->isExam()
+                ? 'Gỡ bài thi khỏi lộ trình (đề vẫn còn trong ngân hàng đề thi, bài làm cũ của học viên vẫn giữ).'
+                : 'Các bài trong chương sẽ được gỡ khỏi lộ trình (bài vẫn còn trong thư viện).')
             ->action(function (array $arguments) {
                 $this->authorizeEdit();
-                $this->chapter($arguments['chapter'])->delete();
+                $chapter = $this->chapter($arguments['chapter']);
+                // Coaching trong chương chỉ sống trong lộ trình → xoá theo
+                $coaching = $chapter->pathLessons()->with('lesson')->get()->pluck('lesson')->filter(fn ($l) => $l?->isCoaching());
+                $chapter->delete();
+                $coaching->each->forceDelete();
                 $this->renumberChapters();
             });
     }
@@ -167,10 +221,12 @@ class BuildLearningPath extends Page
                     ->options([
                         'existing' => 'Chọn bài đã có',
                         'new' => 'Tạo bài mới',
+                        'coaching' => 'Coaching',
                     ])
                     ->icons([
                         'existing' => Heroicon::BookOpen,
                         'new' => Heroicon::Sparkles,
+                        'coaching' => Heroicon::ChatBubbleLeftRight,
                     ])
                     ->default('existing')
                     ->inline()
@@ -198,25 +254,41 @@ class BuildLearningPath extends Page
                 LessonForm::iconField()
                     ->visible(fn (Get $get) => $get('mode') === 'new'),
 
+                // Coaching: trao đổi 1-1 với giáo viên (đặt lịch theo lịch rảnh — làm sau), không có nội dung
+                TextInput::make('coaching_title')
+                    ->label('Tên bài coaching')
+                    ->default(Lesson::COACHING_DEFAULT_TITLE)
+                    ->required(fn (Get $get) => $get('mode') === 'coaching')
+                    ->maxLength(255)
+                    ->helperText('Học viên đặt lịch trao đổi 1-1 với giáo viên. Bài coaching không có nội dung, không chặn bài sau và không tính vào % hoàn thành.')
+                    ->visible(fn (Get $get) => $get('mode') === 'coaching'),
+
                 Select::make('unlock_mode')
                     ->label('Mở khóa')
                     ->options(UnlockMode::class)
                     ->default(UnlockMode::AfterPrevious)
                     ->required(),
                 Toggle::make('is_preview')
-                    ->label('Cho học thử (xem không cần mua)'),
+                    ->label('Cho học thử (xem không cần mua)')
+                    ->visible(fn (Get $get) => $get('mode') !== 'coaching'),
             ])
             ->action(function (array $data, array $arguments) {
                 $this->authorizeEdit();
                 $chapter = $this->chapter($arguments['chapter']);
 
-                if ($data['mode'] === 'new') {
+                if ($data['mode'] === 'coaching') {
+                    $lesson = Lesson::create([
+                        'kind' => Lesson::KIND_COACHING,
+                        'title' => $data['coaching_title'] ?? null,
+                    ]);
+                    $data['is_preview'] = false;
+                } elseif ($data['mode'] === 'new') {
                     $lesson = Lesson::create([
                         'title' => $data['title'],
                         'icon' => $data['icon'] ?? null,
                     ]);
                 } else {
-                    $lesson = Lesson::query()->visibleTo(auth()->user())->findOrFail($data['lesson_id']);
+                    $lesson = Lesson::query()->library()->visibleTo(auth()->user())->findOrFail($data['lesson_id']);
                 }
 
                 if ($this->path()->pathLessons()->where('lesson_id', $lesson->id)->exists()) {
@@ -244,11 +316,31 @@ class BuildLearningPath extends Page
             ->modalWidth('lg')
             ->schema(LessonForm::fields())
             ->fillForm(fn (array $arguments) => $this->pathLesson($arguments['item'])->lesson->only(['title', 'icon', 'summary']))
-            ->visible(fn (array $arguments) => $this->canEditLesson($arguments))
+            ->visible(fn (array $arguments) => $this->canEditLesson($arguments) && ! $this->argLesson($arguments)->isCoaching())
             ->action(function (array $data, array $arguments) {
                 $lesson = $this->pathLesson($arguments['item'])->lesson;
                 abort_unless(auth()->user()->can('update', $lesson), 403);
                 $lesson->update($data);
+            });
+    }
+
+    public function editCoachingAction(): Action
+    {
+        return Action::make('editCoaching')
+            ->label('Đổi tên')
+            ->icon(Heroicon::PencilSquare)
+            ->modalHeading('Đổi tên bài coaching')
+            ->modalWidth('md')
+            ->schema([
+                TextInput::make('title')->label('Tên bài coaching')->required()->maxLength(255),
+            ])
+            ->fillForm(fn (array $arguments) => ['title' => $this->pathLesson($arguments['item'])->lesson->title])
+            ->visible(fn (array $arguments) => (bool) $this->argLesson($arguments)?->isCoaching())
+            ->action(function (array $data, array $arguments) {
+                $this->authorizeEdit();
+                $lesson = $this->pathLesson($arguments['item'])->lesson;
+                abort_unless($lesson->isCoaching(), 404);
+                $lesson->update(['title' => $data['title']]);
             });
     }
 
@@ -260,7 +352,7 @@ class BuildLearningPath extends Page
             ->link()
             ->size('sm')
             ->url(fn (array $arguments) => ($lesson = $this->argLesson($arguments)) ? LessonResource::getUrl('content', ['record' => $lesson]) : null)
-            ->visible(fn (array $arguments) => $this->canEditLesson($arguments));
+            ->visible(fn (array $arguments) => $this->canEditLesson($arguments) && ! $this->argLesson($arguments)->isCoaching());
     }
 
     public function removeLessonAction(): Action
@@ -271,10 +363,17 @@ class BuildLearningPath extends Page
             ->color('danger')
             ->requiresConfirmation()
             ->modalHeading('Gỡ bài khỏi lộ trình?')
-            ->modalDescription('Bài vẫn còn trong thư viện bài học.')
+            ->modalDescription(fn (array $arguments) => $this->argLesson($arguments)?->isCoaching()
+                ? 'Bài coaching sẽ bị xoá.'
+                : 'Bài vẫn còn trong thư viện bài học.')
             ->action(function (array $arguments) {
                 $this->authorizeEdit();
-                $this->pathLesson($arguments['item'])->delete();
+                $item = $this->pathLesson($arguments['item']);
+                $item->delete();
+                // Coaching chỉ sống trong lộ trình
+                if ($item->lesson?->isCoaching()) {
+                    $item->lesson->forceDelete();
+                }
             });
     }
 
@@ -302,7 +401,7 @@ class BuildLearningPath extends Page
     {
         $this->authorizeEdit();
 
-        $chapters = $this->path()->chapters()->with('pathLessons')->get();
+        $chapters = $this->path()->chapters()->where('kind', PathChapter::KIND_CHAPTER)->with('pathLessons')->get()->values();
         $chapterIndex = $chapters->search(fn (PathChapter $c) => $c->pathLessons->contains('id', $itemId));
 
         if ($chapterIndex === false) {
@@ -352,6 +451,9 @@ class BuildLearningPath extends Page
     {
         $this->authorizeEdit();
         $item = $this->pathLesson($itemId);
+        if ($item->lesson?->isCoaching()) {
+            return; // coaching không có học thử
+        }
         $item->update(['is_preview' => ! $item->is_preview]);
     }
 
@@ -375,6 +477,9 @@ class BuildLearningPath extends Page
         DB::transaction(function () use ($lists, $pathItemIds) {
             foreach ($lists as $chapterId => $ids) {
                 $chapter = $this->chapter($chapterId);
+                if ($chapter->isExam()) {
+                    continue; // bài thi không chứa bài
+                }
 
                 foreach (array_values(array_intersect(array_map('intval', $ids), $pathItemIds)) as $i => $id) {
                     PathLesson::whereKey($id)->update([
@@ -428,6 +533,27 @@ class BuildLearningPath extends Page
     }
 
     /** @return array<\Filament\Schemas\Components\Component> */
+    private static function examFields(): array
+    {
+        return [
+            TextInput::make('title')
+                ->label('Tên hiển thị trên lộ trình')
+                ->placeholder('VD: Thi giữa kỳ')
+                ->required()
+                ->maxLength(255),
+            Select::make('exam_id')
+                ->label('Đề thi')
+                ->options(fn () => Exam::query()->withCount('questions')->orderBy('title')->get()
+                    ->mapWithKeys(fn (Exam $exam) => [$exam->id => $exam->title . ' · ' . $exam->questionsPerAttempt((int) $exam->questions_count) . ' câu'
+                        . ($exam->time_limit_minutes ? ', ' . $exam->time_limit_minutes . ' phút' : '')])
+                    ->all())
+                ->searchable()
+                ->required()
+                ->helperText('Chọn từ Đào tạo › Ngân hàng đề thi.'),
+        ];
+    }
+
+    /** @return array<\Filament\Schemas\Components\Component> */
     private static function chapterFields(): array
     {
         return [
@@ -451,6 +577,7 @@ class BuildLearningPath extends Page
     private function lessonOptions(?string $search = null): array
     {
         return Lesson::query()
+            ->library()
             ->visibleTo(auth()->user())
             ->whereNotIn('id', $this->path()->pathLessons()->select('lesson_id'))
             ->when(filled($search), fn ($query) => $query->where('title', 'like', "%{$search}%"))

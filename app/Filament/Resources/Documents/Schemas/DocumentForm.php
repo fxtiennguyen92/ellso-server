@@ -156,7 +156,7 @@ class DocumentForm
                                     ->helperText('Học viên đã được mở khoá học này.'),
                                 Select::make('lessons')
                                     ->label('Theo bài học')
-                                    ->relationship('lessons', 'title')
+                                    ->relationship('lessons', 'title', fn ($query) => $query->library())
                                     ->multiple()
                                     ->searchable()
                                     ->helperText('Bài học đang mở với học viên (theo lộ trình) — không cần học xong.'),

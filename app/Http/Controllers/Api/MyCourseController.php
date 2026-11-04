@@ -18,7 +18,8 @@ use App\Support\MediaStorage;
  * Khoá học của tôi (học viên đã đăng nhập).
  * - GET  /my/courses                 : các khoá đã ghi danh + % hoàn thành + bài tiếp theo
  * - GET  /my/courses/{course}        : chưa có lộ trình → câu hỏi phân loại (chọn sẵn câu trả lời cũ);
- *                                      có lộ trình → bản đồ chương / bài với trạng thái completed | available | locked
+ *                                      có lộ trình → bản đồ: chương (type chapter, bài lesson | coaching với trạng thái
+ *                                      completed | available | locked) và bài thi (type exam: locked | available | passed)
  * - POST /my/courses/{course}/path   : trả lời câu hỏi phân loại → gợi ý & gán lộ trình (gồm cả Năng lực từ bài kiểm tra đầu vào)
  */
 class MyCourseController extends Controller
@@ -53,25 +54,38 @@ class MyCourseController extends Controller
             return response()->json(['data' => $data]);
         }
 
+        // Chương (kèm bài) và bài thi (ngang cấp chương) theo đúng thứ tự trên bản đồ
         $chapters = [];
-        foreach ($this->progress->itemStates($user, $enrollment->learningPath) as $row) {
-            $item = $row['item'];
-            $chapterId = $item->path_chapter_id;
-            $chapters[$chapterId] ??= [
-                'id' => $chapterId,
-                'title' => $item->chapter?->title,
-                'color' => $item->chapter?->color?->value,
-                'lessons' => [],
-            ];
-            $chapters[$chapterId]['lessons'][] = [
-                'id' => $item->lesson->id,
-                'title' => $item->lesson->title,
-                'icon_url' => $item->lesson->icon ? MediaStorage::disk()->url($item->lesson->icon) : null,
-                'state' => $row['state'],
-                'completed_at' => $row['progress']?->completed_at?->toIso8601String(),
+        foreach ($this->progress->outline($user, $enrollment->learningPath) as $row) {
+            $chapter = $row['chapter'];
+            if ($row['type'] === 'exam') {
+                $chapters[] = [
+                    ...ExamController::summary($chapter),
+                    'state' => $row['state'],
+                    'passed' => $row['passed'],
+                    'best_score' => $row['best']?->score,
+                    'attempts' => $row['attempts'],
+                ];
+
+                continue;
+            }
+
+            $chapters[] = [
+                'id' => $chapter->id,
+                'type' => 'chapter',
+                'title' => $chapter->title,
+                'color' => $chapter->color?->value,
+                'lessons' => array_map(fn ($r) => [
+                    'id' => $r['item']->lesson->id,
+                    'type' => $r['item']->lesson->kind, // lesson | coaching
+                    'title' => $r['item']->lesson->title,
+                    'icon_url' => $r['item']->lesson->icon ? MediaStorage::disk()->url($r['item']->lesson->icon) : null,
+                    'state' => $r['state'],
+                    'completed_at' => $r['progress']?->completed_at?->toIso8601String(),
+                ], $row['items']),
             ];
         }
-        $data['chapters'] = array_values($chapters);
+        $data['chapters'] = $chapters;
 
         return response()->json(['data' => $data]);
     }
@@ -148,6 +162,8 @@ class MyCourseController extends Controller
             'enrolled_at' => $e->enrolled_at->toIso8601String(),
             'last_activity_at' => $e->last_activity_at?->toIso8601String(),
             'completed_at' => $e->completed_at?->toIso8601String(),
+            // Chứng chỉ: hoàn thành khoá + đậu mọi bài thi của lộ trình
+            'certificate' => $this->progress->certificateStatus($e),
         ];
     }
 

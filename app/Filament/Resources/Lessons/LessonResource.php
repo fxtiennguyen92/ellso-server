@@ -155,6 +155,7 @@ class LessonResource extends Resource
     {
         return parent::getEloquentQuery()
             ->withoutGlobalScopes([SoftDeletingScope::class])
+            ->library()
             ->visibleTo(auth()->user());
     }
 

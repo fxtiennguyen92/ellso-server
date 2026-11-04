@@ -24,7 +24,17 @@ class Lesson extends Model
     /** Icon: xoá file khi bỏ / thay icon, hoặc khi xoá vĩnh viễn. */
     protected array $fileAttributes = ['icon'];
 
+    public const KIND_LESSON = 'lesson';
+
+    /** Coaching 1-1 với giáo viên: không có nội dung, không vào thư viện, không tính % / không chặn bài sau. */
+    public const KIND_COACHING = 'coaching';
+
+    public const COACHING_DEFAULT_TITLE = 'Trao đổi trực tiếp';
+
+    protected $attributes = ['kind' => self::KIND_LESSON];
+
     protected $fillable = [
+        'kind',
         'owner_id',
         'title',
         'icon',
@@ -65,6 +75,13 @@ class Lesson extends Model
         static::deleted(function (Lesson $lesson) {
             $lesson->pathLessons()->delete();
         });
+
+        // Coaching chỉ sống trong lộ trình: gỡ khỏi lộ trình → xoá luôn
+        static::creating(function (Lesson $lesson) {
+            if ($lesson->kind === self::KIND_COACHING) {
+                $lesson->title = filled($lesson->title) ? $lesson->title : self::COACHING_DEFAULT_TITLE;
+            }
+        });
     }
 
     // ── Nội dung ─────────────────────────────────────────────
@@ -76,7 +93,19 @@ class Lesson extends Model
 
     public function isPublished(): bool
     {
-        return $this->published_at !== null && $this->content_published !== null;
+        // Coaching không có nội dung → luôn hiện trên app
+        return $this->isCoaching() || ($this->published_at !== null && $this->content_published !== null);
+    }
+
+    public function isCoaching(): bool
+    {
+        return $this->kind === self::KIND_COACHING;
+    }
+
+    /** Chỉ bài học thông thường (thư viện bài học). */
+    public function scopeLibrary(Builder $query): void
+    {
+        $query->where('kind', self::KIND_LESSON);
     }
 
     public function contentStatus(): ContentStatus

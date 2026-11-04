@@ -13,7 +13,7 @@ use App\Support\MediaStorage;
 
 /**
  * Học bài (học viên đã đăng nhập).
- * - GET  /lessons/{id}        : nội dung đã xuất bản (câu hỏi không kèm đáp án) + tiến độ
+ * - GET  /lessons/{id}        : nội dung đã xuất bản (câu hỏi không kèm đáp án) + tiến độ; coaching → type coaching, không nội dung
  * - POST /lessons/{id}/read   : đã đọc đến cuối bài
  * - POST /lessons/{id}/quiz   : trả lời một câu hỏi {block_id, option_ids[]} → đúng/sai + giải thích
  * Hoàn thành bài = đọc hết + trả lời đúng mọi câu hỏi (xem App\Services\LearningProgress).
@@ -25,12 +25,26 @@ class LessonController extends Controller
     public function show(Request $request, int $id): JsonResponse
     {
         [$user, $lesson, $access] = $this->authorizeLesson($request, $id);
+
+        // Coaching: không có nội dung — đặt lịch trao đổi 1-1 với giáo viên (làm sau)
+        if ($lesson->isCoaching()) {
+            return response()->json(['data' => [
+                'id' => $lesson->id,
+                'type' => Lesson::KIND_COACHING,
+                'title' => $lesson->title,
+                'icon_url' => $lesson->icon ? MediaStorage::disk()->url($lesson->icon) : null,
+                'course_id' => $access['enrollment']?->course_id,
+                'booking' => null,
+            ]]);
+        }
+
         $progress = $this->progress->viewed($user, $lesson, $access['enrollment']);
         $answered = $this->progress->correctBlockIds($user, $lesson);
 
         return response()->json([
             'data' => [
                 'id' => $lesson->id,
+                'type' => Lesson::KIND_LESSON,
                 'title' => $lesson->title,
                 'summary' => $lesson->summary,
                 'icon_url' => $lesson->icon ? MediaStorage::disk()->url($lesson->icon) : null,
@@ -45,6 +59,7 @@ class LessonController extends Controller
     public function read(Request $request, int $id): JsonResponse
     {
         [$user, $lesson, $access] = $this->authorizeLesson($request, $id);
+        abort_if($lesson->isCoaching(), 404, 'Bài coaching không có nội dung.');
         $progress = $this->progress->markRead($user, $lesson, $access['enrollment']);
 
         return response()->json(['data' => $this->progressData($progress, $lesson, $this->progress->correctBlockIds($user, $lesson))]);
@@ -53,6 +68,7 @@ class LessonController extends Controller
     public function answer(Request $request, int $id): JsonResponse
     {
         [$user, $lesson, $access] = $this->authorizeLesson($request, $id);
+        abort_if($lesson->isCoaching(), 404, 'Bài coaching không có câu hỏi.');
         $data = $request->validate([
             'block_id' => ['required', 'string', 'max:32'],
             'option_ids' => ['required', 'array', 'min:1', 'max:' . LessonContent::QUIZ_MAX_OPTIONS],

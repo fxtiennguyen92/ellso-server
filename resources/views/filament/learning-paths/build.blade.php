@@ -7,6 +7,8 @@
     $snake = [0, 34, 52, 34, 0, -34, -52, -34];
     $mapIndex = 0;
     $lessonNumber = 0;
+    $chapterNumber = 0;
+    $examHex = '#1f2937';
 @endphp
 
 <x-filament-panels::page>
@@ -39,6 +41,13 @@
         .eb-map-btn img, .eb-map-btn .fi-icon { width: 1.5rem; height: 1.5rem; color: #fff; }
         .eb-map-hidden { opacity: .35; outline: 2px dashed var(--gray-400); outline-offset: 3px; box-shadow: none; }
         .eb-ghost { opacity: .3; }
+        .eb-exam { border: 2px dashed color-mix(in oklab, var(--warning-500) 55%, transparent); border-radius: .75rem; padding: .75rem 1rem; display: flex; align-items: center; gap: .75rem; background: color-mix(in oklab, var(--warning-500) 6%, transparent); }
+        .eb-exam-icon { width: 2.5rem; height: 2.5rem; border-radius: .75rem; display: flex; align-items: center; justify-content: center; background: var(--warning-500); color: #fff; flex: none; }
+        .eb-exam-icon .fi-icon { width: 1.375rem; height: 1.375rem; color: #fff; }
+        .eb-exam-body { flex: 1; min-width: 0; }
+        .eb-exam-title { font-weight: 600; font-size: .9375rem; }
+        .eb-exam-sub { font-size: .8125rem; opacity: .7; margin-top: .125rem; }
+        .eb-map-exam { margin: .875rem .75rem; padding: .625rem .75rem; border-radius: .75rem; border: 2px dashed var(--warning-500); text-align: center; font-size: .8125rem; font-weight: 600; }
     </style>
 
     <div class="eb-layout">
@@ -69,7 +78,53 @@
                 })"
             >
                 @foreach ($chapters as $chapter)
-                    @php $color = $chapter->color ?? ChapterColor::Sage; @endphp
+                    @if ($chapter->isExam())
+                        {{-- ── Bài thi: ngang cấp chương, kéo thả cùng chương ── --}}
+                        <div class="eb-chapter" data-id="{{ $chapter->id }}" wire:key="chapter-{{ $chapter->id }}">
+                            <div class="eb-exam">
+                                <x-filament::icon-button
+                                    class="eb-chapter-handle"
+                                    icon="heroicon-m-bars-2"
+                                    color="gray"
+                                    size="sm"
+                                    label="Kéo để đổi chỗ"
+                                    tooltip="Kéo để đặt bài thi giữa các chương"
+                                />
+                                <span class="eb-exam-icon"><x-filament::icon icon="heroicon-o-document-check" /></span>
+                                <div class="eb-exam-body">
+                                    <div class="eb-exam-title">{{ $chapter->title }}</div>
+                                    <div class="eb-exam-sub">
+                                        Bài thi · {{ $chapter->exam?->title ?? '(đề đã bị xoá)' }}
+                                        @if ($chapter->exam)
+                                            · {{ $chapter->exam->questionsPerAttempt((int) $chapter->exam->questions_count) }} câu
+                                            · {{ $chapter->exam->time_limit_minutes ? $chapter->exam->time_limit_minutes . ' phút' : 'không giới hạn thời gian' }}
+                                            · đậu ≥ {{ \App\Models\Exam::PASS_PERCENT }}%
+                                        @endif
+                                    </div>
+                                    <div class="eb-meta">
+                                        <x-filament::badge size="sm" color="warning" icon="heroicon-m-lock-closed">Mở khi xong các bài trước</x-filament::badge>
+                                        @if ($chapter->exam && (int) $chapter->exam->questions_count === 0)
+                                            <x-filament::badge size="sm" color="danger">Đề chưa có câu hỏi</x-filament::badge>
+                                        @endif
+                                    </div>
+                                </div>
+                                <x-filament-actions::group
+                                    :actions="[
+                                        ($this->editExamAction)(['chapter' => $chapter->id]),
+                                        ($this->openExamAction)(['chapter' => $chapter->id]),
+                                        ($this->deleteChapterAction)(['chapter' => $chapter->id]),
+                                    ]"
+                                    icon="heroicon-m-ellipsis-vertical"
+                                    color="gray"
+                                    tooltip="Thao tác"
+                                    dropdown-placement="bottom-end"
+                                />
+                            </div>
+                        </div>
+                        @continue
+                    @endif
+
+                    @php $color = $chapter->color ?? ChapterColor::Sage; $chapterNumber++; @endphp
 
                     <div class="eb-chapter" data-id="{{ $chapter->id }}" wire:key="chapter-{{ $chapter->id }}">
                         <x-filament::section compact>
@@ -84,7 +139,7 @@
                                         tooltip="Kéo để đổi chỗ chương"
                                     />
                                     <span class="eb-dot" style="background: {{ $color->hex() }}"></span>
-                                    Chương {{ $loop->iteration }}: {{ $chapter->title }}
+                                    Chương {{ $chapterNumber }}: {{ $chapter->title }}
                                 </span>
                             </x-slot>
 
@@ -146,7 +201,8 @@
                                     @php
                                         $lesson = $item->lesson;
                                         $lessonNumber++;
-                                        $status = $lesson?->contentStatus();
+                                        $coaching = (bool) $lesson?->isCoaching();
+                                        $status = $coaching ? null : $lesson?->contentStatus();
                                         $unlock = $item->unlock_mode ?? UnlockMode::AfterPrevious;
                                     @endphp
 
@@ -168,7 +224,7 @@
                                                 {{-- Icon do giảng viên tải lên (nội dung bài học) --}}
                                                 <img src="{{ $lesson->iconUrl() }}" alt="">
                                             @else
-                                                <x-filament::icon icon="heroicon-o-book-open" />
+                                                <x-filament::icon :icon="$coaching ? 'heroicon-o-chat-bubble-left-right' : 'heroicon-o-book-open'" />
                                             @endif
                                         </span>
 
@@ -177,7 +233,11 @@
                                                 {{ $lesson?->title ?? '(bài đã bị xóa)' }}
                                             </div>
                                             <div class="eb-meta">
-                                                @if ($status)
+                                                @if ($coaching)
+                                                    <x-filament::badge size="sm" color="info" icon="heroicon-m-chat-bubble-left-right" tooltip="Trao đổi 1-1 với giáo viên — không chặn bài sau, không tính vào % hoàn thành">
+                                                        Coaching
+                                                    </x-filament::badge>
+                                                @elseif ($status)
                                                     <x-filament::badge size="sm" :color="$status->getColor()">
                                                         {{ $status->getLabel() }}
                                                     </x-filament::badge>
@@ -195,7 +255,8 @@
                                                     {{ $unlock->shortLabel() }}
                                                 </x-filament::badge>
 
-                                                {{-- Bấm để bật / tắt học thử --}}
+                                                {{-- Bấm để bật / tắt học thử (coaching không có học thử) --}}
+                                                @unless ($coaching)
                                                 <x-filament::badge
                                                     tag="button"
                                                     size="sm"
@@ -206,6 +267,7 @@
                                                 >
                                                     {{ $item->is_preview ? 'Học thử' : 'Không học thử' }}
                                                 </x-filament::badge>
+                                                @endunless
                                             </div>
                                         </div>
 
@@ -219,6 +281,7 @@
                                                     ($this->moveLessonUpAction)(['item' => $item->id]),
                                                     ($this->moveLessonDownAction)(['item' => $item->id]),
                                                     ($this->editLessonInfoAction)(['item' => $item->id]),
+                                                    ($this->editCoachingAction)(['item' => $item->id]),
                                                     ($this->removeLessonAction)(['item' => $item->id]),
                                                 ]"
                                                 icon="heroicon-m-ellipsis-vertical"
@@ -250,17 +313,23 @@
                 <x-slot name="heading">Xem trước trên app</x-slot>
                 <x-slot name="description">Bài mờ (viền đứt) chưa xuất bản → bị ẩn trên app.</x-slot>
 
+                @php $mapChapter = 0; @endphp
                 @forelse ($chapters as $chapter)
-                    @php $color = $chapter->color ?? ChapterColor::Sage; @endphp
+                    @if ($chapter->isExam())
+                        <div class="eb-map-exam" style="display:flex;align-items:center;justify-content:center;gap:.375rem"><x-filament::icon icon="heroicon-m-document-check" style="width:1rem;height:1rem" /> {{ $chapter->title }}</div>
+                        @continue
+                    @endif
+                    @php $color = $chapter->color ?? ChapterColor::Sage; $mapChapter++; @endphp
 
                     <div class="eb-map-chapter" style="background: {{ $color->hex() }}">
-                        <strong>Chương {{ $loop->iteration }}</strong><br>{{ $chapter->title }}
+                        <strong>Chương {{ $mapChapter }}</strong><br>{{ $chapter->title }}
                     </div>
 
                     @foreach ($chapter->pathLessons as $item)
                         @php
                             $lesson = $item->lesson;
                             $hidden = ! $lesson || $lesson->trashed() || ! $lesson->isPublished();
+                            $mapCoaching = (bool) $lesson?->isCoaching();
                             $offset = $snake[$mapIndex % count($snake)];
                             $mapIndex++;
                         @endphp
@@ -274,7 +343,7 @@
                                 @if ($lesson?->iconUrl())
                                     <img src="{{ $lesson->iconUrl() }}" alt="">
                                 @else
-                                    <x-filament::icon icon="heroicon-o-book-open" />
+                                    <x-filament::icon :icon="$mapCoaching ? 'heroicon-o-chat-bubble-left-right' : 'heroicon-o-book-open'" />
                                 @endif
                             </div>
                         </div>

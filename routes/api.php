@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AppSessionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\HlsController;
 use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\MyCourseController;
@@ -58,6 +59,12 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::get('my/courses', [MyCourseController::class, 'index']);
     Route::get('my/courses/{courseId}', [MyCourseController::class, 'show'])->whereNumber('courseId');
     Route::post('my/courses/{courseId}/path', [MyCourseController::class, 'choosePath'])->whereNumber('courseId');
+
+    // Bài thi trong lộ trình
+    Route::get('my/courses/{courseId}/exams/{chapterId}', [ExamController::class, 'show'])->whereNumber(['courseId', 'chapterId']);
+    Route::post('my/courses/{courseId}/exams/{chapterId}/attempts', [ExamController::class, 'start'])->whereNumber(['courseId', 'chapterId'])->middleware('throttle:20,1');
+    Route::get('exam-attempts/{id}', [ExamController::class, 'attempt'])->whereNumber('id');
+    Route::post('exam-attempts/{id}/submit', [ExamController::class, 'submit'])->whereNumber('id')->middleware('throttle:20,1');
 
     // Học bài: nội dung, đã đọc hết, trả lời câu hỏi (server chấm)
     Route::get('lessons/{id}', [LessonController::class, 'show'])->whereNumber('id');

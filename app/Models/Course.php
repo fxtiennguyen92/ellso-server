@@ -100,7 +100,7 @@ class Course extends Model
     /** Các bài (trong thư viện) đang được dùng ở lộ trình của khóa này. */
     public function lessonsQuery(): Builder
     {
-        return Lesson::query()->whereHas('pathLessons.learningPath', fn ($query) => $query->where('course_id', $this->id));
+        return Lesson::query()->library()->whereHas('pathLessons.learningPath', fn ($query) => $query->where('course_id', $this->id));
     }
 
     public function learningPaths(): HasMany
