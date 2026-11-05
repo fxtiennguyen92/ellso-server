@@ -17,7 +17,7 @@ use Illuminate\Http\Request;
 /**
  * Chương trình huấn luyện offline (nhiều buổi) cho app.
  * Public (token không bắt buộc; có token app thì trả thêm "registered"):
- * - GET /trainings       : chương trình đang mở còn buổi sắp diễn ra, buổi sắp tới gần nhất trước.
+ * - GET /trainings       : chương trình đang mở còn buổi sắp diễn ra, buổi sắp tới gần nhất trước; kèm lịch gọn (schedule).
  * - GET /trainings/{id}  : chi tiết + khối nội dung + mọi buổi (buổi 1 … n, địa điểm).
  * Cần đăng nhập:
  * - POST   /trainings/{id}/register : đăng ký cả chương trình (cần gói thành viên; phí > 0 → payment_required).
@@ -41,7 +41,16 @@ class TrainingController extends Controller
         $registered = $this->registeredIds($user, $courses->pluck('id')->all());
 
         return response()->json([
-            'data' => $courses->map(fn (TrainingCourse $c) => $this->summary($c, $user, $registered)),
+            'data' => $courses->map(fn (TrainingCourse $c) => [
+                ...$this->summary($c, $user, $registered),
+                // Lịch gọn mọi buổi (thẻ trên Home hiện số buổi + dải ngày); chi tiết địa điểm ở GET /trainings/{id}
+                'schedule' => $c->activeSessions->values()->map(fn (TrainingSession $s, int $i) => [
+                    'number' => $i + 1,
+                    'starts_at' => $s->starts_at->toIso8601String(),
+                    'ends_at' => $s->ends_at->toIso8601String(),
+                    'state' => $s->state(),
+                ])->all(),
+            ]),
         ]);
     }
 

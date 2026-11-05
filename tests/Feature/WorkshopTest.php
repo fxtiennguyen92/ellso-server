@@ -260,6 +260,8 @@ class WorkshopTest extends TestCase
             ->assertJsonPath('data.0.is_free', true)
             ->assertJsonPath('data.0.next_session.id', $next->id)
             ->assertJsonPath('data.0.upcoming_sessions_count', 1)
+            ->assertJsonPath('data.0.upcoming_sessions.0.id', $next->id)
+            ->assertJsonPath('data.0.upcoming_sessions.0.registered', null)
             ->assertJsonPath('data.0.trainer.name', 'Thầy Minh')
             ->assertJsonPath('data.1.title', 'Sau')
             ->assertJsonPath('data.1.price', 150000)

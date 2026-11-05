@@ -18,7 +18,7 @@ use Illuminate\Http\Request;
 /**
  * Workshop online cho app.
  * Public (token không bắt buộc; có token app thì trả thêm "registered" + link họp):
- * - GET /workshops       : workshop đang mở còn buổi sắp diễn ra, buổi gần nhất trước.
+ * - GET /workshops       : workshop đang mở còn buổi sắp diễn ra, buổi gần nhất trước; kèm tối đa 4 buổi sắp tới.
  * - GET /workshops/{id}  : chi tiết + khối nội dung + các buổi chưa kết thúc (chỗ còn lại, link họp nếu được xem).
  * Cần đăng nhập:
  * - POST   /workshop-sessions/{id}/register : đăng ký một buổi (cần gói thành viên; phí > 0 → payment_required).
@@ -30,22 +30,32 @@ use Illuminate\Http\Request;
  */
 class WorkshopController extends Controller
 {
+    /** Số buổi sắp tới trả kèm mỗi workshop ở danh sách. */
+    private const LIST_SESSIONS = 4;
+
     public function __construct(private readonly EventRegistration $registration) {}
 
     public function index(Request $request): JsonResponse
     {
+        $user = OptionalAppUser::from($request);
         $workshops = Workshop::query()
             ->listed()
             ->with(['trainer:id,name', 'upcomingSessions'])
             ->get()
             ->sortBy(fn (Workshop $w) => $w->upcomingSessions->first()?->starts_at)
             ->values();
+        $registered = $this->registeredIds($user, $workshops->flatMap(fn (Workshop $w) => $w->upcomingSessions->take(self::LIST_SESSIONS)->pluck('id'))->all());
 
         return response()->json([
             'data' => $workshops->map(fn (Workshop $w) => [
                 ...$this->summary($w),
                 'next_session' => ($next = $w->upcomingSessions->first()) ? $this->sessionTime($next) : null,
                 'upcoming_sessions_count' => $w->upcomingSessions->count(),
+                // Vài buổi sắp tới gần nhất (thẻ trên Home hiện ≥ 3 ngày để người dùng thấy còn lần sau)
+                'upcoming_sessions' => $w->upcomingSessions->take(self::LIST_SESSIONS)->map(fn (WorkshopSession $s) => [
+                    ...$this->sessionTime($s),
+                    'registered' => $user ? in_array($s->id, $registered, true) : null,
+                ])->values(),
             ]),
         ]);
     }

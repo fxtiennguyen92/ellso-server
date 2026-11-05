@@ -353,6 +353,8 @@ class TrainingCourseTest extends TestCase
             ->assertJsonPath('data.0.seats_left', 10)
             ->assertJsonPath('data.0.banner.width', 1280)
             ->assertJsonPath('data.0.sessions_count', 2)
+            ->assertJsonCount(2, 'data.0.schedule')
+            ->assertJsonPath('data.0.schedule.1.number', 2)
             ->assertJsonPath('data.0.next_session.id', $s1->id)
             ->assertJsonPath('data.0.next_session.number', 1)
             ->assertJsonPath('data.0.next_session.location.label', 'Cafe A')
