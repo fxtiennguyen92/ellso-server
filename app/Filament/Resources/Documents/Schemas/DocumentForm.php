@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Enums\VideoStatus;
 use App\Models\Document;
 use App\Models\DocumentTopic;
+use App\Rules\DocumentFile;
 use App\Support\DocumentStorage;
 use App\Support\VideoChapters;
 use Closure;
@@ -125,9 +126,14 @@ class DocumentForm
                             ->directory(fn (Get $get) => 'files/' . (self::type($get)?->value ?? 'pdf'))
                             ->visibility('private')
                             ->moveFiles()
+                            // Hộp chọn file chỉ hiện PDF / EPUB; nhận diện theo đuôi file (mimeTypeMap) chứ không tin MIME trình duyệt gửi.
+                            // MIME phía server của EPUB thất thường (zip / octet-stream) nên nhận cả các loại đó,
+                            // rồi DocumentFile kiểm tra đuôi + nội dung thật (PDF bắt đầu %PDF-, EPUB là zip có container.xml).
                             ->acceptedFileTypes(fn (Get $get) => self::type($get) === DocumentType::Book
-                                ? ['application/pdf', 'application/epub+zip']
-                                : ['application/pdf'])
+                                ? ['application/pdf', 'application/epub+zip', 'application/zip', 'application/x-zip-compressed', 'application/octet-stream']
+                                : ['application/pdf', 'application/octet-stream'])
+                            ->mimeTypeMap(['pdf' => 'application/pdf', 'epub' => 'application/epub+zip'])
+                            ->rule(fn (Get $get) => new DocumentFile(self::type($get) === DocumentType::Book ? ['pdf', 'epub'] : ['pdf']))
                             ->maxSize((int) config('ellso.documents.file_max_upload_mb') * 1024)
                             ->storeFileNamesIn('file_name')
                             ->previewable(false)

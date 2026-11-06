@@ -179,6 +179,43 @@ class DocumentTest extends TestCase
         $this->assertTrue($book->fresh()->is_free);
     }
 
+    /** EPUB / PDF: nhận theo đuôi + nội dung thật, không phụ thuộc MIME (EPUB hay bị nhận là zip / octet-stream). */
+    public function test_book_file_validated_by_content_not_mime(): void
+    {
+        Queue::fake();
+        $this->actingAs($this->admin);
+
+        $epub = function (bool $mimetypeFirst = true, bool $container = true): string {
+            $path = tempnam(sys_get_temp_dir(), 'ep');
+            $zip = new \ZipArchive;
+            $zip->open($path, \ZipArchive::OVERWRITE);
+            if (! $mimetypeFirst) {
+                $zip->addFromString('OEBPS/a.xhtml', '<html/>');
+            }
+            $zip->addFromString('mimetype', 'application/epub+zip');
+            if ($container) {
+                $zip->addFromString('META-INF/container.xml', '<container/>');
+            }
+            $zip->close();
+
+            return (string) file_get_contents($path);
+        };
+        $create = fn (string $title, UploadedFile $file) => Livewire::test(CreateDocument::class)
+            ->fillForm(['type' => 'book', 'title' => $title, 'is_free' => true, 'status' => 'draft', 'preview_enabled' => false, 'file_path' => $file])
+            ->call('create');
+
+        // EPUB không chuẩn thứ tự (server nhận là application/zip) vẫn được nhận
+        $create('Sách EPUB', UploadedFile::fake()->createWithContent('sach.epub', $epub(mimetypeFirst: false)))->assertHasNoFormErrors();
+        $this->assertSame('epub', Document::where('title', 'Sách EPUB')->sole()->file_format);
+
+        // Đổi đuôi / file hỏng → báo rõ
+        $create('Giả 1', UploadedFile::fake()->createWithContent('sach.epub', 'không phải zip'))->assertHasFormErrors(['file_path']);
+        $create('Giả 2', UploadedFile::fake()->createWithContent('sach.epub', $epub(container: false)))->assertHasFormErrors(['file_path']);
+        $create('Giả 3', UploadedFile::fake()->createWithContent('sach.pdf', 'hello'))->assertHasFormErrors(['file_path']);
+        $create('Giả 4', UploadedFile::fake()->createWithContent('sach.zip', $epub()))->assertHasFormErrors(['file_path']);
+        $this->assertSame(0, Document::where('title', 'like', 'Giả%')->count());
+    }
+
     public function test_video_chapters(): void
     {
         // Parser: mm:ss / h:mm:ss, ngăn cách tuỳ ý, tự sắp xếp, báo lỗi theo dòng
