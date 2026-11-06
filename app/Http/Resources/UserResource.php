@@ -19,6 +19,8 @@ class UserResource extends JsonResource
             'avatar' => $this->avatar,
             'role' => $this->role,
             'referral_code' => $this->referral_code,
+            // Số xu đang có (số nguyên, không quy đổi tiền trên app)
+            'coins' => (int) $this->coin_balance,
             'referrer' => $this->whenLoaded('referrer', fn () => $this->referrer ? [
                 'name' => $this->referrer->name,
                 'referral_code' => $this->referrer->referral_code,

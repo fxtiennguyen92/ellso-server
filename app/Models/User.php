@@ -46,6 +46,7 @@ class User extends Authenticatable implements FilamentUser
     {
         return [
             'email_verified_at' => 'datetime',
+            'coin_balance' => 'integer',
             'password' => 'hashed',
             'temp_password' => 'hashed',
             'temp_password_expires_at' => 'datetime',
