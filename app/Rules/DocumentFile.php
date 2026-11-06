@@ -5,6 +5,7 @@ namespace App\Rules;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Http\UploadedFile;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use ZipArchive;
 
 /**
@@ -32,9 +33,10 @@ class DocumentFile implements ValidationRule
             return;
         }
 
-        $path = $value->getRealPath();
         if ($ext === 'pdf') {
-            $head = (string) @file_get_contents($path, false, null, 0, 1024);
+            $stream = self::open($value);
+            $head = $stream ? (string) fread($stream, 1024) : '';
+            $stream && fclose($stream);
             if (! str_contains($head, '%PDF')) {
                 $fail('File PDF bị hỏng hoặc không phải PDF thật (đổi đuôi từ định dạng khác?).');
             }
@@ -42,17 +44,55 @@ class DocumentFile implements ValidationRule
             return;
         }
 
-        // EPUB
-        $zip = new ZipArchive;
-        if ($zip->open($path) !== true) {
-            $fail('File EPUB bị hỏng: không mở được (EPUB thực chất là file zip).');
+        // EPUB: ZipArchive cần file trên máy → file tạm ở storage S3 thì chép về file tạm cục bộ trước
+        [$path, $cleanup] = self::localCopy($value);
+        try {
+            $zip = new ZipArchive;
+            if ($path === null || $zip->open($path) !== true) {
+                $fail('File EPUB bị hỏng: không mở được (EPUB thực chất là file zip).');
 
-            return;
+                return;
+            }
+            $ok = $zip->locateName('META-INF/container.xml') !== false;
+            $zip->close();
+            if (! $ok) {
+                $fail('File EPUB thiếu META-INF/container.xml — không phải EPUB chuẩn.');
+            }
+        } finally {
+            $cleanup();
         }
-        $ok = $zip->locateName('META-INF/container.xml') !== false;
-        $zip->close();
-        if (! $ok) {
-            $fail('File EPUB thiếu META-INF/container.xml — không phải EPUB chuẩn.');
+    }
+
+    /**
+     * Mở luồng đọc file vừa upload. Production để file tạm Livewire trên S3 (BizFly) — getRealPath() khi đó
+     * chỉ là key, không đọc được trực tiếp → đọc qua storage.
+     *
+     * @return resource|null
+     */
+    private static function open(UploadedFile $file)
+    {
+        $stream = $file instanceof TemporaryUploadedFile ? $file->readStream() : @fopen($file->getRealPath(), 'rb');
+
+        return is_resource($stream) ? $stream : null;
+    }
+
+    /** @return array{0: ?string, 1: \Closure} đường dẫn file đọc được trên máy + hàm dọn file tạm */
+    private static function localCopy(UploadedFile $file): array
+    {
+        $real = $file->getRealPath();
+        if ($real && is_file($real)) {
+            return [$real, fn () => null];
         }
+        $stream = self::open($file);
+        if (! $stream) {
+            return [null, fn () => null];
+        }
+        $tmp = tempnam(sys_get_temp_dir(), 'epub');
+        $out = fopen($tmp, 'wb');
+        stream_copy_to_stream($stream, $out);
+        fclose($out);
+        fclose($stream);
+
+        return [$tmp, fn () => @unlink($tmp)];
     }
 }
