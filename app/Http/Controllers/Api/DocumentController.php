@@ -187,7 +187,7 @@ class DocumentController extends Controller
             'teacher' => $d->author_id && $d->authorUser ? [
                 'id' => $d->authorUser->id,
                 'name' => $d->authorUser->name,
-                'avatar' => $d->authorUser->avatar,
+                'avatar' => $d->authorUser->avatarUrl(),
             ] : null,
             'topic_id' => $d->document_topic_id,
             'cover' => $d->cover_color?->value,

@@ -16,7 +16,7 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,
-            'avatar' => $this->avatar,
+            'avatar' => $this->avatarUrl(),
             'role' => $this->role,
             'referral_code' => $this->referral_code,
             // Số xu đang có (số nguyên, không quy đổi tiền trên app)

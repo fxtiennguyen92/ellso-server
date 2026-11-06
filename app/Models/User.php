@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\MediaStorage;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\UserLogEvent;
 use App\Enums\UserRole;
@@ -115,6 +116,17 @@ class User extends Authenticatable implements FilamentUser
             'temp_password' => null,
             'temp_password_expires_at' => null,
         ])->save();
+    }
+
+    /** Link ảnh đại diện: ảnh app tải lên (đường dẫn trên ổ media) hoặc link ngoài có sẵn; null = dùng chữ viết tắt. */
+    public function avatarUrl(): ?string
+    {
+        $a = $this->avatar;
+        if (! is_string($a) || $a === '') {
+            return null;
+        }
+
+        return preg_match('#^https?://#i', $a) ? $a : MediaStorage::url($a);
     }
 
     public function referrer(): BelongsTo

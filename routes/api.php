@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AppSessionController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ExamController;
@@ -62,6 +63,10 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::get('me', [AuthController::class, 'me']);
     Route::get('user', [AuthController::class, 'me']); // giữ tương thích, dùng /me
     Route::post('auth/logout', [AuthController::class, 'logout']);
+    Route::patch('me', [ProfileController::class, 'update']);
+    Route::post('me/avatar', [ProfileController::class, 'uploadAvatar'])->middleware('throttle:20,1');
+    Route::delete('me/avatar', [ProfileController::class, 'deleteAvatar']);
+    Route::post('me/password', [ProfileController::class, 'changePassword'])->middleware('throttle:change-password');
 
     // Xem trước mã khuyến mãi khi thanh toán (giới hạn để chống dò mã)
     Route::post('promo-codes/check', [PromoCodeController::class, 'check'])->middleware('throttle:promo-code-check');
