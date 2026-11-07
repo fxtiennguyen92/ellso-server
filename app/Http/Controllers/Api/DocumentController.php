@@ -66,10 +66,13 @@ class DocumentController extends Controller
         return response()->json(['data' => [
             ...$this->present(new Collection([$doc]), $request->user())[0],
             'description' => $doc->description,
+            'topic' => $doc->topic?->name,
             'file' => $doc->type === DocumentType::Video ? null : [
                 'format' => $doc->file_format,
                 'size' => $doc->file_size,
                 'downloadable' => $doc->allow_download,
+                // số trang (PDF) / số chương (EPUB) của cả cuốn — biết được sau khi tạo bản đọc thử
+                'length' => $doc->source_count,
             ],
         ]]);
     }
