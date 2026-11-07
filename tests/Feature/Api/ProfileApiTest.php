@@ -187,6 +187,8 @@ class ProfileApiTest extends TestCase
 
         $first = $this->withToken($this->token)->getJson('/v1/me/coins')->assertOk()
             ->assertJsonPath('balance', 220)
+            ->assertJsonPath('earned_month', 250)
+            ->assertJsonPath('spent_month', 30)
             ->assertJsonPath('data.0.amount', -30)
             ->assertJsonPath('data.0.source_label', 'Dùng xu')
             ->assertJsonCount(20, 'data');

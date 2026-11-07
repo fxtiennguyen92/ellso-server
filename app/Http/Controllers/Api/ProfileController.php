@@ -247,7 +247,8 @@ class ProfileController extends Controller
     }
 
     /**
-     * GET /me/coins?cursor= — số dư + lịch sử xu, mới nhất trước, 20 dòng / trang (cursor = next_cursor của trang trước).
+     * GET /me/coins?cursor= — số dư, xu nhận / dùng trong tháng (giờ VN), lịch sử mới nhất trước, 20 dòng / trang
+     * (cursor = next_cursor của trang trước).
      */
     public function coins(Request $request): JsonResponse
     {
@@ -255,8 +256,14 @@ class ProfileController extends Controller
         $user = $request->user();
         $page = $user->coinTransactions()->orderByDesc('id')->cursorPaginate(20);
 
+        // Tháng hiện tại theo giờ Việt Nam
+        $from = now('Asia/Ho_Chi_Minh')->startOfMonth()->utc();
+        $month = $user->coinTransactions()->where('created_at', '>=', $from);
+
         return response()->json([
             'balance' => (int) $user->coin_balance,
+            'earned_month' => (int) (clone $month)->where('amount', '>', 0)->sum('amount'),
+            'spent_month' => (int) abs((clone $month)->where('amount', '<', 0)->sum('amount')),
             'data' => collect($page->items())->map(fn ($t) => [
                 'id' => $t->id,
                 'amount' => $t->amount,
