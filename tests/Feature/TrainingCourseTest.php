@@ -426,7 +426,7 @@ class TrainingCourseTest extends TestCase
 
         $this->get(ManageTrainingLocations::getUrl())->assertForbidden();
 
-        $this->getJson("/v1/trainings/{$mine->id}")->assertJsonPath('data.trainer', ['id' => $this->teacher->id, 'name' => 'Cô Lan']);
+        $this->getJson("/v1/trainings/{$mine->id}")->assertJsonPath('data.trainer', ['id' => $this->teacher->id, 'name' => 'Cô Lan', 'avatar' => null]);
     }
 
     /** Bỏ / thay ảnh rồi lưu, hoặc xoá chương trình → file trên storage bị xoá (trừ khi bản ghi khác còn dùng). */
