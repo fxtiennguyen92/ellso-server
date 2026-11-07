@@ -9,6 +9,9 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Models\UserLog;
 use App\Support\MediaStorage;
+use App\Support\ReferralCode;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -121,6 +124,76 @@ class ProfileController extends Controller
         UserLog::record($user, UserLogEvent::PasswordChanged, $request, ['source' => 'app_profile']);
 
         return response()->json(['message' => 'Đã đổi mật khẩu.']);
+    }
+
+    /**
+     * GET /me/referrer/preview?code= — xem trước người giới thiệu (tên + email) trước khi xác nhận thêm.
+     * Cần đăng nhập (khác GET /referrals/{code} công khai chỉ trả tên).
+     */
+    public function previewReferrer(Request $request): JsonResponse
+    {
+        $referrer = $this->resolveReferrer($request);
+
+        return response()->json(['data' => [
+            'name' => $referrer->name,
+            'email' => $referrer->email,
+            'referral_code' => $referrer->referral_code,
+        ]]);
+    }
+
+    /** POST /me/referrer {code} — thêm người giới thiệu sau khi đăng ký. Chỉ một lần, không đổi được. */
+    public function setReferrer(Request $request): UserResource
+    {
+        $referrer = $this->resolveReferrer($request);
+
+        /** @var User $user */
+        $user = $request->user();
+        $updated = DB::transaction(function () use ($user, $referrer) {
+            // khoá dòng để 2 yêu cầu cùng lúc không ghi đè nhau
+            $fresh = User::query()->whereKey($user->getKey())->lockForUpdate()->first();
+            if ($fresh->referred_by_id !== null) {
+                return false;
+            }
+            $fresh->forceFill(['referred_by_id' => $referrer->getKey()])->save();
+
+            return true;
+        });
+
+        if (! $updated) {
+            throw ValidationException::withMessages(['code' => 'Tài khoản đã có người giới thiệu, không thể thay đổi.']);
+        }
+
+        UserLog::record($user, UserLogEvent::ReferrerAdded, $request, ['referral_code' => $referrer->referral_code, 'source' => 'app_profile']);
+
+        return new UserResource($user->refresh()->load('referrer'));
+    }
+
+    private function resolveReferrer(Request $request): User
+    {
+        $request->validate(['code' => ['required', 'string', 'max:32']], ['code.required' => 'Vui lòng nhập mã giới thiệu.']);
+
+        /** @var User $user */
+        $user = $request->user();
+        if ($user->referred_by_id !== null) {
+            throw ValidationException::withMessages(['code' => 'Tài khoản đã có người giới thiệu, không thể thay đổi.']);
+        }
+
+        $code = ReferralCode::normalize((string) $request->input('code'));
+        $referrer = $code
+            ? User::query()->where('referral_code', $code)->where('is_active', true)->first()
+            : null;
+
+        if (! $referrer) {
+            throw ValidationException::withMessages(['code' => 'Mã giới thiệu không hợp lệ.']);
+        }
+        if ($referrer->is($user)) {
+            throw ValidationException::withMessages(['code' => 'Không thể dùng mã giới thiệu của chính bạn.']);
+        }
+        if ($referrer->referred_by_id === $user->getKey()) {
+            throw ValidationException::withMessages(['code' => 'Người này được bạn giới thiệu nên không thể là người giới thiệu của bạn.']);
+        }
+
+        return $referrer;
     }
 
     /** Chỉ xoá ảnh do app tải lên (thư mục avatars/), không đụng link ngoài. */

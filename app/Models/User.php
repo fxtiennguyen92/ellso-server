@@ -223,6 +223,28 @@ class User extends Authenticatable implements FilamentUser
         return $end ? \Illuminate\Support\Carbon::parse($end) : null;
     }
 
+    /**
+     * Ngày bắt đầu chuỗi gói thành viên đang còn hạn: gói đang dùng, lùi về các gói liền trước nối tiếp
+     * (gia hạn khi còn hạn → gói mới bắt đầu đúng ngày gói cũ hết). null nếu không có gói còn hạn.
+     */
+    public function membershipStartedAt(): ?\Illuminate\Support\Carbon
+    {
+        $rows = $this->memberships()->where('starts_at', '<=', now())->orderByDesc('starts_at')->get(['starts_at', 'ends_at']);
+        $current = $rows->first(fn (StudentMembership $m) => $m->ends_at->isFuture());
+        if (! $current) {
+            return null;
+        }
+
+        $start = $current->starts_at;
+        foreach ($rows as $m) {
+            if ($m->starts_at->lt($start) && $m->ends_at->gte($start)) {
+                $start = $m->starts_at;
+            }
+        }
+
+        return $start;
+    }
+
     /** Chỉ admin và giảng viên (đang hoạt động) được vào CMS. Học viên dùng app. */
     public function canAccessPanel(Panel $panel): bool
     {

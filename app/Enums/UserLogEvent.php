@@ -17,6 +17,7 @@ enum UserLogEvent: string implements HasLabel, HasColor
     case TempPasswordSent = 'temp_password_sent';
     case ForgotPasswordThrottled = 'forgot_password_throttled';
     case MembershipGranted = 'membership_granted';
+    case ReferrerAdded = 'referrer_added';
 
     public function getLabel(): string
     {
@@ -31,6 +32,7 @@ enum UserLogEvent: string implements HasLabel, HasColor
             self::TempPasswordSent => 'Gửi mật khẩu tạm',
             self::ForgotPasswordThrottled => 'Quên mật khẩu bị chặn (spam)',
             self::MembershipGranted => 'Nhận gói thành viên',
+            self::ReferrerAdded => 'Thêm người giới thiệu',
         };
     }
 
@@ -38,7 +40,7 @@ enum UserLogEvent: string implements HasLabel, HasColor
     {
         return match ($this) {
             self::Registered, self::Login => 'success',
-            self::LoginWithTempPassword, self::PasswordChanged, self::TempPasswordSent, self::MembershipGranted => 'info',
+            self::LoginWithTempPassword, self::PasswordChanged, self::TempPasswordSent, self::MembershipGranted, self::ReferrerAdded => 'info',
             self::LoginFailed, self::LoginBlocked, self::ForgotPasswordThrottled => 'danger',
             self::Logout => 'gray',
         };

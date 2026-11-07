@@ -3,6 +3,8 @@
 namespace Tests\Feature\Api;
 
 use App\Enums\UserRole;
+use App\Enums\MembershipSource;
+use App\Models\StudentMembership;
 use App\Models\User;
 use App\Support\MediaStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -89,5 +91,49 @@ class ProfileApiTest extends TestCase
         $this->withToken($this->token)->getJson('/v1/me')->assertOk();
         $this->app['auth']->forgetGuards();
         $this->withToken($other)->getJson('/v1/me')->assertUnauthorized();
+    }
+
+    public function test_add_referrer_once_with_preview(): void
+    {
+        $ref = User::factory()->create(['role' => UserRole::Student, 'is_active' => true, 'name' => 'Người GT', 'email' => 'gt@ellso.test']);
+
+        $this->withToken($this->token)->getJson('/v1/me/referrer/preview?code=' . strtolower($ref->referral_code))
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Người GT')
+            ->assertJsonPath('data.email', 'gt@ellso.test');
+
+        $this->withToken($this->token)->postJson('/v1/me/referrer', ['code' => 'KHONGCO1'])->assertUnprocessable()->assertJsonValidationErrors('code');
+        $this->withToken($this->token)->postJson('/v1/me/referrer', ['code' => $this->user->referral_code])->assertUnprocessable()->assertJsonValidationErrors('code');
+
+        $this->withToken($this->token)->postJson('/v1/me/referrer', ['code' => $ref->referral_code])
+            ->assertOk()
+            ->assertJsonPath('data.referrer.name', 'Người GT')
+            ->assertJsonPath('data.referrer.email', 'gt@ellso.test');
+        $this->assertSame($ref->id, $this->user->fresh()->referred_by_id);
+
+        // đã có thì không đổi được
+        $other = User::factory()->create(['role' => UserRole::Student, 'is_active' => true]);
+        $this->withToken($this->token)->postJson('/v1/me/referrer', ['code' => $other->referral_code])->assertUnprocessable()->assertJsonValidationErrors('code');
+        $this->assertSame($ref->id, $this->user->fresh()->referred_by_id);
+    }
+
+    public function test_cannot_add_own_referral_as_referrer(): void
+    {
+        $child = User::factory()->create(['role' => UserRole::Student, 'is_active' => true, 'referred_by_id' => $this->user->id]);
+        $this->withToken($this->token)->postJson('/v1/me/referrer', ['code' => $child->referral_code])->assertUnprocessable()->assertJsonValidationErrors('code');
+    }
+
+    public function test_membership_started_at_follows_renewal_chain(): void
+    {
+        $this->withToken($this->token)->getJson('/v1/me')->assertJsonPath('data.membership.active', false)->assertJsonPath('data.membership.started_at', null);
+
+        $first = now()->subMonths(13)->startOfDay();
+        foreach ([[$first, $first->copy()->addYear()], [$first->copy()->addYear(), $first->copy()->addYears(2)]] as [$a, $b]) {
+            StudentMembership::create(['user_id' => $this->user->id, 'starts_at' => $a, 'ends_at' => $b, 'price' => 0, 'source' => MembershipSource::cases()[0]]);
+        }
+
+        $this->withToken($this->token)->getJson('/v1/me')
+            ->assertJsonPath('data.membership.active', true)
+            ->assertJsonPath('data.membership.started_at', $first->toIso8601String());
     }
 }
