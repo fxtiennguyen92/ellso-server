@@ -25,6 +25,10 @@ class SystemSetting extends Model
 
     public const STUDENT_MEMBERSHIP_PRICE = 'student_membership_price';
 
+    public const HOME_TAGLINE = 'home_tagline';
+
+    public const DEFAULT_HOME_TAGLINE = 'Hôm nay học gì cùng Ellso?';
+
     private const CACHE_KEY = 'system_settings';
 
     protected $fillable = [
@@ -62,6 +66,14 @@ class SystemSetting extends Model
     public static function creditToVndRate(): int
     {
         return (int) static::get(self::CREDIT_TO_VND_RATE, 0);
+    }
+
+    /** Câu chào ở Trang chủ app; trống → câu mặc định. */
+    public static function homeTagline(): string
+    {
+        $v = trim((string) static::get(self::HOME_TAGLINE, ''));
+
+        return $v !== '' ? $v : self::DEFAULT_HOME_TAGLINE;
     }
 
     public static function supportEmail(): ?string

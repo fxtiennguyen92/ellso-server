@@ -29,6 +29,7 @@ Route::prefix('auth')->group(function () {
         ->middleware(['auth:sanctum', 'abilities:' . AuthController::ABILITY_SET_PASSWORD]);
 });
 
+Route::get('app-config', [\App\Http\Controllers\Api\AppConfigController::class, 'show']);
 Route::get('referrals/{code}', [ReferralController::class, 'show'])->middleware('throttle:referral-check');
 
 // Chiến dịch marketing: banner trên Home + trang chi tiết
