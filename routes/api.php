@@ -69,6 +69,8 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::post('me/password', [ProfileController::class, 'changePassword'])->middleware('throttle:change-password');
     Route::get('me/referrer/preview', [ProfileController::class, 'previewReferrer'])->middleware('throttle:referral-check');
     Route::post('me/referrer', [ProfileController::class, 'setReferrer'])->middleware('throttle:referral-check');
+    Route::get('me/devices', [ProfileController::class, 'devices']);
+    Route::delete('me/devices/{id}', [ProfileController::class, 'revokeDevice'])->whereNumber('id')->middleware('throttle:20,1');
 
     // Xem trước mã khuyến mãi khi thanh toán (giới hạn để chống dò mã)
     Route::post('promo-codes/check', [PromoCodeController::class, 'check'])->middleware('throttle:promo-code-check');

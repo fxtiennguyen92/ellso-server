@@ -196,6 +196,56 @@ class ProfileController extends Controller
         return $referrer;
     }
 
+    /**
+     * GET /me/devices — các thiết bị đang đăng nhập (mỗi token đăng nhập = một thiết bị), thiết bị đang dùng đứng đầu,
+     * còn lại theo lần dùng gần nhất. Không gồm token tạm đổi mật khẩu lần đầu.
+     */
+    public function devices(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $currentId = $user->currentAccessToken()?->getKey();
+
+        $rows = $user->tokens()
+            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->get()
+            ->reject(fn ($t) => in_array(AuthController::ABILITY_SET_PASSWORD, (array) $t->abilities, true))
+            ->sortByDesc(fn ($t) => [$t->getKey() === $currentId ? 1 : 0, ($t->last_used_at ?? $t->created_at)?->getTimestamp()])
+            ->values()
+            ->map(fn ($t) => [
+                'id' => $t->getKey(),
+                'name' => $t->name,
+                'platform' => $t->platform,
+                'os_version' => $t->os_version,
+                'app_version' => $t->app_version,
+                'last_used_at' => ($t->last_used_at ?? $t->created_at)?->toIso8601String(),
+                'created_at' => $t->created_at?->toIso8601String(),
+                'current' => $t->getKey() === $currentId,
+            ]);
+
+        return response()->json(['data' => $rows]);
+    }
+
+    /** DELETE /me/devices/{id} — đăng xuất tài khoản trên thiết bị đó (xoá token). Thiết bị đang dùng → dùng Đăng xuất. */
+    public function revokeDevice(Request $request, int $id): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        if ($user->currentAccessToken()?->getKey() === $id) {
+            return response()->json(['message' => 'Đây là thiết bị bạn đang dùng. Hãy dùng Đăng xuất trong Hồ sơ.', 'code' => 'current_device'], 422);
+        }
+
+        $token = $user->tokens()->whereKey($id)->first();
+        if (! $token) {
+            return response()->json(['message' => 'Thiết bị không còn đăng nhập.', 'code' => 'not_found'], 404);
+        }
+        $token->delete();
+
+        UserLog::record($user, UserLogEvent::Logout, $request, ['source' => 'app_devices', 'token_id' => $id, 'device' => $token->name]);
+
+        return response()->json(['message' => 'Đã đăng xuất thiết bị.']);
+    }
+
     /** Chỉ xoá ảnh do app tải lên (thư mục avatars/), không đụng link ngoài. */
     private static function deleteStored(?string $path): void
     {

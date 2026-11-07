@@ -136,4 +136,35 @@ class ProfileApiTest extends TestCase
             ->assertJsonPath('data.membership.active', true)
             ->assertJsonPath('data.membership.started_at', $first->toIso8601String());
     }
+
+    public function test_devices_list_and_remote_logout(): void
+    {
+        $u = User::factory()->create(['role' => UserRole::Student, 'is_active' => true, 'email' => 'dev@example.com']);
+        $u->setOwnPassword('MatKhau123');
+        $login = fn (string $id, string $name, string $platform) => $this->withHeaders([
+            'X-Device-Id' => $id, 'X-Device-Name' => $name, 'X-Device-Platform' => $platform, 'X-Device-OS' => '18.1',
+        ])->postJson('/v1/auth/login', ['email' => 'dev@example.com', 'password' => 'MatKhau123'])->assertOk()->json('token');
+
+        $phone = $login('dev-phone', 'iPhone 15', 'ios');
+        $web = $login('dev-web', 'Chrome', 'web');
+        $phone = $login('dev-phone', 'iPhone 15', 'ios'); // đăng nhập lại cùng máy → thay phiên cũ, không nhân đôi
+        $this->assertSame(2, $u->tokens()->count());
+
+        $list = $this->withToken($phone)->getJson('/v1/me/devices')->assertOk()->json('data');
+        $this->assertCount(2, $list);
+        $this->assertTrue($list[0]['current']);
+        $this->assertSame('ios', $list[0]['platform']);
+        $this->assertSame('Chrome', $list[1]['name']);
+
+        $this->withToken($phone)->deleteJson('/v1/me/devices/' . $list[0]['id'])->assertStatus(422)->assertJsonPath('code', 'current_device');
+        $this->withToken($phone)->deleteJson('/v1/me/devices/' . $list[1]['id'])->assertOk();
+        $this->assertSame(1, $u->tokens()->count());
+
+        // token của máy đã bị đăng xuất không dùng được nữa; không xoá được token của người khác
+        $this->app['auth']->forgetGuards();
+        $this->withToken($web)->getJson('/v1/me')->assertUnauthorized();
+        $otherId = $this->user->tokens()->first()->getKey();
+        $this->app['auth']->forgetGuards();
+        $this->withToken($phone)->deleteJson('/v1/me/devices/' . $otherId)->assertNotFound();
+    }
 }

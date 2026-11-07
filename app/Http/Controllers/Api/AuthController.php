@@ -237,6 +237,19 @@ class AuthController extends Controller
     {
         $token = $user->createToken(DeviceInfo::tokenName($request));
 
+        // Lưu thiết bị của phiên (màn Thiết bị đăng nhập). Đăng nhập lại trên cùng máy → bỏ phiên cũ của máy đó.
+        $info = DeviceInfo::fromRequest($request);
+        $token->accessToken->forceFill([
+            'platform' => $info['platform'],
+            'os_version' => $info['os_version'],
+            'app_version' => $info['app_version'],
+            'device_id' => $info['device_id'],
+            'ip_address' => $info['ip_address'],
+        ])->save();
+        if ($info['device_id']) {
+            $user->tokens()->where('device_id', $info['device_id'])->whereKeyNot($token->accessToken->getKey())->delete();
+        }
+
         $user->forceFill(['last_login_at' => now()])->save();
 
         UserLog::record($user, UserLogEvent::Login, $request, [
