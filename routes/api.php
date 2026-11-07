@@ -70,6 +70,8 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::get('me/referrer/preview', [ProfileController::class, 'previewReferrer'])->middleware('throttle:referral-check');
     Route::post('me/referrer', [ProfileController::class, 'setReferrer'])->middleware('throttle:referral-check');
     Route::get('me/devices', [ProfileController::class, 'devices']);
+    Route::get('me/coins', [ProfileController::class, 'coins']);
+    Route::get('me/referrals', [ProfileController::class, 'referrals']);
     Route::delete('me/devices/{id}', [ProfileController::class, 'revokeDevice'])->whereNumber('id')->middleware('throttle:20,1');
 
     // Xem trước mã khuyến mãi khi thanh toán (giới hạn để chống dò mã)

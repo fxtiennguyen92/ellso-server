@@ -246,6 +246,52 @@ class ProfileController extends Controller
         return response()->json(['message' => 'Đã đăng xuất thiết bị.']);
     }
 
+    /**
+     * GET /me/coins?cursor= — số dư + lịch sử xu, mới nhất trước, 20 dòng / trang (cursor = next_cursor của trang trước).
+     */
+    public function coins(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $page = $user->coinTransactions()->orderByDesc('id')->cursorPaginate(20);
+
+        return response()->json([
+            'balance' => (int) $user->coin_balance,
+            'data' => collect($page->items())->map(fn ($t) => [
+                'id' => $t->id,
+                'amount' => $t->amount,
+                'balance_after' => $t->balance_after,
+                'source' => $t->source->value,
+                'source_label' => $t->source->getLabel(),
+                'description' => $t->description,
+                'created_at' => $t->created_at?->toIso8601String(),
+            ]),
+            'next_cursor' => $page->nextCursor()?->encode(),
+        ]);
+    }
+
+    /**
+     * GET /me/referrals?cursor= — bạn bè mình đã giới thiệu (đăng ký bằng mã của mình hoặc thêm mình làm người giới thiệu),
+     * mới nhất trước, 20 / trang. Chỉ trả tên, ảnh, ngày tham gia (không lộ email / SĐT của bạn bè).
+     */
+    public function referrals(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $page = $user->referrals()->orderByDesc('id')->cursorPaginate(20, ['id', 'name', 'avatar', 'created_at']);
+
+        return response()->json([
+            'total' => $user->referrals()->count(),
+            'data' => collect($page->items())->map(fn (User $u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'avatar' => $u->avatarUrl(),
+                'joined_at' => $u->created_at?->toIso8601String(),
+            ]),
+            'next_cursor' => $page->nextCursor()?->encode(),
+        ]);
+    }
+
     /** Chỉ xoá ảnh do app tải lên (thư mục avatars/), không đụng link ngoài. */
     private static function deleteStored(?string $path): void
     {

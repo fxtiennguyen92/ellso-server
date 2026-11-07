@@ -3,9 +3,11 @@
 namespace Tests\Feature\Api;
 
 use App\Enums\UserRole;
+use App\Enums\CoinSource;
 use App\Enums\MembershipSource;
 use App\Models\StudentMembership;
 use App\Models\User;
+use App\Services\CoinLedger;
 use App\Support\MediaStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -166,5 +168,44 @@ class ProfileApiTest extends TestCase
         $otherId = $this->user->tokens()->first()->getKey();
         $this->app['auth']->forgetGuards();
         $this->withToken($phone)->deleteJson('/v1/me/devices/' . $otherId)->assertNotFound();
+    }
+
+    public function test_coin_history_paginates_and_ledger_keeps_balance(): void
+    {
+        $ledger = app(CoinLedger::class);
+        for ($i = 1; $i <= 25; $i++) {
+            $ledger->record($this->user, 10, CoinSource::Learning, "Bài {$i}");
+        }
+        $ledger->record($this->user, -30, CoinSource::Spend, 'Đổi xu');
+        $this->assertSame(220, (int) $this->user->fresh()->coin_balance);
+
+        try {
+            $ledger->record($this->user, -1000, CoinSource::Spend, 'Quá số dư');
+            $this->fail('Phải báo không đủ xu');
+        } catch (\InvalidArgumentException) {
+        }
+
+        $first = $this->withToken($this->token)->getJson('/v1/me/coins')->assertOk()
+            ->assertJsonPath('balance', 220)
+            ->assertJsonPath('data.0.amount', -30)
+            ->assertJsonPath('data.0.source_label', 'Dùng xu')
+            ->assertJsonCount(20, 'data');
+        $next = $first->json('next_cursor');
+        $this->assertNotNull($next);
+        $this->withToken($this->token)->getJson('/v1/me/coins?cursor=' . $next)->assertOk()
+            ->assertJsonCount(6, 'data')
+            ->assertJsonPath('next_cursor', null)
+            ->assertJsonPath('data.5.description', 'Bài 1');
+    }
+
+    public function test_referrals_list_only_own_and_no_private_fields(): void
+    {
+        User::factory()->count(3)->create(['role' => UserRole::Student, 'referred_by_id' => $this->user->id]);
+        User::factory()->create(['role' => UserRole::Student]);
+
+        $r = $this->withToken($this->token)->getJson('/v1/me/referrals')->assertOk()
+            ->assertJsonPath('total', 3)
+            ->assertJsonCount(3, 'data');
+        $this->assertSame(['id', 'name', 'avatar', 'joined_at'], array_keys($r->json('data.0')));
     }
 }
