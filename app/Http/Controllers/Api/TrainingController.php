@@ -142,7 +142,7 @@ class TrainingController extends Controller
             'id' => $c->id,
             'title' => $c->title,
             'summary' => $c->summary,
-            'trainer' => $c->trainer ? ['id' => $c->trainer->id, 'name' => $c->trainer->name] : null,
+            'trainer' => $c->trainer ? ['id' => $c->trainer->id, 'name' => $c->trainer->name, 'avatar' => $c->trainer->avatarUrl()] : null,
             'price' => $c->price,
             'is_free' => $c->price === 0,          // miễn phí với học viên có gói thành viên
             'capacity' => $c->capacity,

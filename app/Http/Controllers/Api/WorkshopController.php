@@ -151,7 +151,7 @@ class WorkshopController extends Controller
             'id' => $w->id,
             'title' => $w->title,
             'summary' => $w->summary,
-            'trainer' => $w->trainer ? ['id' => $w->trainer->id, 'name' => $w->trainer->name] : null,
+            'trainer' => $w->trainer ? ['id' => $w->trainer->id, 'name' => $w->trainer->name, 'avatar' => $w->trainer->avatarUrl()] : null,
             'price' => $w->price,
             'is_free' => $w->price === 0,          // miễn phí với học viên có gói thành viên
             'capacity' => $w->capacity,            // mỗi buổi; null = không giới hạn
