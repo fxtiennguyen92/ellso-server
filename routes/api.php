@@ -29,6 +29,11 @@ Route::prefix('auth')->group(function () {
         ->middleware(['auth:sanctum', 'abilities:' . AuthController::ABILITY_SET_PASSWORD]);
 });
 
+// Trình đọc sách (trang HTML cho WebView / iframe) + file sách qua link có chữ ký
+Route::get('reader', [\App\Http\Controllers\Api\ReaderController::class, 'page'])->name('reader.page');
+Route::get('reader/file/{id}/{kind}', [\App\Http\Controllers\Api\ReaderController::class, 'file'])
+    ->whereNumber('id')->whereIn('kind', ['preview', 'full'])->middleware('signed')->name('reader.file');
+
 Route::get('app-config', [\App\Http\Controllers\Api\AppConfigController::class, 'show']);
 Route::get('referrals/{code}', [ReferralController::class, 'show'])->middleware('throttle:referral-check');
 

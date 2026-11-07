@@ -260,6 +260,16 @@ class BookPreviewTest extends TestCase
         $this->assertStringContainsString($book->fresh()->preview_path, $preview['url']); // link tạm tới file đọc thử, không phải file sách
         $this->assertStringNotContainsString($book->file_path, $preview['url']);
 
+        // Trình đọc: trang HTML + file đọc thử qua link có chữ ký (đúng nội dung bản đọc thử, sửa chữ ký → 403)
+        $this->assertStringContainsString('/v1/reader?', $preview['reader_url']);
+        $this->get($preview['reader_url'])->assertOk()->assertSee('epub-0.3.93.min.js', false);
+        parse_str((string) parse_url($preview['reader_url'], PHP_URL_QUERY), $q);
+        $this->assertStringContainsString('/v1/reader/file/' . $book->id . '/preview', $q['file']);
+        $file = $this->get($q['file'])->assertOk()->assertHeader('Content-Type', 'application/epub+zip');
+        $this->assertSame(Storage::disk('documents_local')->get($book->fresh()->preview_path), $file->streamedContent());
+        $this->get($q['file'] . 'x')->assertForbidden();
+        $this->get('/v1/reader/file/' . $book->id . '/full')->assertForbidden();
+
         // Video / PDF: preview null; sách tắt đọc thử → 404 no_preview
         $pdf = Document::create(['type' => DocumentType::Pdf, 'title' => 'PDF', 'is_free' => true, 'status' => 'published', 'file_path' => 'files/pdf/a.pdf', 'file_format' => 'pdf']);
         $this->assertNull($this->api()->getJson("/v1/documents/{$pdf->id}")->json('data.preview'));
