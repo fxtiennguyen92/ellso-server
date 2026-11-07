@@ -157,7 +157,8 @@ class DocumentForm
                             ->visible(fn (Get $get) => self::type($get) === DocumentType::Book && $get('preview_enabled'))
                             ->schema([
                                 TextInput::make('preview_pages')
-                                    ->label('Số trang đọc thử (PDF)')
+                                    ->label('Số trang đọc thử tối đa (PDF)')
+                                    ->helperText('Thực tế lấy số nhỏ hơn giữa số này và 20% số trang của sách (ít nhất 1 trang). VD sách 20 trang, nhập 10 → đọc thử 4 trang.')
                                     ->integer()
                                     ->minValue(1)
                                     ->maxValue(200)
@@ -166,14 +167,14 @@ class DocumentForm
                                     ->required()
                                     ->visible(fn (?Document $record) => $record?->file_format !== 'epub'),
                                 TextInput::make('preview_chapters')
-                                    ->label('Số chương đọc thử (EPUB)')
+                                    ->label('Số chương đọc thử tối đa (EPUB)')
                                     ->integer()
                                     ->minValue(1)
                                     ->maxValue(50)
                                     ->default((int) config('ellso.documents.preview_chapters'))
                                     ->suffix('chương')
                                     ->required()
-                                    ->helperText('Chương = mục trong danh sách đọc của file EPUB; trang bìa / mục lục cũng có thể tính là một chương.')
+                                    ->helperText('Thực tế lấy số nhỏ hơn giữa số này và 20% số chương của sách (ít nhất 1 chương). Chương = mục trong danh sách đọc của file EPUB; trang bìa / mục lục cũng có thể tính là một chương.')
                                     ->visible(fn (?Document $record) => $record?->file_format !== 'pdf'),
                             ]),
                         Callout::make(fn (?Document $record) => self::previewStatus($record))
@@ -291,8 +292,8 @@ class DocumentForm
         return match ($record->preview_status) {
             VideoStatus::Ready => 'Bản đọc thử sẵn sàng · ' . $record->preview_count . ' ' . $unit . ' đầu'
                 . ($record->source_count ? ' / ' . $record->source_count . ' ' . $unit : '')
-                . ($record->source_count !== null && $record->source_count <= $wanted
-                    ? '. Lưu ý: sách chỉ có ' . $record->source_count . ' ' . $unit . ' nên bản đọc thử là toàn bộ sách — nên giảm số ' . $unit . ' đọc thử.'
+                . ($record->preview_count !== null && $record->preview_count < $wanted
+                    ? ' (giới hạn 20% cuốn sách)'
                     : ''),
             VideoStatus::Failed => new HtmlString('Lỗi tạo bản đọc thử: ' . e((string) $record->preview_error) . '<br>Bấm "Tạo lại bản đọc thử" hoặc tải lại file sách.'),
             default => 'Bản đọc thử: ' . mb_strtolower($record->preview_status->getLabel()) . '… (tải lại trang để xem).',
@@ -301,12 +302,7 @@ class DocumentForm
 
     private static function previewColor(?Document $record): string
     {
-        $wanted = $record?->file_format === 'epub' ? $record?->preview_chapters : $record?->preview_pages;
-
-        return match (true) {
-            $record?->preview_status === VideoStatus::Ready && $record->source_count !== null && $record->source_count <= $wanted => 'warning',
-            default => $record?->preview_status?->getColor() ?? 'gray',
-        };
+        return $record?->preview_status?->getColor() ?? 'gray';
     }
 
     private static function videoStatus(?Document $record): HtmlString | string

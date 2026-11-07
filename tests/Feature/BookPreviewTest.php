@@ -131,10 +131,10 @@ class BookPreviewTest extends TestCase
     {
         $source = tempnam(sys_get_temp_dir(), 'src') . '.epub';
         $target = tempnam(sys_get_temp_dir(), 'out') . '.epub';
-        file_put_contents($source, $this->epub(5));
+        file_put_contents($source, $this->epub(12));
 
-        $this->assertSame(5, EpubPreview::chapterCount($source));
-        $this->assertSame(['kept' => 2, 'total' => 5], EpubPreview::make($source, $target, 2));
+        $this->assertSame(12, EpubPreview::chapterCount($source));
+        $this->assertSame(['kept' => 2, 'total' => 12], EpubPreview::make($source, $target, 2));
 
         $zip = new ZipArchive;
         $this->assertTrue($zip->open($target) === true);
@@ -160,25 +160,27 @@ class BookPreviewTest extends TestCase
         $this->assertStringNotContainsString('ch4.xhtml', $ncx);
         $zip->close();
 
-        // Xin nhiều hơn số chương → giữ hết
-        $this->assertSame(['kept' => 5, 'total' => 5], EpubPreview::make($source, $target, 9));
+        // Xin nhiều hơn 20% cuốn sách → chỉ lấy 20% (12 chương → 2); sách quá ngắn vẫn giữ ít nhất 1 chương
+        $this->assertSame(['kept' => 2, 'total' => 12], EpubPreview::make($source, $target, 9));
+        file_put_contents($source, $this->epub(3));
+        $this->assertSame(['kept' => 1, 'total' => 3], EpubPreview::make($source, $target, 2));
     }
 
     public function test_cms_epub_book_preview_regenerate_and_toggle_off(): void
     {
-        $book = $this->createBook('sach.epub', $this->epub(5));
+        $book = $this->createBook('sach.epub', $this->epub(20));
         $this->assertTrue($book->preview_enabled);
         $this->assertSame(2, $book->preview_chapters);
         $this->assertSame('epub', $book->file_format);
         $this->assertSame(VideoStatus::Ready, $book->preview_status);
         $this->assertSame(2, $book->preview_count);
-        $this->assertSame(5, $book->source_count);
+        $this->assertSame(20, $book->source_count);
         $first = $book->preview_path;
         Storage::disk('documents_local')->assertExists($first);
 
         // Đổi số chương → tạo lại, xoá bản cũ
         Livewire::test(EditDocument::class, ['record' => $book->getRouteKey()])
-            ->assertSee('Bản đọc thử sẵn sàng · 2 chương đầu / 5 chương')
+            ->assertSee('Bản đọc thử sẵn sàng · 2 chương đầu / 20 chương')
             ->assertActionVisible('regeneratePreview')
             ->fillForm(['preview_chapters' => 3])
             ->call('save')
@@ -187,6 +189,15 @@ class BookPreviewTest extends TestCase
         $this->assertSame(3, $book->preview_count);
         $this->assertNotSame($first, $book->preview_path);
         Storage::disk('documents_local')->assertMissing($first);
+
+        // Nhập quá 20% (20 chương → tối đa 4) → lấy 4, CMS ghi rõ
+        Livewire::test(EditDocument::class, ['record' => $book->getRouteKey()])
+            ->fillForm(['preview_chapters' => 9])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertSame(4, $book->fresh()->preview_count);
+        Livewire::test(EditDocument::class, ['record' => $book->getRouteKey()])
+            ->assertSee('Bản đọc thử sẵn sàng · 4 chương đầu / 20 chương (giới hạn 20% cuốn sách)');
 
         // Tạo lại thủ công
         $second = $book->preview_path;
@@ -213,11 +224,11 @@ class BookPreviewTest extends TestCase
             $this->markTestSkipped('Cần qpdf');
         }
 
-        $book = $this->createBook('sach.pdf', $this->pdf(15));
+        $book = $this->createBook('sach.pdf', $this->pdf(60));
         $this->assertSame('pdf', $book->file_format);
         $this->assertSame(VideoStatus::Ready, $book->preview_status, (string) $book->preview_error);
         $this->assertSame(10, $book->preview_count);
-        $this->assertSame(15, $book->source_count);
+        $this->assertSame(60, $book->source_count);
 
         $tmp = tempnam(sys_get_temp_dir(), 'pv') . '.pdf';
         file_put_contents($tmp, Storage::disk('documents_local')->get($book->preview_path));
@@ -225,14 +236,14 @@ class BookPreviewTest extends TestCase
         $pages->run();
         $this->assertSame('10', trim($pages->getOutput()));
 
-        // Đặt nhiều hơn số trang → lấy hết, CMS cảnh báo
+        // Nhập nhiều hơn 20% (60 trang → tối đa 12) → lấy 12, CMS ghi rõ
         Livewire::test(EditDocument::class, ['record' => $book->getRouteKey()])
-            ->fillForm(['preview_pages' => 20])
+            ->fillForm(['preview_pages' => 30])
             ->call('save')
             ->assertHasNoFormErrors();
-        $this->assertSame(15, $book->fresh()->preview_count);
+        $this->assertSame(12, $book->fresh()->preview_count);
         Livewire::test(EditDocument::class, ['record' => $book->getRouteKey()])
-            ->assertSee('sách chỉ có 15 trang nên bản đọc thử là toàn bộ sách');
+            ->assertSee('12 trang đầu / 60 trang (giới hạn 20% cuốn sách)');
     }
 
     public function test_pdf_that_qpdf_cannot_read_marks_failed(): void
@@ -245,7 +256,7 @@ class BookPreviewTest extends TestCase
 
     public function test_api_preview_for_non_buyer_and_no_preview(): void
     {
-        $book = $this->createBook('sach.epub', $this->epub(4));
+        $book = $this->createBook('sach.epub', $this->epub(10));
 
         // Học viên chưa mua: sách khoá nhưng mở được bản đọc thử
         $item = $this->api()->getJson("/v1/documents/{$book->id}")->assertOk()->json('data');

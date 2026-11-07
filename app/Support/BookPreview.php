@@ -13,6 +13,18 @@ use App\Models\Document;
  */
 class BookPreview
 {
+    /** Bản đọc thử không quá 20% số trang / chương của cuốn sách. */
+    public const MAX_PERCENT = 20;
+
+    /**
+     * Số trang / chương thật sự cắt làm bản đọc thử: số nhỏ hơn giữa số admin nhập (tối đa) và 20% cả cuốn,
+     * ít nhất 1. VD sách 20 trang, nhập 10 → 20% = 4 → lấy 4 trang.
+     */
+    public static function limit(int $max, int $total): int
+    {
+        return max(1, min($max, intdiv($total * self::MAX_PERCENT, 100), $total));
+    }
+
     /** Các trường mà đổi thì phải tạo lại bản đọc thử. */
     public const TRIGGERS = ['file_path', 'file_format', 'preview_enabled', 'preview_pages', 'preview_chapters'];
 

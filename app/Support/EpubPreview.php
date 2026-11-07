@@ -61,7 +61,7 @@ class EpubPreview
             if ($total === 0) {
                 throw new RuntimeException('EPUB không có chương nào trong spine.');
             }
-            $keep = max(1, min($chapters, $total));
+            $keep = BookPreview::limit($chapters, $total);
             $cutAfter = $linear[$keep - 1];
 
             // File không được xoá dù nằm trong spine: mục lục (nav)

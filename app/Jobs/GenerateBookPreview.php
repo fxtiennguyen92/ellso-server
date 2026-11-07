@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Enums\DocumentType;
 use App\Enums\VideoStatus;
 use App\Models\Document;
+use App\Support\BookPreview;
 use App\Support\DocumentStorage;
 use App\Support\EpubPreview;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -65,7 +66,7 @@ class GenerateBookPreview implements ShouldQueue
                 if ($total < 1) {
                     throw new RuntimeException('Không đọc được số trang của file PDF.');
                 }
-                $kept = min(max(1, (int) $doc->preview_pages), $total);
+                $kept = BookPreview::limit(max(1, (int) $doc->preview_pages), $total);
                 $this->run([config('ellso.documents.qpdf'), '--warning-exit-0', '--empty', '--pages', $source, '1-' . $kept, '--', $target]);
             }
 
