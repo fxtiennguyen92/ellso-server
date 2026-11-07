@@ -129,10 +129,12 @@
       document.getElementById('status').style.display = 'none';
       post({ type: 'ready', total: spineTotal, unit: 'chapter' });
       var endSent = false;
+      // EPUB không có trang cố định: mỗi chương được chia thành nhiều trang theo khổ màn hình + cỡ chữ
       rendition.on('relocated', function (loc) {
         var idx = (loc.start && loc.start.index) || 0;
-        showPill('Chương ' + (idx + 1) + ' / ' + spineTotal);
-        post({ type: 'progress', current: idx + 1, total: spineTotal });
+        var d = (loc.start && loc.start.displayed) || { page: 1, total: 1 };
+        showPill('Chương ' + (idx + 1) + ' / ' + spineTotal + ' · trang ' + d.page + ' / ' + d.total);
+        post({ type: 'progress', current: idx + 1, total: spineTotal, page: d.page, pages: d.total });
         if (!endSent && loc.atEnd) { endSent = true; post({ type: 'end' }); }
       });
       document.getElementById('prev').onclick = function () { rendition.prev(); };
