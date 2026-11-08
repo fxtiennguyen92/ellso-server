@@ -27,7 +27,7 @@ use Random\Randomizer;
  */
 class PlacementTest extends Model
 {
-    protected $fillable = ['key', 'title', 'intro', 'question_count', 'shuffle_options', 'is_active', 'sort_order'];
+    protected $fillable = ['key', 'title', 'intro', 'question_count', 'duration_minutes', 'shuffle_options', 'is_active', 'sort_order'];
 
     protected $attributes = ['shuffle_options' => true, 'is_active' => false];
 
@@ -37,6 +37,7 @@ class PlacementTest extends Model
             'is_active' => 'boolean',
             'sort_order' => 'integer',
             'question_count' => 'integer',
+            'duration_minutes' => 'integer',
             'shuffle_options' => 'boolean',
         ];
     }
@@ -61,6 +62,12 @@ class PlacementTest extends Model
             }
         });
         static::deleted(fn () => AbilityClassifications::syncSoon());
+    }
+
+    /** Thời gian làm bài ước tính (phút) cho app: số đặt trong CMS, không có thì ~1 phút / câu (tối thiểu 3). */
+    public function estimatedMinutes(int $questionCount): int
+    {
+        return $this->duration_minutes ?: max(3, $questionCount);
     }
 
     public function scopeActive(Builder $query): Builder

@@ -82,6 +82,14 @@ class PlacementTestResource extends Resource
                                 . ($total ? " trong {$total} câu đã soạn" : ' trong các câu đã soạn')
                                 . ', thứ tự ngẫu nhiên, ưu tiên mỗi năng lực có ít nhất 1 câu. Mức độ tính theo % điểm trên chính bộ câu học viên nhận được.';
                         }),
+                    TextInput::make('duration_minutes')
+                        ->label('Thời gian làm bài (ước tính)')
+                        ->integer()
+                        ->minValue(1)
+                        ->maxValue(300)
+                        ->suffix('phút')
+                        ->placeholder('Tự tính: ~1 phút / câu')
+                        ->helperText('Chỉ để hiện trên app khi học viên xác nhận bắt đầu (không đếm ngược, không tự nộp bài). Để trống = khoảng 1 phút mỗi câu.'),
                     Toggle::make('shuffle_options')
                         ->label('Đảo thứ tự đáp án')
                         ->default(true)

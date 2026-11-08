@@ -42,7 +42,8 @@ class PlacementTestController extends Controller
         return response()->json([
             'data' => $tests->map(fn (PlacementTest $test) => [
                 ...$this->summary($test, $latest[$test->key] ?? null),
-                'question_count' => $test->questionsPerAttempt((int) $test->questions_count),
+                'question_count' => $count = $test->questionsPerAttempt((int) $test->questions_count),
+                'minutes' => $test->estimatedMinutes($count),
             ])->values(),
         ]);
     }
@@ -173,6 +174,7 @@ class PlacementTestController extends Controller
         return [
             ...$this->summary($test, $this->latestByKey($user)[$test->key] ?? null),
             'question_count' => $test->questions->count(),
+            'minutes' => $test->estimatedMinutes($test->questions->count()),
             'questions' => $test->questions->map(fn (PlacementQuestion $q) => [
                 'id' => $q->id,
                 'type' => $q->type->value,

@@ -103,6 +103,15 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::post('lessons/{id}/quiz', [LessonController::class, 'answer'])->whereNumber('id')->middleware('throttle:60,1');
     Route::post('lessons/{id}/videos/{videoId}/play', [LessonController::class, 'playVideo'])->whereNumber(['id', 'videoId'])->middleware('throttle:60,1');
 
+    // Khám phá khoá học (phân trang) + danh mục
+    Route::get('courses', [\App\Http\Controllers\Api\CourseCatalogController::class, 'index']);
+    Route::get('courses/categories', [\App\Http\Controllers\Api\CourseCatalogController::class, 'categories']);
+
+    // Giỏ hàng (khoá học, sách)
+    Route::get('cart', [\App\Http\Controllers\Api\CartController::class, 'index']);
+    Route::post('cart', [\App\Http\Controllers\Api\CartController::class, 'store'])->middleware('throttle:60,1');
+    Route::delete('cart/{type}/{id}', [\App\Http\Controllers\Api\CartController::class, 'destroy'])->whereIn('type', ['course', 'document'])->whereNumber('id');
+
     // Tài liệu: Video (HLS), PDF, Sách
     Route::get('documents', [DocumentController::class, 'index']);
     Route::get('documents/topics', [DocumentController::class, 'topics']);

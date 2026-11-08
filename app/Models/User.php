@@ -180,6 +180,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(DocumentPurchase::class);
     }
 
+    public function cartItems(): HasMany
+    {
+        return $this->hasMany(CartItem::class);
+    }
+
     public function savedDocuments(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Document::class, 'document_saves')->withPivot('created_at');

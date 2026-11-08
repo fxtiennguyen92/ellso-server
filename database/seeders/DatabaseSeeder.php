@@ -43,6 +43,7 @@ class DatabaseSeeder extends Seeder
 
         if (app()->isLocal()) {
             $this->call(DemoCourseSeeder::class);
+            $this->call(DemoCatalogSeeder::class);
         }
     }
 }
