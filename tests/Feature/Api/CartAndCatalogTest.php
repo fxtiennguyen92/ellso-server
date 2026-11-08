@@ -10,6 +10,8 @@ use App\Models\Category;
 use App\Models\Course;
 use App\Models\Document;
 use App\Models\PlacementTest;
+use App\Models\PromoCode;
+use App\Enums\DiscountType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -118,5 +120,25 @@ class CartAndCatalogTest extends TestCase
 
         $test->update(['duration_minutes' => 12]);
         $this->getJson('/v1/placement-tests')->assertJsonPath('data.0.minutes', 12);
+    }
+
+    public function test_cart_promo_preview_applies_to_courses_only(): void
+    {
+        $promo = PromoCode::create([
+            'code' => PromoCode::generateUniqueCode(), 'name' => 'Giảm 10%',
+            'discount_type' => DiscountType::Percent, 'discount_value' => 10, 'is_active' => true,
+        ]);
+        $book = $this->book(['price' => 100000]);
+        $this->postJson('/v1/cart', ['type' => 'document', 'id' => $book->id]);
+        $this->postJson('/v1/cart/promo', ['code' => $promo->code])->assertStatus(422)->assertJsonPath('reason', 'no_course');
+
+        $course = $this->course(['price' => 500000]);
+        $this->postJson('/v1/cart', ['type' => 'course', 'id' => $course->id]);
+        $this->postJson('/v1/cart/promo', ['code' => $promo->code])->assertOk()
+            ->assertJsonPath('data.discount', 50000)
+            ->assertJsonPath('data.subtotal', 600000)
+            ->assertJsonPath('data.total', 550000)
+            ->assertJsonPath('data.eligible.0.id', $course->id);
+        $this->postJson('/v1/cart/promo', ['code' => 'KHONGCO'])->assertStatus(422)->assertJsonPath('reason', 'not_found');
     }
 }

@@ -110,6 +110,7 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     // Giỏ hàng (khoá học, sách)
     Route::get('cart', [\App\Http\Controllers\Api\CartController::class, 'index']);
     Route::post('cart', [\App\Http\Controllers\Api\CartController::class, 'store'])->middleware('throttle:60,1');
+    Route::post('cart/promo', [\App\Http\Controllers\Api\CartController::class, 'promo'])->middleware('throttle:promo-code-check');
     Route::delete('cart/{type}/{id}', [\App\Http\Controllers\Api\CartController::class, 'destroy'])->whereIn('type', ['course', 'document'])->whereNumber('id');
 
     // Tài liệu: Video (HLS), PDF, Sách

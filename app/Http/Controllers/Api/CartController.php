@@ -8,6 +8,8 @@ use App\Models\CartItem;
 use App\Models\Course;
 use App\Models\Document;
 use App\Models\User;
+use App\Services\PromoCodeException;
+use App\Services\PromoCodeService;
 use App\Support\MediaStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,6 +22,8 @@ use Illuminate\Http\Request;
  * - GET    /cart                       giỏ: {items, count, total}
  * - POST   /cart  {type, id}           thêm (đã có thì giữ nguyên) → giỏ
  * - DELETE /cart/{type}/{id}           bỏ ra → giỏ
+ * - POST   /cart/promo {code}           xem trước mã khuyến mãi cho giỏ hiện tại (chưa ghi lượt dùng — ghi khi tạo đơn).
+ *                                       Mã khuyến mãi hiện chỉ áp dụng cho khoá học (PromoCodeService); sách trong giỏ không được giảm.
  */
 class CartController extends Controller
 {
@@ -59,6 +63,40 @@ class CartController extends Controller
         $request->user()->cartItems()->where('item_type', $type)->where('item_id', $id)->delete();
 
         return response()->json(['data' => $this->cart($request->user())]);
+    }
+
+    public function promo(Request $request, PromoCodeService $promoCodes): JsonResponse
+    {
+        $data = $request->validate(['code' => ['required', 'string', 'max:20']], ['code.required' => 'Vui lòng nhập mã khuyến mãi.']);
+        $user = $request->user();
+        $cart = $this->cart($user);
+
+        $courseIds = collect($cart['items'])->where('type', CartItem::TYPE_COURSE)->pluck('id');
+        if ($courseIds->isEmpty()) {
+            return response()->json([
+                'valid' => false,
+                'reason' => 'no_course',
+                'message' => $cart['count'] ? 'Mã khuyến mãi hiện chỉ áp dụng cho khoá học.' : 'Giỏ hàng đang trống.',
+            ], 422);
+        }
+
+        try {
+            $result = $promoCodes->evaluate($data['code'], $user, Course::query()->whereKey($courseIds)->get(['id', 'title', 'price', 'category_id']));
+        } catch (PromoCodeException $e) {
+            return response()->json(['valid' => false, 'reason' => $e->reason, 'message' => $e->getMessage()], 422);
+        }
+
+        $promo = $result['promo_code'];
+
+        return response()->json(['data' => [
+            'code' => $promo->code,
+            'description' => $promo->description,
+            'discount' => (int) $result['discount'],
+            'eligible' => collect($result['eligible_course_ids'])->map(fn ($id) => ['type' => CartItem::TYPE_COURSE, 'id' => (int) $id])->values(),
+            'subtotal' => $cart['total'],
+            'total' => max(0, $cart['total'] - (int) $result['discount']),
+            'ends_at' => $promo->ends_at?->toIso8601String(),
+        ]]);
     }
 
     /** @return array{0: string, 1: string}|null [mã, thông báo] khi không thêm được */
