@@ -89,6 +89,7 @@ class CartAndCatalogTest extends TestCase
         $this->postJson('/v1/cart', ['type' => 'document', 'id' => $book->id])->assertOk()->assertJsonPath('data.count', 2);
 
         $this->getJson('/v1/cart')->assertJsonPath('data.total', 400000)->assertJsonPath('data.items.0.kind', 'book');
+        $this->getJson('/v1/cart')->assertJsonPath('data.coins.balance', 0)->assertJsonPath('data.coins.rate', 1000);
         $this->getJson('/v1/courses')->assertJsonPath('data.0.in_cart', true);
 
         $this->deleteJson("/v1/cart/course/{$course->id}")->assertOk()->assertJsonPath('data.count', 1);

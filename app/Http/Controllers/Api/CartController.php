@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Models\Course;
 use App\Models\Document;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\PromoCodeException;
 use App\Services\PromoCodeService;
@@ -19,7 +20,7 @@ use Illuminate\Http\Request;
  * Món mua được: khoá học đã xuất bản có giá > 0 mà chưa ghi danh; sách có giá bán mà chưa mua.
  * Món không còn mua được (đã có quyền, ngừng bán, bị xoá) tự rời giỏ khi xem giỏ.
  *
- * - GET    /cart                       giỏ: {items, count, total}
+ * - GET    /cart                       giỏ: {items, count, total, coins: {balance, rate (VND / 1 xu, CMS: Thiết lập › credit_to_vnd_rate)}}
  * - POST   /cart  {type, id}           thêm (đã có thì giữ nguyên) → giỏ
  * - DELETE /cart/{type}/{id}           bỏ ra → giỏ
  * - POST   /cart/promo {code}           xem trước mã khuyến mãi cho giỏ hiện tại (chưa ghi lượt dùng — ghi khi tạo đơn).
@@ -189,6 +190,12 @@ class CartController extends Controller
             'items' => $items,
             'count' => count($items),
             'total' => array_sum(array_column($items, 'price')),
+            // Xu dùng để trừ tiền khi thanh toán: app tự tính số xu dùng tối đa = min(số dư, floor(còn phải trả / rate)).
+            // Trừ xu thật khi tạo đơn hàng (chưa làm).
+            'coins' => [
+                'balance' => (int) $user->coin_balance,
+                'rate' => SystemSetting::creditToVndRate(),
+            ],
         ];
     }
 }
