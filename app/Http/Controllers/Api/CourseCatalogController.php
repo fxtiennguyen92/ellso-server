@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\CourseStatus;
+use App\Enums\CourseType;
 use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\Course;
 use App\Models\User;
+use App\Support\HtmlBlocks;
 use App\Support\MediaStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +19,7 @@ use Illuminate\Support\Collection;
  * Khám phá khoá học (app, đã đăng nhập).
  * - GET /courses?category_id=&page=   khoá đã xuất bản, mới nhất trước, 10 khoá / trang (app tải thêm khi cuộn)
  * - GET /courses/categories           danh mục có khoá đã xuất bản (để lọc)
+ * - GET /courses/{id}                  trang giới thiệu khoá (khoá đã xuất bản, hoặc khoá học viên đã ghi danh)
  */
 class CourseCatalogController extends Controller
 {
@@ -63,6 +66,54 @@ class CourseCatalogController extends Controller
             ->get(['id', 'name']);
 
         return response()->json(['data' => $categories]);
+    }
+
+    public function show(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        $course = Course::query()->with(['category', 'instructor', 'defaultPath.chapters.pathLessons.lesson'])->find($id);
+        $enrolled = $course && $user->enrollments()->where('course_id', $course->id)->exists();
+        if (! $course || ($course->status !== CourseStatus::Published && ! $enrolled)) {
+            return response()->json(['message' => 'Khoá học không tồn tại.', 'code' => 'not_found'], 404);
+        }
+
+        $item = self::present(collect([$course]), $user)[0];
+        $personalized = $course->type === CourseType::MultiPath;
+        $pending = $course->pendingPlacementTests($user)->pluck('id')->all();
+
+        // Nội dung (đề cương) theo lộ trình mặc định — khoá nhiều lộ trình: mỗi học viên một lộ trình riêng nên không liệt kê
+        $outline = [];
+        if (! $personalized && $course->defaultPath) {
+            foreach ($course->defaultPath->chapters as $chapter) {
+                if ($chapter->isExam()) {
+                    $outline[] = ['type' => 'exam', 'title' => $chapter->title, 'color' => null, 'lessons' => []];
+
+                    continue;
+                }
+                $lessons = $chapter->pathLessons
+                    ->filter(fn ($pl) => $pl->lesson && $pl->lesson->isPublished())
+                    ->map(fn ($pl) => ['title' => $pl->lesson->title, 'is_preview' => (bool) $pl->is_preview, 'coaching' => $pl->lesson->isCoaching()])
+                    ->values()->all();
+                if ($lessons) {
+                    $outline[] = ['type' => 'chapter', 'title' => $chapter->title, 'color' => $chapter->color?->value, 'lessons' => $lessons];
+                }
+            }
+        }
+
+        return response()->json(['data' => [
+            ...$item,
+            'description_blocks' => HtmlBlocks::toBlocks($course->description),
+            'personalized' => $personalized,
+            'paths_count' => $personalized ? $course->learningPaths()->count() : 1,
+            'chapter_count' => count(array_filter($outline, fn ($c) => $c['type'] === 'chapter')),
+            'outline' => $outline,
+            'instructor_bio' => $course->instructor?->bio,
+            'placement_tests' => $course->requiredPlacementTests()->map(fn ($t) => [
+                'id' => $t->id,
+                'title' => $t->title,
+                'completed' => ! in_array($t->id, $pending, true),
+            ])->values(),
+        ]]);
     }
 
     /** Định dạng giống src/data/courses.ts › CatalogCourse của app. */

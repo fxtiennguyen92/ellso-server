@@ -142,4 +142,21 @@ class CartAndCatalogTest extends TestCase
             ->assertJsonPath('data.eligible.0.id', $course->id);
         $this->postJson('/v1/cart/promo', ['code' => 'KHONGCO'])->assertStatus(422)->assertJsonPath('reason', 'not_found');
     }
+
+    public function test_course_detail_returns_blocks_and_outline(): void
+    {
+        $course = $this->course([
+            'short_description' => 'Ngắn gọn',
+            'description' => '<h2>Bạn sẽ học</h2><p>Nói <strong>thuyết phục</strong> hơn.</p><ul><li>Mở đầu</li><li>Kết luận</li></ul>',
+        ]);
+        $res = $this->getJson("/v1/courses/{$course->id}")->assertOk();
+        $res->assertJsonPath('data.title', $course->title)
+            ->assertJsonPath('data.personalized', false)
+            ->assertJsonPath('data.description_blocks.0', ['type' => 'heading', 'text' => 'Bạn sẽ học'])
+            ->assertJsonPath('data.description_blocks.1.text', 'Nói **thuyết phục** hơn.')
+            ->assertJsonPath('data.description_blocks.2.items', ['Mở đầu', 'Kết luận']);
+
+        $draft = $this->course(['status' => CourseStatus::Draft]);
+        $this->getJson("/v1/courses/{$draft->id}")->assertNotFound();
+    }
 }

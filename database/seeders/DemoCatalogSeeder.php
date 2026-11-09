@@ -60,8 +60,21 @@ class DemoCatalogSeeder extends Seeder
                 'status' => CourseStatus::Published,
                 'price' => $price,
             ]);
+            if (! $course->description) {
+                $course->forceFill(['description' => self::description($title, $short)])->saveQuietly();
+            }
             // Rải ngày xuất bản: vài khoá mới (nhãn "Mới"), còn lại cũ hơn
             $course->forceFill(['published_at' => now()->subDays($i < 3 ? $i * 5 + 2 : 40 + $i * 9)])->saveQuietly();
         }
+    }
+
+    /** Mô tả mẫu (HTML như RichEditor) để trang giới thiệu khoá trên app có nội dung. */
+    private static function description(string $title, string $short): string
+    {
+        return '<p>' . e($short) . ' Khoá <strong>' . e($title) . '</strong> gồm các bài ngắn, học trên điện thoại, mỗi bài 5–10 phút.</p>'
+            . '<h2>Bạn sẽ học được gì</h2>'
+            . '<ul><li>Nắm khung tư duy cốt lõi và áp dụng ngay vào công việc</li><li>Luyện tập qua tình huống thực tế</li><li>Tự đánh giá tiến bộ sau mỗi chương</li></ul>'
+            . '<h2>Khoá học dành cho ai</h2>'
+            . '<p>Người đi làm muốn nâng cấp kỹ năng một cách bài bản, không cần kiến thức nền.</p>';
     }
 }

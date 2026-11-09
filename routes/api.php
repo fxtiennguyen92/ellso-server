@@ -106,6 +106,7 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     // Khám phá khoá học (phân trang) + danh mục
     Route::get('courses', [\App\Http\Controllers\Api\CourseCatalogController::class, 'index']);
     Route::get('courses/categories', [\App\Http\Controllers\Api\CourseCatalogController::class, 'categories']);
+    Route::get('courses/{id}', [\App\Http\Controllers\Api\CourseCatalogController::class, 'show'])->whereNumber('id');
 
     // Giỏ hàng (khoá học, sách)
     Route::get('cart', [\App\Http\Controllers\Api\CartController::class, 'index']);
