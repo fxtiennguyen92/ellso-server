@@ -4,9 +4,11 @@ namespace Database\Seeders;
 
 use App\Enums\CourseStatus;
 use App\Enums\CourseType;
+use App\Enums\UnlockMode;
 use App\Enums\UserRole;
 use App\Models\Category;
 use App\Models\Course;
+use App\Models\Lesson;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use RuntimeException;
@@ -65,7 +67,11 @@ class DemoCatalogSeeder extends Seeder
             }
             // Rải ngày xuất bản: vài khoá mới (nhãn "Mới"), còn lại cũ hơn
             $course->forceFill(['published_at' => now()->subDays($i < 3 ? $i * 5 + 2 : 40 + $i * 9)])->saveQuietly();
+            $this->seedOutline($course, $title);
         }
+
+        // Thêm 1 bài coaching (cuối chương 1) + Thi giữa kỳ + Thi cuối kỳ vào mọi lộ trình (dọn bản cũ trước nên chạy lại được)
+        $this->call(DemoExamSeeder::class);
     }
 
     /** Mô tả mẫu (HTML như RichEditor) để trang giới thiệu khoá trên app có nội dung. */
@@ -76,5 +82,48 @@ class DemoCatalogSeeder extends Seeder
             . '<ul><li>Nắm khung tư duy cốt lõi và áp dụng ngay vào công việc</li><li>Luyện tập qua tình huống thực tế</li><li>Tự đánh giá tiến bộ sau mỗi chương</li></ul>'
             . '<h2>Khoá học dành cho ai</h2>'
             . '<p>Người đi làm muốn nâng cấp kỹ năng một cách bài bản, không cần kiến thức nền.</p>';
+    }
+
+    /** Chương + bài mẫu (đã xuất bản, nội dung vài dòng) cho lộ trình mặc định của khoá — bỏ qua nếu đã có chương. */
+    private function seedOutline(Course $course, string $title): void
+    {
+        $course->ensureDefaultPath();
+        $path = $course->defaultPath()->first();
+        if (! $path || $path->chapters()->exists()) {
+            return;
+        }
+
+        $topic = mb_strtolower($title);
+        $outline = [
+            ['Nền tảng', 'sage', ["Vì sao cần {$topic}?", 'Những khái niệm cốt lõi', 'Sai lầm thường gặp']],
+            ['Áp dụng vào công việc', 'teal', ['Khung 4 bước dễ nhớ', 'Tình huống thực tế', 'Luyện tập có hướng dẫn', 'Bài tập: tự đánh giá']],
+            ['Nâng cao', 'plum', ['Mẹo từ người hướng dẫn', 'Xây thói quen bền vững', 'Tổng kết & kế hoạch hành động']],
+        ];
+
+        foreach ($outline as $ci => [$chapterTitle, $color, $lessons]) {
+            $chapter = $path->chapters()->create(['title' => $chapterTitle, 'color' => $color, 'sort_order' => $ci + 1]);
+            foreach ($lessons as $li => $lessonTitle) {
+                $lesson = Lesson::create([
+                    'owner_id' => $course->instructor_id,
+                    'title' => $lessonTitle,
+                    'content_draft' => [
+                        'time' => now()->getTimestampMs(),
+                        'blocks' => [
+                            ['id' => 'h1', 'type' => 'header', 'data' => ['text' => $lessonTitle, 'level' => 2]],
+                            ['id' => 'p1', 'type' => 'paragraph', 'data' => ['text' => "Nội dung mẫu của bài học trong khoá {$title}."]],
+                        ],
+                        'version' => '2.31.0',
+                    ],
+                ]);
+                $lesson->publish();
+                $chapter->pathLessons()->create([
+                    'learning_path_id' => $path->id,
+                    'lesson_id' => $lesson->id,
+                    'unlock_mode' => UnlockMode::AfterPrevious,
+                    'is_preview' => $ci === 0 && $li === 0,
+                    'sort_order' => $li + 1,
+                ]);
+            }
+        }
     }
 }
