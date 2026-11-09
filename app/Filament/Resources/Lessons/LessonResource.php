@@ -5,9 +5,11 @@ namespace App\Filament\Resources\Lessons;
 use App\Enums\ContentStatus;
 use App\Enums\UserRole;
 use App\Filament\Resources\Lessons\Pages\EditLessonContent;
+use App\Filament\Resources\Lessons\Pages\LessonStatsPage;
 use App\Filament\Resources\Lessons\Pages\ManageLessons;
 use App\Filament\Resources\Lessons\Schemas\LessonForm;
 use App\Models\Lesson;
+use App\Support\MediaStorage;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -28,16 +30,15 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use UnitEnum;
-use App\Support\MediaStorage;
 
 /** Thư viện bài học dùng chung cho mọi khóa. */
 class LessonResource extends Resource
 {
     protected static ?string $model = Lesson::class;
 
-    protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedBookOpen;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;
 
-    protected static string | UnitEnum | null $navigationGroup = 'Đào tạo';
+    protected static string|UnitEnum|null $navigationGroup = 'Đào tạo';
 
     protected static ?int $navigationSort = 2;
 
@@ -111,6 +112,11 @@ class LessonResource extends Resource
                     ->hidden(fn (Lesson $record) => $record->trashed()),
                 // Bấm vào hàng = sửa tên & icon; các thao tác khác trong menu ⋮
                 ActionGroup::make([
+                    Action::make('stats')
+                        ->label('Thống kê học')
+                        ->icon(Heroicon::ChartBar)
+                        ->url(fn (Lesson $record) => static::getUrl('stats', ['record' => $record]))
+                        ->hidden(fn (Lesson $record) => $record->trashed() || $record->isCoaching()),
                     EditAction::make()
                         ->label('Sửa tên & icon')
                         ->modalHeading('Sửa tên & icon')
@@ -140,7 +146,7 @@ class LessonResource extends Resource
 
         return $courses->isEmpty()
             ? null
-            : 'Bài này đang dùng ở ' . $courses->count() . ' khóa: ' . $courses->pluck('title')->join(', ') . '. Thay đổi sẽ áp dụng cho tất cả.';
+            : 'Bài này đang dùng ở '.$courses->count().' khóa: '.$courses->pluck('title')->join(', ').'. Thay đổi sẽ áp dụng cho tất cả.';
     }
 
     public static function getPages(): array
@@ -148,6 +154,7 @@ class LessonResource extends Resource
         return [
             'index' => ManageLessons::route('/'),
             'content' => EditLessonContent::route('/{record}/content'),
+            'stats' => LessonStatsPage::route('/{record}/stats'),
         ];
     }
 

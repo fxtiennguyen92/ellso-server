@@ -7,15 +7,21 @@ use App\Enums\CourseType;
 use App\Enums\EnrollmentSource;
 use App\Enums\UnlockMode;
 use App\Enums\UserRole;
+use App\Filament\Resources\Lessons\LessonResource;
 use App\Models\Classification;
 use App\Models\Course;
 use App\Models\LearningPath;
 use App\Models\Lesson;
+use App\Models\LessonFeedback;
+use App\Models\LessonSession;
 use App\Models\PathChapter;
 use App\Models\PathLesson;
+use App\Models\PlacementAttempt;
+use App\Models\PlacementTest;
 use App\Models\User;
 use App\Services\LearningProgress;
 use App\Support\LessonContent;
+use App\Support\LessonStats;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -83,7 +89,7 @@ class LearningApiTest extends TestCase
     private function lesson(string $title, array $quizBlocks): Lesson
     {
         $lesson = Lesson::create(['title' => $title, 'owner_id' => $this->admin->id, 'content_draft' => ['blocks' => [
-            ['id' => 'p1', 'type' => 'paragraph', 'data' => ['text' => 'Nội dung ' . $title]],
+            ['id' => 'p1', 'type' => 'paragraph', 'data' => ['text' => 'Nội dung '.$title]],
             ['id' => 'img', 'type' => 'image', 'data' => ['file' => ['url' => 'http://cms.test:8000/storage/lessons/content/1/a.png']]],
             ...$quizBlocks,
         ]]]);
@@ -179,7 +185,7 @@ class LearningApiTest extends TestCase
 
     public function test_placement_test_required_blocks_learning(): void
     {
-        $test = \App\Models\PlacementTest::create(['title' => 'Đầu vào', 'is_active' => true]);
+        $test = PlacementTest::create(['title' => 'Đầu vào', 'is_active' => true]);
         $this->course->syncPlacementTestKeys([$test->key]);
         app(LearningProgress::class)->enroll($this->student, $this->course->fresh(), EnrollmentSource::Admin, $this->pathMarketing);
         $token = $this->student->createToken('app', ['app'])->plainTextToken;
@@ -193,10 +199,80 @@ class LearningApiTest extends TestCase
             ->assertJsonPath('code', 'placement_test_required')
             ->assertJsonPath('placement_tests', [['id' => $test->id, 'title' => 'Đầu vào']]);
 
-        \App\Models\PlacementAttempt::create(['user_id' => $this->student->id, 'placement_test_id' => $test->id, 'answers' => [], 'results' => [], 'completed_at' => now()]);
+        PlacementAttempt::create(['user_id' => $this->student->id, 'placement_test_id' => $test->id, 'answers' => [], 'results' => [], 'completed_at' => now()]);
         $this->withToken($token)->getJson("/v1/lessons/{$this->lessons['intro']->id}")->assertOk();
         $this->withToken($token)->getJson('/v1/my/courses')
             ->assertJsonPath('data.0.needs_placement_test', false)
             ->assertJsonPath('data.0.placement_tests.0.completed', true);
+    }
+
+    public function test_lesson_tracking_feedback_and_stats(): void
+    {
+        $token = $this->student->createToken('app', ['app'])->plainTextToken;
+        $api = fn () => $this->withToken($token);
+        $quiz = $this->lessons['quiz'];
+
+        // Chưa ghi danh → không mở phiên được
+        $api()->postJson("/v1/lessons/{$quiz->id}/sessions")->assertForbidden();
+
+        $progress = app(LearningProgress::class);
+        $progress->enroll($this->student, $this->course, EnrollmentSource::Admin, by: $this->admin);
+        $api()->postJson("/v1/my/courses/{$this->course->id}/path", ['answers' => [$this->jobId => [$this->marketingOption]]])->assertOk();
+        $api()->postJson("/v1/lessons/{$this->lessons['intro']->id}/read")->assertOk();
+
+        $api()->getJson("/v1/lessons/{$quiz->id}")->assertOk()
+            ->assertJsonPath('data.my_feedback', null)
+            ->assertJsonPath('data.feedback_reasons.0.key', 'hard');
+
+        $sid = $api()->withHeader('X-Device-Platform', 'ios')->postJson("/v1/lessons/{$quiz->id}/sessions")
+            ->assertCreated()->json('data.session_id');
+
+        // Số chỉ tăng; giá trị nhỏ hơn gửi sau không ghi đè
+        $api()->patchJson("/v1/lesson-sessions/{$sid}", ['active_seconds' => 40, 'max_scroll_percent' => 60])->assertOk();
+        $api()->patchJson("/v1/lesson-sessions/{$sid}", ['active_seconds' => 30, 'max_scroll_percent' => 30, 'video_seconds' => 12])->assertOk();
+        $api()->patchJson("/v1/lesson-sessions/{$sid}", ['max_scroll_percent' => 150])->assertUnprocessable();
+
+        // Trả lời: sai rồi đúng, đọc hết → hoàn thành trong phiên
+        $url = "/v1/lessons/{$quiz->id}/quiz";
+        $api()->postJson($url, ['block_id' => 'q1', 'option_ids' => ['b']]);
+        $api()->postJson($url, ['block_id' => 'q1', 'option_ids' => ['a']]);
+        $api()->postJson($url, ['block_id' => 'q2', 'option_ids' => ['x', 'y']]);
+        $api()->postJson("/v1/lessons/{$quiz->id}/read")->assertJsonPath('data.completed', true);
+        $api()->patchJson("/v1/lesson-sessions/{$sid}", ['active_seconds' => 95, 'max_scroll_percent' => 100, 'reached_end' => true])->assertOk();
+
+        $session = LessonSession::find($sid);
+        $this->assertSame([95, 100, true, 12, true, 'ios'], [$session->active_seconds, $session->max_scroll_percent, $session->reached_end, $session->video_seconds, $session->completed, $session->platform]);
+
+        // Phiên của người khác → 404
+        $other = User::factory()->create(['role' => UserRole::Student, 'is_active' => true]);
+        $this->app['auth']->forgetGuards();
+        $this->withToken($other->createToken('app', ['app'])->plainTextToken)->patchJson("/v1/lesson-sessions/{$sid}", ['active_seconds' => 1])->assertNotFound();
+
+        $this->app['auth']->forgetGuards();
+
+        // Đánh giá: chưa hữu ích + lý do, rồi sửa thành hữu ích (bỏ lý do)
+        $api()->postJson("/v1/lessons/{$quiz->id}/feedback", ['rating' => -1, 'reasons' => ['hard', 'nope']])->assertUnprocessable();
+        $api()->postJson("/v1/lessons/{$quiz->id}/feedback", ['rating' => -1, 'reasons' => ['hard', 'long'], 'comment' => 'Hơi dài'])->assertOk()
+            ->assertJsonPath('data.reasons', ['hard', 'long']);
+        $api()->getJson("/v1/lessons/{$quiz->id}")->assertJsonPath('data.my_feedback.rating', -1);
+
+        $stats = LessonStats::for($quiz->refresh());
+        $this->assertSame(1, $stats['learners']);
+        $this->assertSame(95, $stats['median_seconds']);
+        $this->assertSame(100, $stats['reached_end_percent']);
+        $this->assertSame(100, $stats['completed_percent']);
+        $this->assertSame(0, $stats['quizzes'][0]['first_try_percent']); // q1 sai lần đầu
+        $this->assertSame(2.0, (float) $stats['quizzes'][0]['avg_tries']);
+        $this->assertSame(100, $stats['quizzes'][1]['first_try_percent']);
+        $this->assertSame(['Khó hiểu', 'Quá dài'], collect($stats['feedback']['reasons'])->pluck('label')->sort()->values()->all());
+
+        $api()->postJson("/v1/lessons/{$quiz->id}/feedback", ['rating' => 1, 'reasons' => ['hard'], 'comment' => 'Hơi dài nhưng dễ hiểu'])->assertOk()->assertJsonPath('data.reasons', []);
+        $this->assertSame(1, LessonFeedback::count());
+
+        // Trang thống kê trong CMS
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($this->admin, 'web');
+        $this->get(LessonResource::getUrl('stats', ['record' => $quiz]))
+            ->assertOk()->assertSee('Học viên dừng ở đâu')->assertSee('Câu q1?')->assertSee('Hơi dài');
     }
 }

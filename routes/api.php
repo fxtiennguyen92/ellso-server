@@ -1,17 +1,22 @@
 <?php
 
+use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AppSessionController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\CampaignController;
+use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\CourseCatalogController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\HlsController;
 use App\Http\Controllers\Api\LessonController;
+use App\Http\Controllers\Api\LessonTrackingController;
 use App\Http\Controllers\Api\MyCourseController;
 use App\Http\Controllers\Api\PartnerEventController;
 use App\Http\Controllers\Api\PlacementTestController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PromoCodeController;
+use App\Http\Controllers\Api\ReaderController;
 use App\Http\Controllers\Api\ReferralController;
 use App\Http\Controllers\Api\TrainingController;
 use App\Http\Controllers\Api\WorkshopController;
@@ -26,15 +31,15 @@ Route::prefix('auth')->group(function () {
 
     // Token tạm nhận được khi đăng nhập bằng mật khẩu tạm
     Route::post('set-password', [AuthController::class, 'setPassword'])
-        ->middleware(['auth:sanctum', 'abilities:' . AuthController::ABILITY_SET_PASSWORD]);
+        ->middleware(['auth:sanctum', 'abilities:'.AuthController::ABILITY_SET_PASSWORD]);
 });
 
 // Trình đọc sách (trang HTML cho WebView / iframe) + file sách qua link có chữ ký
-Route::get('reader', [\App\Http\Controllers\Api\ReaderController::class, 'page'])->name('reader.page');
-Route::get('reader/file/{id}/{kind}', [\App\Http\Controllers\Api\ReaderController::class, 'file'])
+Route::get('reader', [ReaderController::class, 'page'])->name('reader.page');
+Route::get('reader/file/{id}/{kind}', [ReaderController::class, 'file'])
     ->whereNumber('id')->whereIn('kind', ['preview', 'full'])->middleware('signed')->name('reader.file');
 
-Route::get('app-config', [\App\Http\Controllers\Api\AppConfigController::class, 'show']);
+Route::get('app-config', [AppConfigController::class, 'show']);
 Route::get('referrals/{code}', [ReferralController::class, 'show'])->middleware('throttle:referral-check');
 
 // Chiến dịch marketing: banner trên Home + trang chi tiết
@@ -102,18 +107,22 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::post('lessons/{id}/read', [LessonController::class, 'read'])->whereNumber('id');
     Route::post('lessons/{id}/quiz', [LessonController::class, 'answer'])->whereNumber('id')->middleware('throttle:60,1');
     Route::post('lessons/{id}/videos/{videoId}/play', [LessonController::class, 'playVideo'])->whereNumber(['id', 'videoId'])->middleware('throttle:60,1');
+    // Theo dõi trải nghiệm học (thời gian, cuộn, video, đánh giá cuối bài)
+    Route::post('lessons/{id}/sessions', [LessonTrackingController::class, 'start'])->whereNumber('id')->middleware('throttle:60,1');
+    Route::patch('lesson-sessions/{id}', [LessonTrackingController::class, 'update'])->whereNumber('id')->middleware('throttle:120,1');
+    Route::post('lessons/{id}/feedback', [LessonTrackingController::class, 'feedback'])->whereNumber('id')->middleware('throttle:30,1');
 
     // Khám phá khoá học (phân trang) + danh mục
-    Route::get('courses', [\App\Http\Controllers\Api\CourseCatalogController::class, 'index']);
-    Route::get('courses/categories', [\App\Http\Controllers\Api\CourseCatalogController::class, 'categories']);
-    Route::get('courses/{id}', [\App\Http\Controllers\Api\CourseCatalogController::class, 'show'])->whereNumber('id');
-    Route::post('courses/{id}/enroll', [\App\Http\Controllers\Api\CourseCatalogController::class, 'enroll'])->whereNumber('id')->middleware('throttle:30,1');
+    Route::get('courses', [CourseCatalogController::class, 'index']);
+    Route::get('courses/categories', [CourseCatalogController::class, 'categories']);
+    Route::get('courses/{id}', [CourseCatalogController::class, 'show'])->whereNumber('id');
+    Route::post('courses/{id}/enroll', [CourseCatalogController::class, 'enroll'])->whereNumber('id')->middleware('throttle:30,1');
 
     // Giỏ hàng (khoá học, sách)
-    Route::get('cart', [\App\Http\Controllers\Api\CartController::class, 'index']);
-    Route::post('cart', [\App\Http\Controllers\Api\CartController::class, 'store'])->middleware('throttle:60,1');
-    Route::post('cart/promo', [\App\Http\Controllers\Api\CartController::class, 'promo'])->middleware('throttle:promo-code-check');
-    Route::delete('cart/{type}/{id}', [\App\Http\Controllers\Api\CartController::class, 'destroy'])->whereIn('type', ['course', 'document'])->whereNumber('id');
+    Route::get('cart', [CartController::class, 'index']);
+    Route::post('cart', [CartController::class, 'store'])->middleware('throttle:60,1');
+    Route::post('cart/promo', [CartController::class, 'promo'])->middleware('throttle:promo-code-check');
+    Route::delete('cart/{type}/{id}', [CartController::class, 'destroy'])->whereIn('type', ['course', 'document'])->whereNumber('id');
 
     // Tài liệu: Video (HLS), PDF, Sách
     Route::get('documents', [DocumentController::class, 'index']);

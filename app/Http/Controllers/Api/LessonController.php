@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Lesson;
+use App\Models\LessonFeedback;
 use App\Models\LessonProgress;
+use App\Models\User;
 use App\Services\LearningProgress;
 use App\Support\LessonContent;
+use App\Support\MediaStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\Support\MediaStorage;
 
 /**
  * Học bài (học viên đã đăng nhập).
@@ -53,6 +55,11 @@ class LessonController extends Controller
                 'content' => LessonContent::forApp($lesson->content_published, $answered, $lesson->videos()->get()->keyBy('id')->all()),
                 'quiz_count' => count(LessonContent::quizzes($lesson->content_published)),
                 'progress' => $this->progressData($progress, $lesson, $answered),
+                // Đánh giá cuối bài của học viên (null nếu chưa đánh giá) + các lý do có thể chọn
+                'my_feedback' => LessonTrackingController::presentFeedback(
+                    LessonFeedback::query()->where('user_id', $user->id)->where('lesson_id', $lesson->id)->first(),
+                ),
+                'feedback_reasons' => collect(LessonFeedback::REASONS)->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values(),
             ],
         ]);
     }
@@ -72,7 +79,7 @@ class LessonController extends Controller
         abort_if($lesson->isCoaching(), 404, 'Bài coaching không có câu hỏi.');
         $data = $request->validate([
             'block_id' => ['required', 'string', 'max:32'],
-            'option_ids' => ['required', 'array', 'min:1', 'max:' . LessonContent::QUIZ_MAX_OPTIONS],
+            'option_ids' => ['required', 'array', 'min:1', 'max:'.LessonContent::QUIZ_MAX_OPTIONS],
             'option_ids.*' => ['string', 'max:16'],
         ]);
 
@@ -88,7 +95,7 @@ class LessonController extends Controller
         ]);
     }
 
-    /** @return array{0: \App\Models\User, 1: Lesson, 2: array} */
+    /** @return array{0: User, 1: Lesson, 2: array} */
     /**
      * Link phát video bài học (HLS, hạn 5 phút — hết hạn thì gọi lại). Chỉ video nằm trong nội dung đã xuất bản.
      * Mốc thời gian nằm trong khối video của content (data.chapters).
