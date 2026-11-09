@@ -10,6 +10,7 @@ use App\Models\Category;
 use App\Models\Course;
 use App\Models\Lesson;
 use App\Models\User;
+use App\Support\MediaStorage;
 use Illuminate\Database\Seeder;
 use RuntimeException;
 
@@ -77,11 +78,11 @@ class DemoCatalogSeeder extends Seeder
     /** Mô tả mẫu (HTML như RichEditor) để trang giới thiệu khoá trên app có nội dung. */
     private static function description(string $title, string $short): string
     {
-        return '<p>' . e($short) . ' Khoá <strong>' . e($title) . '</strong> gồm các bài ngắn, học trên điện thoại, mỗi bài 5–10 phút.</p>'
-            . '<h2>Bạn sẽ học được gì</h2>'
-            . '<ul><li>Nắm khung tư duy cốt lõi và áp dụng ngay vào công việc</li><li>Luyện tập qua tình huống thực tế</li><li>Tự đánh giá tiến bộ sau mỗi chương</li></ul>'
-            . '<h2>Khoá học dành cho ai</h2>'
-            . '<p>Người đi làm muốn nâng cấp kỹ năng một cách bài bản, không cần kiến thức nền.</p>';
+        return '<p>'.e($short).' Khoá <strong>'.e($title).'</strong> gồm các bài ngắn, học trên điện thoại, mỗi bài 5–10 phút.</p>'
+            .'<h2>Bạn sẽ học được gì</h2>'
+            .'<ul><li>Nắm khung tư duy cốt lõi và áp dụng ngay vào công việc</li><li>Luyện tập qua tình huống thực tế</li><li>Tự đánh giá tiến bộ sau mỗi chương</li></ul>'
+            .'<h2>Khoá học dành cho ai</h2>'
+            .'<p>Người đi làm muốn nâng cấp kỹ năng một cách bài bản, không cần kiến thức nền.</p>';
     }
 
     /** Chương + bài mẫu (đã xuất bản, nội dung vài dòng) cho lộ trình mặc định của khoá — bỏ qua nếu đã có chương. */
@@ -108,10 +109,7 @@ class DemoCatalogSeeder extends Seeder
                     'title' => $lessonTitle,
                     'content_draft' => [
                         'time' => now()->getTimestampMs(),
-                        'blocks' => [
-                            ['id' => 'h1', 'type' => 'header', 'data' => ['text' => $lessonTitle, 'level' => 2]],
-                            ['id' => 'p1', 'type' => 'paragraph', 'data' => ['text' => "Nội dung mẫu của bài học trong khoá {$title}."]],
-                        ],
+                        'blocks' => self::sampleBlocks($title, $lessonTitle, $ci * 10 + $li),
                         'version' => '2.31.0',
                     ],
                 ]);
@@ -125,5 +123,101 @@ class DemoCatalogSeeder extends Seeder
                 ]);
             }
         }
+    }
+
+    /**
+     * Nội dung mẫu có đủ các loại khối app cần hiển thị (trừ video — cần tải video thật trong CMS để cắt HLS):
+     * tiêu đề, đoạn văn có định dạng, danh sách (chấm / số / kiểm, lồng nhau), trích dẫn, lưu ý, ảnh, bảng, code,
+     * đường phân cách, câu hỏi chọn 1 và chọn nhiều.
+     */
+    private static function sampleBlocks(string $course, string $lesson, int $n): array
+    {
+        $image = self::lessonImage();
+
+        return [
+            ['id' => 'h1', 'type' => 'header', 'data' => ['text' => 'Mở đầu', 'level' => 2]],
+            ['id' => 'p1', 'type' => 'paragraph', 'data' => ['text' => "Trong bài <b>{$lesson}</b> của khoá <i>{$course}</i>, bạn sẽ đi từ khái niệm đến cách áp dụng. Những ý quan trọng được <mark class=\"cdx-marker\">tô sáng</mark>, thuật ngữ viết dạng <code class=\"inline-code\">code</code>. Đọc thêm tại <a href=\"https://ellso.vn\">ellso.vn</a>."]],
+            ['id' => 'q0', 'type' => 'quote', 'data' => ['text' => 'Học không phải để biết nhiều hơn, mà để làm tốt hơn.', 'caption' => 'Ellso', 'alignment' => 'left']],
+            ['id' => 'h2', 'type' => 'header', 'data' => ['text' => 'Ý chính cần nhớ', 'level' => 3]],
+            ['id' => 'l1', 'type' => 'list', 'data' => ['style' => 'unordered', 'meta' => [], 'items' => [
+                ['content' => 'Xác định <b>mục tiêu</b> trước khi bắt tay vào làm', 'meta' => [], 'items' => []],
+                ['content' => 'Chia nhỏ công việc thành các bước', 'meta' => [], 'items' => [
+                    ['content' => 'Mỗi bước có kết quả rõ ràng', 'meta' => [], 'items' => []],
+                    ['content' => 'Ước lượng thời gian cho từng bước', 'meta' => [], 'items' => []],
+                ]],
+                ['content' => 'Xem lại kết quả và rút kinh nghiệm', 'meta' => [], 'items' => []],
+            ]]],
+            ['id' => 'w1', 'type' => 'warning', 'data' => ['title' => 'Lưu ý', 'message' => 'Đừng cố làm hết trong một lần — <b>đều đặn</b> quan trọng hơn cường độ.']],
+            ['id' => 'img', 'type' => 'image', 'data' => ['file' => ['url' => $image], 'caption' => 'Sơ đồ minh hoạ các bước', 'withBorder' => false, 'stretched' => false, 'withBackground' => $n % 2 === 1]],
+            ['id' => 'h3', 'type' => 'header', 'data' => ['text' => 'Quy trình 4 bước', 'level' => 3]],
+            ['id' => 'l2', 'type' => 'list', 'data' => ['style' => 'ordered', 'meta' => ['start' => 1, 'counterType' => 'numeric'], 'items' => [
+                ['content' => 'Quan sát tình huống', 'meta' => [], 'items' => []],
+                ['content' => 'Đặt câu hỏi đúng', 'meta' => [], 'items' => []],
+                ['content' => 'Thử một giải pháp nhỏ', 'meta' => [], 'items' => []],
+                ['content' => 'Đánh giá và điều chỉnh', 'meta' => [], 'items' => []],
+            ]]],
+            ['id' => 't1', 'type' => 'table', 'data' => ['withHeadings' => true, 'stretched' => false, 'content' => [
+                ['Bước', 'Việc cần làm', 'Thời gian'],
+                ['1', 'Quan sát & ghi chú', '10 phút'],
+                ['2', 'Viết ra 3 câu hỏi', '5 phút'],
+                ['3', 'Thử nghiệm', '1 ngày'],
+            ]]],
+            ['id' => 'quiz1', 'type' => 'quiz', 'data' => [
+                'type' => 'single',
+                'question' => 'Bước đầu tiên của quy trình là gì?',
+                'options' => [
+                    ['id' => 'a', 'text' => 'Thử một giải pháp nhỏ', 'correct' => false],
+                    ['id' => 'b', 'text' => 'Quan sát tình huống', 'correct' => true],
+                    ['id' => 'c', 'text' => 'Đánh giá và điều chỉnh', 'correct' => false],
+                ],
+                'explanation' => 'Quan sát trước giúp bạn hiểu đúng vấn đề rồi mới hành động.',
+            ]],
+            ['id' => 'd1', 'type' => 'delimiter', 'data' => []],
+            ['id' => 'h4', 'type' => 'header', 'data' => ['text' => 'Ví dụ ghi chú', 'level' => 3]],
+            ['id' => 'c1', 'type' => 'code', 'data' => ['code' => "Mục tiêu: hoàn thành báo cáo tuần\nBước 1: gom số liệu (thứ 2)\nBước 2: viết nháp (thứ 3)\nBước 3: gửi góp ý (thứ 4)"]],
+            ['id' => 'l3', 'type' => 'list', 'data' => ['style' => 'checklist', 'meta' => [], 'items' => [
+                ['content' => 'Đã đọc hết bài', 'meta' => ['checked' => true], 'items' => []],
+                ['content' => 'Viết ra mục tiêu của tuần này', 'meta' => ['checked' => false], 'items' => []],
+                ['content' => 'Thử áp dụng một bước', 'meta' => ['checked' => false], 'items' => []],
+            ]]],
+            ['id' => 'quiz2', 'type' => 'quiz', 'data' => [
+                'type' => 'multiple',
+                'question' => 'Những điều nào giúp bạn duy trì việc học? (chọn nhiều)',
+                'options' => [
+                    ['id' => 'a', 'text' => 'Học đều đặn mỗi ngày một ít', 'correct' => true],
+                    ['id' => 'b', 'text' => 'Dồn hết vào cuối tuần', 'correct' => false],
+                    ['id' => 'c', 'text' => 'Ghi lại điều đã học', 'correct' => true],
+                ],
+                'explanation' => 'Đều đặn và ghi chép giúp nhớ lâu hơn học dồn.',
+            ]],
+            ['id' => 'p2', 'type' => 'paragraph', 'data' => ['text' => 'Hết bài rồi! Hãy thử áp dụng ngay hôm nay nhé.']],
+        ];
+    }
+
+    private static ?string $imageUrl = null;
+
+    /** Ảnh minh hoạ dùng chung cho các bài mẫu (vẽ bằng GD, lưu vào ổ ảnh). */
+    private static function lessonImage(): string
+    {
+        if (self::$imageUrl) {
+            return self::$imageUrl;
+        }
+        $path = 'lessons/content/demo/steps.png';
+        $img = imagecreatetruecolor(1200, 640);
+        imagefill($img, 0, 0, imagecolorallocate($img, 236, 253, 245));
+        $colors = [[16, 185, 129], [20, 184, 166], [245, 158, 11], [139, 92, 246]];
+        foreach ($colors as $i => $c) {
+            $x = 170 + $i * 290;
+            if ($i < 3) {
+                imagefilledrectangle($img, $x, 312, $x + 290, 328, imagecolorallocate($img, 167, 243, 208));
+            }
+            imagefilledellipse($img, $x, 320, 190, 190, imagecolorallocate($img, ...$c));
+            imagefilledellipse($img, $x, 320, 90, 90, imagecolorallocate($img, 255, 255, 255));
+        }
+        ob_start();
+        imagepng($img);
+        MediaStorage::disk()->put($path, ob_get_clean());
+
+        return self::$imageUrl = MediaStorage::url($path);
     }
 }

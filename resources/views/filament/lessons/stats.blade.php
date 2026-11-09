@@ -8,7 +8,7 @@
 
 <x-filament-panels::page>
     <style>
-        .ls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .75rem; }
+        .ls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: .75rem; }
         .ls-tile { padding: 1rem; border-radius: .75rem; border: 1px solid var(--gray-200); background: var(--gray-50); }
         .dark .ls-tile { border-color: var(--gray-700); background: rgba(255,255,255,.03); }
         .ls-label { font-size: .8125rem; color: var(--gray-500); }
