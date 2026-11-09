@@ -159,4 +159,14 @@ class CartAndCatalogTest extends TestCase
         $draft = $this->course(['status' => CourseStatus::Draft]);
         $this->getJson("/v1/courses/{$draft->id}")->assertNotFound();
     }
+
+    public function test_enroll_free_course_only(): void
+    {
+        $free = $this->course(['price' => 0]);
+        $paid = $this->course(['price' => 100000]);
+        $this->postJson("/v1/courses/{$paid->id}/enroll")->assertStatus(422)->assertJsonPath('code', 'not_free');
+        $this->postJson("/v1/courses/{$free->id}/enroll")->assertCreated()->assertJsonPath('data.enrolled', true)->assertJsonPath('data.started', false);
+        $this->postJson("/v1/courses/{$free->id}/enroll")->assertOk();
+        $this->assertDatabaseHas('course_enrollments', ['user_id' => $this->student->id, 'course_id' => $free->id, 'source' => 'free']);
+    }
 }

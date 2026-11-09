@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\CourseStatus;
 use App\Enums\CourseType;
+use App\Enums\EnrollmentSource;
 use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\Course;
 use App\Models\User;
+use App\Services\LearningProgress;
 use App\Support\HtmlBlocks;
 use App\Support\MediaStorage;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +22,9 @@ use Illuminate\Support\Collection;
  * - GET /courses?category_id=&page=   khoá đã xuất bản, mới nhất trước, 10 khoá / trang (app tải thêm khi cuộn)
  * - GET /courses/categories           danh mục có khoá đã xuất bản (để lọc)
  * - GET /courses/{id}                  trang giới thiệu khoá (khoá đã xuất bản, hoặc khoá học viên đã ghi danh)
+ * - POST /courses/{id}/enroll          ghi danh khoá MIỄN PHÍ (nút "Bắt đầu học"); đã ghi danh → giữ nguyên
+ * Mỗi khoá có `enrolled`, `progress_percent` (null nếu chưa ghi danh / chưa có lộ trình), `started` (đã học ≥ 1 bài
+ * hoặc đã có hoạt động) → app hiện "Bắt đầu học" / "Tiếp tục học".
  */
 class CourseCatalogController extends Controller
 {
@@ -116,11 +121,36 @@ class CourseCatalogController extends Controller
         ]]);
     }
 
+    public function enroll(Request $request, int $id, LearningProgress $progress): JsonResponse
+    {
+        $user = $request->user();
+        $course = Course::query()->find($id);
+        if (! $course || $course->status !== CourseStatus::Published) {
+            return response()->json(['message' => 'Khoá học không tồn tại.', 'code' => 'not_found'], 404);
+        }
+        $already = $user->enrollments()->where('course_id', $course->id)->exists();
+        if (! $already && ! $course->isFree()) {
+            return response()->json(['message' => 'Khoá học này cần mua trước khi học.', 'code' => 'not_free'], 422);
+        }
+        if (! $already) {
+            $progress->enroll($user, $course, EnrollmentSource::Free);
+        }
+
+        return response()->json(['data' => self::present(collect([$course->load(['category', 'instructor'])]), $user)[0]], $already ? 200 : 201);
+    }
+
     /** Định dạng giống src/data/courses.ts › CatalogCourse của app. */
     public static function present(Collection $courses, User $user): array
     {
         $ids = $courses->pluck('id');
-        $enrolled = $user->enrollments()->whereIn('course_id', $ids)->pluck('course_id')->all();
+        $enrollments = $user->enrollments()->whereIn('course_id', $ids)->with(['learningPath', 'user'])->get()->keyBy('course_id');
+        $enrolled = $enrollments->keys()->all();
+        $learning = app(LearningProgress::class);
+        $progress = $enrollments->map(function ($e) use ($learning) {
+            $s = $learning->summary($e);
+
+            return ['percent' => $s['percent'], 'started' => $s['completed'] > 0 || $e->last_activity_at !== null];
+        });
         $inCart = $user->cartItems()->where('item_type', CartItem::TYPE_COURSE)->whereIn('item_id', $ids)->pluck('item_id')->all();
         $lessonCounts = $courses->mapWithKeys(fn (Course $c) => [$c->id => $c->lessonsQuery()->count()]);
 
@@ -139,6 +169,8 @@ class CourseCatalogController extends Controller
             'lesson_count' => $lessonCounts[$c->id] ?? 0,
             'is_new' => $c->published_at?->gt(now()->subDays(self::NEW_DAYS)) ?? false,
             'enrolled' => in_array($c->id, $enrolled, true),
+            'progress_percent' => $progress[$c->id]['percent'] ?? null,
+            'started' => $progress[$c->id]['started'] ?? false,
             'in_cart' => in_array($c->id, $inCart, true),
         ])->values()->all();
     }
