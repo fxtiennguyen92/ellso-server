@@ -42,8 +42,17 @@ class DatabaseSeeder extends Seeder
         }
 
         if (app()->isLocal()) {
-            $this->call(DemoCourseSeeder::class);
-            $this->call(DemoCatalogSeeder::class);
+            // Dữ liệu demo đầy đủ cho app: khoá học + lộ trình + bài thi, bài đánh giá năng lực, khuyến mãi,
+            // chương trình huấn luyện, workshop, sách
+            $this->call([
+                DemoCourseSeeder::class,
+                DemoCatalogSeeder::class,
+                DemoPlacementTestSeeder::class,
+                DemoCampaignSeeder::class,
+                DemoTrainingSeeder::class,
+                DemoWorkshopSeeder::class,
+                DemoBookSeeder::class,
+            ]);
         }
     }
 }
