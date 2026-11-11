@@ -17,6 +17,7 @@ use RuntimeException;
  * - 1 khoá có phí được admin mở, chưa học bài nào (vẫn hiện — đã sở hữu)
  * - 1 khoá miễn phí đã học 1 bài (hiện)
  * - 1 khoá miễn phí mới bấm vào, chưa học (KHÔNG hiện)
+ * - 1 khoá có phí đã học xong (mục "Đã hoàn thành" ở Khoá học của tôi)
  * Kèm vài tài liệu đã lưu (mục "Tài liệu của tôi").
  * Chạy tay:  php artisan db:seed --class=DemoMyLearningSeeder
  */
@@ -46,6 +47,7 @@ class DemoMyLearningSeeder extends Seeder
             [$paid->get(1), EnrollmentSource::Admin, 0, null],
             [$free->get(0), EnrollmentSource::Free, 1, 3],
             [$free->get(1), EnrollmentSource::Free, 0, null],
+            [$paid->get(2), EnrollmentSource::Purchase, PHP_INT_MAX, 12],
         ], fn ($p) => $p[0] !== null);
 
         foreach ($plan as [$course, $source, $done, $daysAgo]) {
@@ -61,6 +63,9 @@ class DemoMyLearningSeeder extends Seeder
             }
             if ($daysAgo !== null) {
                 $enrollment->forceFill(['last_activity_at' => now()->subDays($daysAgo)])->save();
+            }
+            if ($done === PHP_INT_MAX) {
+                $enrollment->forceFill(['completed_at' => now()->subDays($daysAgo)])->save();
             }
         }
 
