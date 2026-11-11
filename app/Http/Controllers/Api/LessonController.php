@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Lesson;
 use App\Models\LessonFeedback;
 use App\Models\LessonProgress;
+use App\Models\LessonQuizAnswer;
 use App\Models\User;
 use App\Services\LearningProgress;
 use App\Support\LessonContent;
@@ -52,7 +53,7 @@ class LessonController extends Controller
                 'summary' => $lesson->summary,
                 'icon_url' => $lesson->icon ? MediaStorage::disk()->url($lesson->icon) : null,
                 'course_id' => $access['enrollment']?->course_id,
-                'content' => LessonContent::forApp($lesson->content_published, $answered, $lesson->videos()->get()->keyBy('id')->all()),
+                'content' => LessonContent::forApp($lesson->content_published, $answered, $lesson->videos()->get()->keyBy('id')->all(), $this->myCorrectAnswers($user, $lesson)),
                 'quiz_count' => count(LessonContent::quizzes($lesson->content_published)),
                 'progress' => $this->progressData($progress, $lesson, $answered),
                 // Đánh giá cuối bài của học viên (null nếu chưa đánh giá) + các lý do có thể chọn
@@ -140,6 +141,16 @@ class LessonController extends Controller
         }
 
         return [$user, $lesson, $access];
+    }
+
+    /** Lần trả lời đúng gần nhất của học viên cho từng câu hỏi: [block_id => [option_id…]]. */
+    private function myCorrectAnswers(User $user, Lesson $lesson): array
+    {
+        return LessonQuizAnswer::query()
+            ->where('user_id', $user->id)->where('lesson_id', $lesson->id)->where('is_correct', true)
+            ->orderBy('created_at')->orderBy('id')->get()
+            ->mapWithKeys(fn (LessonQuizAnswer $a) => [$a->block_id => $a->option_ids])
+            ->all();
     }
 
     private function progressData(LessonProgress $progress, Lesson $lesson, array $answered): array

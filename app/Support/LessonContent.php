@@ -50,7 +50,7 @@ class LessonContent
         }
 
         if (count($blocks) > self::MAX_BLOCKS) {
-            throw ValidationException::withMessages(['content' => 'Bài học quá dài (tối đa ' . self::MAX_BLOCKS . ' khối).']);
+            throw ValidationException::withMessages(['content' => 'Bài học quá dài (tối đa '.self::MAX_BLOCKS.' khối).']);
         }
 
         $clean = [];
@@ -72,7 +72,7 @@ class LessonContent
                 if ($path === '' || ! str_starts_with($path, $allowedPath) || str_contains($path, '..')) {
                     continue;
                 }
-                $blockData['file']['url'] = rtrim($allowedImageUrlPrefix, '/') . '/' . ltrim(substr($path, strlen(rtrim($allowedPath, '/'))), '/');
+                $blockData['file']['url'] = rtrim($allowedImageUrlPrefix, '/').'/'.ltrim(substr($path, strlen(rtrim($allowedPath, '/'))), '/');
             }
 
             $clean[] = array_filter([
@@ -108,7 +108,7 @@ class LessonContent
 
         foreach (array_slice(is_array($data['options'] ?? null) ? $data['options'] : [], 0, self::QUIZ_MAX_OPTIONS) as $option) {
             $text = $plain($option['text'] ?? '', 500);
-            $id = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($option['id'] ?? '')) ?: substr(md5($text . count($options)), 0, 8);
+            $id = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($option['id'] ?? '')) ?: substr(md5($text.count($options)), 0, 8);
             if ($text === '' || isset($seen[$id])) {
                 continue;
             }
@@ -254,9 +254,10 @@ class LessonContent
      * Nội dung đã xuất bản gửi cho app: câu hỏi KHÔNG kèm đáp án đúng và giải thích (server chấm,
      * giải thích trả về sau khi trả lời); link ảnh theo domain của request; bỏ câu hỏi chưa hợp lệ.
      *
-     * @param  list<string>  $answeredBlockIds  câu hỏi học viên đã trả lời đúng → answered = true
+     * @param  list<string>  $answeredBlockIds  câu hỏi học viên đã trả lời đúng → answered = true (+ my_answer, explanation)
+     * @param  array<string, list<string>>  $myAnswers  đáp án học viên đã chọn ở lần trả lời đúng gần nhất
      */
-    public static function forApp(?array $content, array $answeredBlockIds = [], array $videos = []): array
+    public static function forApp(?array $content, array $answeredBlockIds = [], array $videos = [], array $myAnswers = []): array
     {
         $valid = self::quizzes($content);
         $blocks = [];
@@ -274,7 +275,10 @@ class LessonContent
                     'type' => $quiz['type'],
                     'question' => $quiz['question'],
                     'options' => array_map(fn ($o) => ['id' => $o['id'], 'text' => $o['text']], $quiz['options']),
-                    'answered' => in_array($id, $answeredBlockIds, true),
+                    'answered' => $answered = in_array($id, $answeredBlockIds, true),
+                    // Đã trả lời đúng: gửi lại đáp án học viên đã chọn + giải thích để xem lại bài thấy đúng như lúc làm
+                    'my_answer' => $answered ? array_values($myAnswers[$id] ?? []) : null,
+                    'explanation' => $answered ? ($quiz['explanation'] ?? null) : null,
                 ];
             } elseif ($type === 'video') {
                 // Video bài học: chỉ gửi khi đã xử lý xong; app gọi POST /lessons/{id}/videos/{video}/play để lấy link phát
@@ -332,7 +336,7 @@ class LessonContent
     {
         $doc = new DOMDocument('1.0', 'UTF-8');
         $previous = libxml_use_internal_errors(true);
-        $doc->loadHTML('<?xml encoding="UTF-8"><div id="root">' . $html . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $doc->loadHTML('<?xml encoding="UTF-8"><div id="root">'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
         libxml_use_internal_errors($previous);
 

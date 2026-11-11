@@ -240,6 +240,10 @@ class LearningApiTest extends TestCase
         $api()->postJson($url, ['block_id' => 'q1', 'option_ids' => ['a']]);
         $api()->postJson($url, ['block_id' => 'q2', 'option_ids' => ['x', 'y']]);
         $api()->postJson("/v1/lessons/{$quiz->id}/read")->assertJsonPath('data.completed', true);
+        // Xem lại bài: câu đã trả lời đúng kèm đáp án đã chọn + giải thích
+        $blocks = collect($api()->getJson("/v1/lessons/{$quiz->id}")->json('data.content.blocks'))->where('type', 'quiz')->keyBy('id');
+        $this->assertSame(['a'], $blocks['q1']['data']['my_answer']);
+        $this->assertEqualsCanonicalizing(['x', 'y'], $blocks['q2']['data']['my_answer']);
         $api()->patchJson("/v1/lesson-sessions/{$sid}", ['active_seconds' => 95, 'max_scroll_percent' => 100, 'reached_end' => true])->assertOk();
 
         $session = LessonSession::find($sid);
