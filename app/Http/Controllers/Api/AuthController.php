@@ -87,7 +87,7 @@ class AuthController extends Controller
 
         $email = $request->input('email');
         $password = (string) $request->input('password');
-        $throttleKey = 'login:' . $email . '|' . $request->ip();
+        $throttleKey = 'login:'.$email.'|'.$request->ip();
         $maxAttempts = config('ellso.auth.login_max_attempts_per_minute');
 
         if (RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
@@ -237,6 +237,19 @@ class AuthController extends Controller
     {
         $token = $user->createToken(DeviceInfo::tokenName($request));
 
+        // Lưu thiết bị của phiên (màn Thiết bị đăng nhập). Đăng nhập lại trên cùng máy → bỏ phiên cũ của máy đó.
+        $info = DeviceInfo::fromRequest($request);
+        $token->accessToken->forceFill([
+            'platform' => $info['platform'],
+            'os_version' => $info['os_version'],
+            'app_version' => $info['app_version'],
+            'device_id' => $info['device_id'],
+            'ip_address' => $info['ip_address'],
+        ])->save();
+        if ($info['device_id']) {
+            $user->tokens()->where('device_id', $info['device_id'])->whereKeyNot($token->accessToken->getKey())->delete();
+        }
+
         $user->forceFill(['last_login_at' => now()])->save();
 
         UserLog::record($user, UserLogEvent::Login, $request, [
@@ -255,7 +268,7 @@ class AuthController extends Controller
     private function issueThrottled(User $user, TempPasswordReason $reason, Request $request): void
     {
         $cooldown = config('ellso.auth.forgot_password.cooldown_seconds');
-        $dailyKey = 'forgot-password:day:' . $user->getKey();
+        $dailyKey = 'forgot-password:day:'.$user->getKey();
         $inCooldown = $user->temp_password_sent_at?->gt(now()->subSeconds($cooldown)) ?? false;
         $overDaily = RateLimiter::tooManyAttempts($dailyKey, config('ellso.auth.forgot_password.max_per_email_per_day'));
 

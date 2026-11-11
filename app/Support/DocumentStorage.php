@@ -37,11 +37,11 @@ class DocumentStorage
         return self::url($path, $minutes, $options);
     }
 
-    /** Xoá file riêng tư của tài liệu (file gốc video, thư mục HLS, PDF / sách). */
+    /** Xoá file riêng tư của tài liệu (file gốc video, thư mục HLS, PDF / sách, bản đọc thử sách). */
     public static function deleteFor(Document $doc): void
     {
         $disk = self::disk();
-        foreach (array_filter([$doc->video_source_path, $doc->file_path]) as $path) {
+        foreach (array_filter([$doc->video_source_path, $doc->file_path, $doc->preview_path]) as $path) {
             $disk->delete($path);
         }
         if ($doc->hls_path) {

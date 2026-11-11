@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PlacementTests\Pages;
 
 use App\Filament\Resources\PlacementTests\Pages\Concerns\SimulatesPlacementTest;
+use App\Filament\Resources\PlacementTests\Pages\Concerns\HandlesPlacementDrafts;
 use App\Filament\Resources\PlacementTests\PlacementTestResource;
 use App\Models\Classification;
 use App\Models\PlacementDimension;
@@ -29,11 +30,11 @@ use Illuminate\Support\HtmlString;
 
 /**
  * Tab "Phân loại & mức độ": mỗi phân loại (VD: Khả năng tiếp thu) có các mức (Xuất sắc ≥ 12, Tốt ≥ 8, …).
- * Hiện khoảng điểm có thể đạt (tính từ điểm của các đáp án) để admin đặt ngưỡng cho đúng.
+ * Ngưỡng mức độ tính theo % của khoảng điểm có thể đạt (trên bộ câu học viên nhận được).
  */
 class ManagePlacementDimensions extends ManageRelatedRecords
 {
-    use SimulatesPlacementTest;
+    use HandlesPlacementDrafts, SimulatesPlacementTest;
 
     protected static string $resource = PlacementTestResource::class;
 
@@ -54,12 +55,12 @@ class ManagePlacementDimensions extends ManageRelatedRecords
 
     public function getSubheading(): ?string
     {
-        return $this->test()->title . ' — mỗi năng lực có nhiều mức độ; học viên đạt mức có "điểm từ" cao nhất mà tổng điểm của họ chạm tới.';
+        return $this->draftNotice() . $this->test()->title . ' — mỗi năng lực có nhiều mức độ. Ngưỡng tính theo %: 0% = điểm thấp nhất, 100% = điểm cao nhất có thể đạt với các câu học viên nhận được; học viên đạt mức có ngưỡng cao nhất mà % của họ chạm tới.';
     }
 
     protected function getHeaderActions(): array
     {
-        return [$this->simulateAction()];
+        return [...$this->draftActions(), $this->simulateAction()];
     }
 
     public function form(Schema $schema): Schema
@@ -76,7 +77,7 @@ class ManagePlacementDimensions extends ManageRelatedRecords
                     ->rows(2)
                     ->helperText('Hiện dưới tên năng lực ở màn kết quả trên app.'),
                 Callout::make(fn (?PlacementDimension $record) => $this->rangeText($record))
-                    ->description('Đặt "Điểm từ" của các mức trong khoảng này. Điểm thấp hơn mọi mức → học viên nhận mức thấp nhất.')
+                    ->description('Ngưỡng mỗi mức tính bằng % (0–100) của khoảng điểm này, nên vẫn đúng khi mỗi học viên nhận bộ câu ngẫu nhiên khác nhau. Mức thấp nhất nên đặt 0%.')
                     ->info(),
                 Repeater::make('levels')
                     ->label('Mức độ')
@@ -86,7 +87,7 @@ class ManagePlacementDimensions extends ManageRelatedRecords
                     ->addActionLabel('Thêm mức độ')
                     ->collapsible()
                     ->itemLabel(fn (array $state) => filled($state['name'] ?? null)
-                        ? $state['name'] . (filled($state['min_score'] ?? null) ? ' · từ ' . $state['min_score'] . ' điểm' : '')
+                        ? $state['name'] . (filled($state['min_percent'] ?? null) ? ' · từ ' . $state['min_percent'] . '%' : '')
                         : 'Mức mới')
                     ->schema([
                         Grid::make(3)->schema([
@@ -97,10 +98,13 @@ class ManagePlacementDimensions extends ManageRelatedRecords
                                 ->maxLength(60)
                                 ->live(onBlur: true)
                                 ->columnSpan(2),
-                            TextInput::make('min_score')
-                                ->label('Điểm từ')
-                                ->helperText('Đạt khi tổng điểm ≥ số này')
+                            TextInput::make('min_percent')
+                                ->label('Đạt từ')
+                                ->helperText('Đạt khi % điểm ≥ số này')
                                 ->integer()
+                                ->minValue(0)
+                                ->maxValue(100)
+                                ->suffix('%')
                                 ->required()
                                 ->live(onBlur: true),
                         ]),
@@ -140,7 +144,7 @@ class ManagePlacementDimensions extends ManageRelatedRecords
                     ->state(fn (PlacementDimension $record) => $this->levelsHtml($record))
                     ->html(),
                 TextColumn::make('range')
-                    ->label('Điểm có thể đạt')
+                    ->label(fn () => $this->test()->drawsQuestions() ? 'Điểm (toàn bộ câu)' : 'Điểm có thể đạt')
                     ->state(function (PlacementDimension $record) {
                         [$min, $max] = $this->ranges()[$record->id] ?? [0, 0];
 
@@ -208,31 +212,26 @@ class ManagePlacementDimensions extends ManageRelatedRecords
 
         return $min === 0 && $max === 0
             ? 'Chưa có đáp án nào cộng điểm cho năng lực này.'
-            : "Với các câu hỏi hiện tại, điểm của năng lực này nằm trong khoảng {$min} → {$max}.";
+            : ($this->test()->drawsQuestions()
+                ? "Nếu làm toàn bộ câu, điểm của năng lực này nằm trong khoảng {$min} → {$max}. Mỗi lần làm chỉ rút một phần câu, nên khoảng điểm thực tế nhỏ hơn và tính riêng cho từng bộ câu."
+                : "Với các câu hỏi hiện tại, điểm của năng lực này nằm trong khoảng {$min} → {$max}.");
     }
 
-    /** Các mức dạng chip, cảnh báo mức không thể đạt. */
+    /** Các mức dạng chip (ngưỡng %). */
     private function levelsHtml(PlacementDimension $record): HtmlString
     {
-        [, $max] = $this->ranges()[$record->id] ?? [0, 0];
-        $levels = $record->levels->sortByDesc('min_score');
+        $levels = $record->levels->sortByDesc('min_percent');
 
         if ($levels->isEmpty()) {
             return new HtmlString('<span style="color: var(--warning-600)">Chưa có mức độ</span>');
         }
 
-        $chips = $levels->map(function (PlacementLevel $level) use ($max) {
-            $unreachable = $level->min_score > $max;
-            $style = $unreachable
-                ? 'background: color-mix(in oklab, var(--danger-500) 12%, transparent); color: var(--danger-600);'
-                : 'background: color-mix(in oklab, var(--primary-500) 10%, transparent); color: var(--primary-700);';
+        $chips = $levels->map(function (PlacementLevel $level) {
             $courses = $level->courses->count();
 
-            return '<span style="display:inline-flex;gap:4px;align-items:center;padding:2px 8px;border-radius:999px;font-size:12px;margin:2px 4px 2px 0;' . $style . '"'
-                . ($unreachable ? ' title="Không thể đạt: điểm tối đa hiện tại là ' . $max . '"' : '') . '>'
-                . '<b>' . e($level->name) . '</b> ≥ ' . $level->min_score
+            return '<span style="display:inline-flex;gap:4px;align-items:center;padding:2px 8px;border-radius:999px;font-size:12px;margin:2px 4px 2px 0;background: color-mix(in oklab, var(--primary-500) 10%, transparent); color: var(--primary-700);">'
+                . '<b>' . e($level->name) . '</b> ≥ ' . $level->min_percent . '%'
                 . ($courses ? ' · ' . $courses . ' khoá' : '')
-                . ($unreachable ? ' · không thể đạt' : '')
                 . '</span>';
         })->join('');
 

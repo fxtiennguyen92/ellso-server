@@ -16,16 +16,20 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,
-            'avatar' => $this->avatar,
+            'avatar' => $this->avatarUrl(),
             'role' => $this->role,
             'referral_code' => $this->referral_code,
+            // Số xu đang có (số nguyên, không quy đổi tiền trên app)
+            'coins' => (int) $this->coin_balance,
             'referrer' => $this->whenLoaded('referrer', fn () => $this->referrer ? [
                 'name' => $this->referrer->name,
+                'email' => $this->referrer->email,
                 'referral_code' => $this->referrer->referral_code,
             ] : null),
             // Gói thành viên (1 năm): ends_at = ngày hết hạn xa nhất của các gói còn hạn
             'membership' => [
                 'active' => ($endsAt = $this->membershipEndsAt()) !== null,
+                'started_at' => $endsAt ? $this->membershipStartedAt()?->toIso8601String() : null,
                 'ends_at' => $endsAt?->toIso8601String(),
             ],
             'last_login_at' => $this->last_login_at?->toIso8601String(),

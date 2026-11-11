@@ -33,6 +33,11 @@ return [
     ],
 
     // Tài liệu: ổ lưu file (documents_local | documents_s3), thời hạn link, video HLS
+    // Chương trình huấn luyện: video trailer tải lên (MP4 / WebM / MOV, không chuyển HLS), dung lượng tối đa (MB)
+    'trainings' => [
+        'trailer_max_upload_mb' => (int) env('TRAINING_TRAILER_MAX_MB', 200),
+    ],
+
     'documents' => [
         'disk' => env('DOCUMENTS_DISK', 'documents_local'),
         'link_ttl_minutes' => 5,          // link mở PDF / sách / bắt đầu phát video
@@ -45,5 +50,8 @@ return [
         'hls_segment_seconds' => 6,
         'ffmpeg' => env('FFMPEG_BINARY', 'ffmpeg'),
         'ffprobe' => env('FFPROBE_BINARY', 'ffprobe'),
+        'qpdf' => env('QPDF_BINARY', 'qpdf'),     // cắt trang đầu PDF làm bản đọc thử sách
+        'preview_pages' => 10,            // mặc định: số trang đọc thử (sách PDF)
+        'preview_chapters' => 2,          // mặc định: số chương đọc thử (sách EPUB)
     ],
 ];

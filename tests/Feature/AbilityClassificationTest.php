@@ -44,8 +44,8 @@ class AbilityClassificationTest extends TestCase
         // 1 câu chọn 1: A → 5 điểm (Xuất sắc), B → 1 điểm (Cần hỗ trợ)
         $this->test = PlacementTest::create(['title' => 'Đầu vào', 'is_active' => true]);
         $this->dimension = $this->test->dimensions()->create(['name' => 'Khả năng tiếp thu', 'sort_order' => 1]);
-        $this->dimension->levels()->create(['name' => 'Cần hỗ trợ', 'min_score' => 0]);
-        $this->dimension->levels()->create(['name' => 'Xuất sắc', 'min_score' => 4]);
+        $this->dimension->levels()->create(['name' => 'Cần hỗ trợ', 'min_percent' => 0]);
+        $this->dimension->levels()->create(['name' => 'Xuất sắc', 'min_percent' => 75]);
         $q = $this->test->questions()->create(['type' => PlacementQuestionType::Single, 'prompt' => 'Câu 1']);
         $q->options()->create(['label' => 'A', 'scores' => [$this->dimension->id => 5]]);
         $q->options()->create(['label' => 'B', 'scores' => [$this->dimension->id => 1]]);
@@ -77,7 +77,7 @@ class AbilityClassificationTest extends TestCase
 
         // Đổi tên, thêm mức, xoá mức → đồng bộ (mức xoá chỉ ẩn để giữ điều kiện cũ)
         $this->dimension->update(['name' => 'Tiếp thu']);
-        $this->dimension->levels()->create(['name' => 'Tốt', 'min_score' => 2]);
+        $this->dimension->levels()->create(['name' => 'Tốt', 'min_percent' => 50]);
         $this->dimension->levels()->where('name', 'Cần hỗ trợ')->first()->delete();
         $ability = $this->ability();
         $this->assertSame('Tiếp thu', $ability->name);
@@ -93,8 +93,21 @@ class AbilityClassificationTest extends TestCase
         $this->assertSame('Tiếp thu (mới)', $this->ability()->name);
         $this->assertTrue($this->ability()->is_active);
 
-        // Bài mới tạo từ đầu (không nhân bản) → năng lực cũ thành "không dùng"
-        PlacementTest::create(['title' => 'Bài khác', 'is_active' => true])->dimensions()->create(['name' => 'Khác']);
+        // Bài khác chạy song song → cả hai nhóm năng lực đều dùng được
+        $other = PlacementTest::create(['title' => 'Bài khác', 'is_active' => true]);
+        $other->dimensions()->create(['name' => 'Khác']);
+        $this->assertTrue(Classification::where('placement_dimension_key', $this->dimension->key)->sole()->is_active);
+        $this->assertTrue(Classification::where('name', 'Khác')->sole()->is_active);
+
+        // Nhân bản thành bài mới (không phải phiên bản) → năng lực mới, key mới
+        $fresh = $copy->duplicate(asNewVersion: false);
+        $this->assertNotSame($copy->key, $fresh->key);
+        $this->assertNotSame($this->dimension->key, $fresh->dimensions()->first()->key);
+        $this->assertSame(3, Classification::where('type', Classification::TYPE_ABILITY)->count());
+        $this->assertFalse(Classification::where('placement_dimension_key', $fresh->dimensions()->first()->key)->sole()->is_active); // chưa bật
+
+        // Ngừng dùng một bài → năng lực của bài đó "không dùng", bài kia giữ nguyên
+        $copy->update(['is_active' => false]);
         $this->assertFalse(Classification::where('placement_dimension_key', $this->dimension->key)->sole()->is_active);
         $this->assertTrue(Classification::where('name', 'Khác')->sole()->is_active);
     }
@@ -137,20 +150,54 @@ class AbilityClassificationTest extends TestCase
             [$ability->options->firstWhere('name', 'Cần hỗ trợ')->id],
             AbilityClassifications::optionIdsFor($this->student),
         );
+
+        // Bài kiểm tra thứ hai (nhóm năng lực khác): gộp mức của bài làm mới nhất của TỪNG bài
+        $second = PlacementTest::create(['title' => 'Tư duy', 'is_active' => true]);
+        $logic = $second->dimensions()->create(['name' => 'Tư duy logic']);
+        $logic->levels()->create(['name' => 'Tốt', 'min_percent' => 1]);
+        $q = $second->questions()->create(['type' => PlacementQuestionType::Single, 'prompt' => 'Câu 1']);
+        $o = $q->options()->create(['label' => 'X', 'scores' => [$logic->id => 2]]);
+        $q->options()->create(['label' => 'Z', 'scores' => []]);
+        $this->travel(1)->minutes();
+        app(PlacementScoring::class)->submit($this->student, $second->fresh()->loadStructure(), [['question_id' => $q->id, 'option_ids' => [$o->id]]]);
+
+        $logicGood = Classification::where('placement_dimension_key', $logic->key)->sole()->options->sole();
+        $this->assertEqualsCanonicalizing(
+            [$ability->options->firstWhere('name', 'Cần hỗ trợ')->id, $logicGood->id],
+            AbilityClassifications::optionIdsFor($this->student),
+        );
     }
 
-    public function test_course_requires_placement_test_option(): void
+    public function test_course_requires_chosen_placement_tests(): void
     {
         $course = Course::create(['title' => 'Khoá B', 'instructor_id' => $this->admin->id, 'price' => 1, 'status' => CourseStatus::Published]);
         $this->assertFalse($course->needsPlacementTest($this->student));
 
-        $course->update(['requires_placement_test' => true]);
-        $this->assertTrue($course->fresh()->needsPlacementTest($this->student));
+        $second = PlacementTest::create(['title' => 'Tư duy', 'is_active' => true]);
+        $q = $second->questions()->create(['type' => PlacementQuestionType::Single, 'prompt' => 'Câu 1']);
+        $q->options()->create(['label' => 'X', 'scores' => []]);
 
+        // Chỉ bắt buộc bài "Tư duy" → làm bài "Đầu vào" không đủ
+        $course->syncPlacementTestKeys([$second->key]);
         $this->answer('A');
+        $this->assertTrue($course->fresh()->needsPlacementTest($this->student));
+        $this->assertSame([$second->id], $course->fresh()->pendingPlacementTests($this->student)->pluck('id')->all());
+
+        // Bắt buộc cả hai, theo thứ tự đã chọn
+        $course->syncPlacementTestKeys([$second->key, $this->test->key]);
+        $this->assertSame([$second->id, $this->test->id], $course->fresh()->requiredPlacementTests()->pluck('id')->all());
+        $this->assertSame([$second->id], $course->fresh()->pendingPlacementTests($this->student)->pluck('id')->all());
+
+        // Đã làm phiên bản cũ → phiên bản mới (cùng bài) vẫn tính là đã làm
+        app(PlacementScoring::class)->submit($this->student, $second->fresh()->loadStructure(), [['question_id' => $q->id, 'option_ids' => [$q->options->first()->id]]]);
+        $v2 = $second->duplicate();
+        $v2->update(['is_active' => true]);
+        $this->assertFalse($second->fresh()->is_active);
+        $this->assertTrue($this->test->fresh()->is_active); // bài khác không bị tắt
+        $this->assertSame([$v2->id, $this->test->id], $course->fresh()->requiredPlacementTests()->pluck('id')->all());
         $this->assertFalse($course->fresh()->needsPlacementTest($this->student));
 
-        // Không có bài nào đang dùng → không chặn
+        // Bài bắt buộc đang tắt → không chặn
         $other = User::factory()->create(['role' => UserRole::Student]);
         PlacementTest::query()->update(['is_active' => false]);
         $this->assertFalse($course->fresh()->needsPlacementTest($other));
@@ -171,9 +218,16 @@ class AbilityClassificationTest extends TestCase
             ->assertOk()->assertSee('Năng lực · Khả năng tiếp thu')->assertSee('Theo mức đạt được ở bài kiểm tra đầu vào.');
 
         Livewire::test(EditCourse::class, ['record' => $course->getRouteKey()])
-            ->fillForm(['requires_placement_test' => true])
+            ->assertFormFieldExists('placement_test_keys')
+            ->fillForm(['placement_test_keys' => [$this->test->key]])
             ->call('save')
             ->assertHasNoFormErrors();
-        $this->assertTrue($course->fresh()->requires_placement_test);
+        $this->assertSame([$this->test->key], $course->fresh()->placementTestRequirements->pluck('placement_test_key')->all());
+
+        Livewire::test(EditCourse::class, ['record' => $course->getRouteKey()])
+            ->assertFormSet(['placement_test_keys' => [$this->test->key]])
+            ->fillForm(['placement_test_keys' => []])
+            ->call('save');
+        $this->assertSame(0, $course->fresh()->placementTestRequirements()->count());
     }
 }

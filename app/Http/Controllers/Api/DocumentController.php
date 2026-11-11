@@ -9,18 +9,21 @@ use App\Models\Document;
 use App\Models\DocumentTopic;
 use App\Models\User;
 use App\Services\DocumentAccess;
+use App\Support\BookPreview;
 use App\Support\DocumentStorage;
+use App\Support\VideoChapters;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
  * Tài liệu cho app (đăng nhập). Server tính sẵn `unlocked` cho học viên; app chỉ hiển thị.
- * - GET    /documents?type=video|pdf|book&topic_id=&teacher_id=&q=   danh sách (mới nhất trước)
+ * - GET    /documents?type=video|pdf|book&topic_id=&teacher_id=&q=   danh sách (mới nhất trước); thêm &page=&per_page= → từng đợt + meta
  * - GET    /documents/topics                           chủ đề để lọc
  * - GET    /documents/{id}                             chi tiết + điều kiện mở
  * - POST   /documents/{id}/play                        video: link HLS (5 phút)
  * - POST   /documents/{id}/open                        PDF / sách: link xem (5 phút) + link tải (sách cho tải)
+ * - POST   /documents/{id}/preview                     sách: link bản đọc thử (5 phút), không cần quyền xem
  * - POST   /documents/{id}/save · DELETE …/save        lưu / bỏ lưu
  * - GET    /my/documents                               đã lưu + đã mua
  */
@@ -35,20 +38,31 @@ class DocumentController extends Controller
             'topic_id' => ['nullable', 'integer'],
             'teacher_id' => ['nullable', 'integer'],
             'q' => ['nullable', 'string', 'max:100'],
+            // Có `page` → trả từng đợt `per_page` (mặc định 20) kèm meta {page, has_more, total} (màn Tìm kiếm của app)
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:30'],
         ]);
 
-        $docs = Document::query()
+        $query = Document::query()
             ->published()
             ->when($data['type'] ?? null, fn ($q, $type) => $q->where('type', $type))
             ->when($data['topic_id'] ?? null, fn ($q, $topic) => $q->where('document_topic_id', $topic))
             ->when($data['teacher_id'] ?? null, fn ($q, $teacher) => $q->where('author_id', $teacher))
             ->when($data['q'] ?? null, fn ($q, $term) => $q->where(fn ($w) => $w->where('title', 'like', "%{$term}%")->orWhere(fn ($a) => $a->whereAuthorLike($term))))
             ->latest('published_at')
-            ->with(['authorUser', 'links.course', 'links.lesson'])
-            ->limit(200)
-            ->get();
+            ->latest('id')
+            ->with(['authorUser', 'links.course', 'links.lesson']);
 
-        return response()->json(['data' => $this->present($docs, $request->user())]);
+        if (isset($data['page'])) {
+            $page = $query->paginate($data['per_page'] ?? 20);
+
+            return response()->json([
+                'data' => $this->present(new Collection($page->items()), $request->user()),
+                'meta' => ['page' => $page->currentPage(), 'has_more' => $page->hasMorePages(), 'total' => $page->total()],
+            ]);
+        }
+
+        return response()->json(['data' => $this->present($query->limit(200)->get(), $request->user())]);
     }
 
     public function topics(): JsonResponse
@@ -63,10 +77,13 @@ class DocumentController extends Controller
         return response()->json(['data' => [
             ...$this->present(new Collection([$doc]), $request->user())[0],
             'description' => $doc->description,
+            'topic' => $doc->topic?->name,
             'file' => $doc->type === DocumentType::Video ? null : [
                 'format' => $doc->file_format,
                 'size' => $doc->file_size,
                 'downloadable' => $doc->allow_download,
+                // số trang (PDF) / số chương (EPUB) của cả cuốn — biết được sau khi tạo bản đọc thử
+                'length' => $doc->source_count,
             ],
         ]]);
     }
@@ -83,6 +100,7 @@ class DocumentController extends Controller
             'url' => HlsController::masterUrl($doc, $request->user()),
             'expires_at' => now()->addMinutes($ttl)->toIso8601String(),
             'duration_seconds' => $doc->duration_seconds,
+            'chapters' => VideoChapters::present($doc->video_chapters),
             'qualities' => collect($doc->hls_variants)->pluck('height')->values(),
         ]]);
     }
@@ -100,6 +118,27 @@ class DocumentController extends Controller
             'format' => $doc->file_format,
             'file_name' => $doc->file_name,
             'download_url' => $doc->allow_download ? DocumentStorage::downloadUrl($doc->file_path, $doc->file_name ?: basename($doc->file_path), $ttl) : null,
+            // Sách và PDF: trang đọc của server (pdf.js / epub.js) — app mở trong WebView / iframe
+            'reader_url' => ReaderController::readerUrl($doc, ReaderController::KIND_FULL, $ttl),
+            'expires_at' => now()->addMinutes($ttl)->toIso8601String(),
+        ]]);
+    }
+
+    /** Sách: link bản đọc thử (5 phút). Ai đăng nhập cũng mở được, kể cả khi sách đang khoá. */
+    public function preview(Request $request, int $id): JsonResponse
+    {
+        $doc = $this->find($id);
+        if (! BookPreview::available($doc)) {
+            return response()->json(['message' => 'Sách này chưa có bản đọc thử.', 'code' => 'no_preview'], 404);
+        }
+
+        $ttl = (int) config('ellso.documents.link_ttl_minutes');
+
+        return response()->json(['data' => [
+            'url' => DocumentStorage::url($doc->preview_path, $ttl),
+            'format' => $doc->file_format,
+            ...array_diff_key(BookPreview::present($doc), ['available' => true]),
+            'reader_url' => ReaderController::readerUrl($doc, ReaderController::KIND_PREVIEW, $ttl),
             'expires_at' => now()->addMinutes($ttl)->toIso8601String(),
         ]]);
     }
@@ -165,7 +204,7 @@ class DocumentController extends Controller
             'teacher' => $d->author_id && $d->authorUser ? [
                 'id' => $d->authorUser->id,
                 'name' => $d->authorUser->name,
-                'avatar' => $d->authorUser->avatar,
+                'avatar' => $d->authorUser->avatarUrl(),
             ] : null,
             'topic_id' => $d->document_topic_id,
             'cover' => $d->cover_color?->value,
@@ -176,6 +215,10 @@ class DocumentController extends Controller
             'bought_at' => $purchases->get($d->id)?->purchased_at?->toIso8601String(),
             'saved' => in_array($d->id, $saved, true),
             'duration' => $d->durationLabel(),
+            // Video: mốc thời gian [{start (giây), time ("02:15"), title}] — bấm để tua; tài liệu khác: []
+            'chapters' => $d->type === DocumentType::Video ? VideoChapters::present($d->video_chapters) : [],
+            // Sách: {available, pages (PDF) | chapters (EPUB)}; video / PDF: null
+            'preview' => BookPreview::present($d),
             'published_at' => $d->published_at?->toIso8601String(),
         ])->values()->all();
     }

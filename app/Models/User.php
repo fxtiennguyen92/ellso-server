@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\MediaStorage;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\UserLogEvent;
 use App\Enums\UserRole;
@@ -46,6 +47,7 @@ class User extends Authenticatable implements FilamentUser
     {
         return [
             'email_verified_at' => 'datetime',
+            'coin_balance' => 'integer',
             'password' => 'hashed',
             'temp_password' => 'hashed',
             'temp_password_expires_at' => 'datetime',
@@ -116,6 +118,17 @@ class User extends Authenticatable implements FilamentUser
         ])->save();
     }
 
+    /** Link ảnh đại diện: ảnh app tải lên (đường dẫn trên ổ media) hoặc link ngoài có sẵn; null = dùng chữ viết tắt. */
+    public function avatarUrl(): ?string
+    {
+        $a = $this->avatar;
+        if (! is_string($a) || $a === '') {
+            return null;
+        }
+
+        return preg_match('#^https?://#i', $a) ? $a : MediaStorage::url($a);
+    }
+
     public function referrer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'referred_by_id');
@@ -134,6 +147,11 @@ class User extends Authenticatable implements FilamentUser
     public function appSessions(): HasMany
     {
         return $this->hasMany(AppSession::class);
+    }
+
+    public function coinTransactions(): HasMany
+    {
+        return $this->hasMany(CoinTransaction::class);
     }
 
     public function memberships(): HasMany
@@ -162,15 +180,38 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(DocumentPurchase::class);
     }
 
+    public function cartItems(): HasMany
+    {
+        return $this->hasMany(CartItem::class);
+    }
+
     public function savedDocuments(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Document::class, 'document_saves')->withPivot('created_at');
     }
 
-    /** Khoá huấn luyện mà giáo viên này hướng dẫn. */
+    /** Chương trình huấn luyện mà giảng viên này hướng dẫn. */
     public function trainingCourses(): HasMany
     {
         return $this->hasMany(TrainingCourse::class, 'trainer_id');
+    }
+
+    /** Workshop mà giảng viên này hướng dẫn. */
+    public function workshops(): HasMany
+    {
+        return $this->hasMany(Workshop::class, 'trainer_id');
+    }
+
+    /** Chương trình huấn luyện học viên đã đăng ký. */
+    public function trainingRegistrations(): HasMany
+    {
+        return $this->hasMany(TrainingRegistration::class);
+    }
+
+    /** Buổi workshop học viên đã đăng ký. */
+    public function workshopRegistrations(): HasMany
+    {
+        return $this->hasMany(WorkshopRegistration::class);
     }
 
     /** Các lần làm bài kiểm tra đầu vào. */
@@ -190,6 +231,28 @@ class User extends Authenticatable implements FilamentUser
         $end = $this->memberships()->where('ends_at', '>', now())->max('ends_at');
 
         return $end ? \Illuminate\Support\Carbon::parse($end) : null;
+    }
+
+    /**
+     * Ngày bắt đầu chuỗi gói thành viên đang còn hạn: gói đang dùng, lùi về các gói liền trước nối tiếp
+     * (gia hạn khi còn hạn → gói mới bắt đầu đúng ngày gói cũ hết). null nếu không có gói còn hạn.
+     */
+    public function membershipStartedAt(): ?\Illuminate\Support\Carbon
+    {
+        $rows = $this->memberships()->where('starts_at', '<=', now())->orderByDesc('starts_at')->get(['starts_at', 'ends_at']);
+        $current = $rows->first(fn (StudentMembership $m) => $m->ends_at->isFuture());
+        if (! $current) {
+            return null;
+        }
+
+        $start = $current->starts_at;
+        foreach ($rows as $m) {
+            if ($m->starts_at->lt($start) && $m->ends_at->gte($start)) {
+                $start = $m->starts_at;
+            }
+        }
+
+        return $start;
     }
 
     /** Chỉ admin và giảng viên (đang hoạt động) được vào CMS. Học viên dùng app. */

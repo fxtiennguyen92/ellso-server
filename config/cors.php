@@ -16,7 +16,8 @@ return [
     */
 
     // API của app nằm ở /v1/* (không có prefix api/) — bản web của app gọi từ trình duyệt nên cần CORS
-    'paths' => ['v1/*', 'sanctum/csrf-cookie'],
+    // private-docs/*: link tạm có chữ ký của ổ tài liệu local (dev) — trình đọc sách bản web tải file bằng fetch
+    'paths' => ['v1/*', 'sanctum/csrf-cookie', 'private-docs/*'],
 
     'allowed_methods' => ['*'],
 

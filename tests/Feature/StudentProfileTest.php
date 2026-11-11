@@ -27,7 +27,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
 
-/** Tài khoản › Học viên + Học bạ. */
+/** Học viên › Tài khoản + Học bạ. */
 class StudentProfileTest extends TestCase
 {
     use RefreshDatabase;

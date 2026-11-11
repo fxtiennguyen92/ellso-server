@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\LessonContent;
 use App\Enums\ContentStatus;
 use App\Models\Concerns\CleansUpFiles;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,7 +25,17 @@ class Lesson extends Model
     /** Icon: xoá file khi bỏ / thay icon, hoặc khi xoá vĩnh viễn. */
     protected array $fileAttributes = ['icon'];
 
+    public const KIND_LESSON = 'lesson';
+
+    /** Coaching 1-1 với giáo viên: không có nội dung, không vào thư viện, không tính % / không chặn bài sau. */
+    public const KIND_COACHING = 'coaching';
+
+    public const COACHING_DEFAULT_TITLE = 'Trao đổi trực tiếp';
+
+    protected $attributes = ['kind' => self::KIND_LESSON];
+
     protected $fillable = [
+        'kind',
         'owner_id',
         'title',
         'icon',
@@ -62,8 +73,20 @@ class Lesson extends Model
         });
 
         // Xóa bài khỏi thư viện → gỡ khỏi mọi lộ trình
+        // Xoá vĩnh viễn → xoá video bài học (file trên ổ tài liệu)
+        static::forceDeleted(function (Lesson $lesson) {
+            $lesson->videos()->get()->each->delete();
+        });
+
         static::deleted(function (Lesson $lesson) {
             $lesson->pathLessons()->delete();
+        });
+
+        // Coaching chỉ sống trong lộ trình: gỡ khỏi lộ trình → xoá luôn
+        static::creating(function (Lesson $lesson) {
+            if ($lesson->kind === self::KIND_COACHING) {
+                $lesson->title = filled($lesson->title) ? $lesson->title : self::COACHING_DEFAULT_TITLE;
+            }
         });
     }
 
@@ -76,7 +99,19 @@ class Lesson extends Model
 
     public function isPublished(): bool
     {
-        return $this->published_at !== null && $this->content_published !== null;
+        // Coaching không có nội dung → luôn hiện trên app
+        return $this->isCoaching() || ($this->published_at !== null && $this->content_published !== null);
+    }
+
+    public function isCoaching(): bool
+    {
+        return $this->kind === self::KIND_COACHING;
+    }
+
+    /** Chỉ bài học thông thường (thư viện bài học). */
+    public function scopeLibrary(Builder $query): void
+    {
+        $query->where('kind', self::KIND_LESSON);
     }
 
     public function contentStatus(): ContentStatus
@@ -133,6 +168,26 @@ class Lesson extends Model
         $copy->owner_id = auth()->id() ?? $this->owner_id;
         $copy->save();
 
+        // Video bài học: bản sao dùng chung file đã xử lý (không cắt lại), đổi id trong khối video của bản nháp
+        $map = [];
+        // (chỉ video đã xử lý xong — video đang xử lý thì bản sao phải tải lại)
+        foreach ($this->videos()->whereIn('id', LessonContent::videoIds($this->content_draft) ?: [0])->get()->filter->isReady() as $video) {
+            $newVideo = $video->replicate(['lesson_id']);
+            $newVideo->lesson_id = $copy->id;
+            $newVideo->hls_key = $video->hls_key;
+            $newVideo->save();
+            $map[$video->id] = $newVideo->id;
+        }
+        if ($map) {
+            $content = $copy->content_draft;
+            foreach ($content['blocks'] ?? [] as $i => $block) {
+                if (($block['type'] ?? null) === 'video' && isset($map[$block['data']['video_id'] ?? 0])) {
+                    $content['blocks'][$i]['data']['video_id'] = $map[$block['data']['video_id']];
+                }
+            }
+            $copy->forceFill(['content_draft' => $content])->saveQuietly();
+        }
+
         return $copy;
     }
 
@@ -146,6 +201,12 @@ class Lesson extends Model
     public function pathLessons(): HasMany
     {
         return $this->hasMany(PathLesson::class);
+    }
+
+    /** Video tải riêng cho bài (khối "Video" trong nội dung). */
+    public function videos(): HasMany
+    {
+        return $this->hasMany(LessonVideo::class);
     }
 
     /** Các khóa học đang dùng bài này (qua lộ trình). */

@@ -4,15 +4,28 @@ namespace App\Support;
 
 use App\Enums\TempPasswordReason;
 use App\Mail\TempPasswordMail;
+use App\Mail\WorkshopLinkMail;
 use App\Models\EmailTemplate;
 use App\Models\User;
+use Illuminate\Mail\Mailable;
 
 /** Dựng email mẫu từ một EmailTemplate (kể cả nội dung chưa lưu) để xem trước / gửi thử trên CMS. */
 class EmailTemplatePreview
 {
-    public static function mail(EmailTemplate $template, ?User $recipient = null): TempPasswordMail
+    public static function mail(EmailTemplate $template, ?User $recipient = null): Mailable
     {
         $sample = $template->sampleValues();
+
+        if ($template->key === EmailTemplate::WORKSHOP_LINK) {
+            return new WorkshopLinkMail(
+                name: $recipient?->name ?? $sample['ten'],
+                email: $recipient?->email ?? $sample['email'],
+                workshopTitle: $sample['workshop'],
+                when: $sample['thoi_gian'],
+                meetingUrl: $sample['link'],
+                template: $template,
+            );
+        }
 
         $user = new User;
         $user->name = $recipient?->name ?? $sample['ten'];

@@ -2,14 +2,13 @@
 
 namespace App\Filament\Statistics\Widgets;
 
-use App\Models\PlacementDimension;
 use App\Support\PlacementStatistics;
 use Filament\Support\RawJs;
 
-/** Phân bố mức độ của một phân loại (mỗi học viên lấy bài làm mới nhất trong khoảng). */
+/** Phân bố mức độ của một năng lực theo key (mỗi học viên lấy bài làm mới nhất trong khoảng) + % điểm trung bình. */
 class PlacementLevelChart extends StudentActivityChart
 {
-    public ?int $dimensionId = null;
+    public ?string $dimensionKey = null;
 
     protected ?string $maxHeight = '220px';
 
@@ -18,19 +17,23 @@ class PlacementLevelChart extends StudentActivityChart
 
     private function rows(): array
     {
-        return $this->dimensionId ? (new PlacementStatistics($this->pageFilters))->distribution($this->dimensionId) : [];
+        return $this->dimensionKey ? (new PlacementStatistics($this->pageFilters))->distribution($this->dimensionKey) : [];
     }
 
     public function getHeading(): string
     {
-        return PlacementDimension::find($this->dimensionId)?->name ?? 'Năng lực';
+        return PlacementStatistics::resolveTest($this->pageFilters['test_key'] ?? null)?->dimensions()->where('key', $this->dimensionKey)->value('name') ?? 'Năng lực';
     }
 
     public function getDescription(): string
     {
         $total = array_sum(array_column($this->rows(), 'count'));
+        $average = $this->dimensionKey ? (new PlacementStatistics($this->pageFilters))->averagePercent($this->dimensionKey) : null;
 
-        return $total ? number_format($total, 0, ',', '.') . ' học viên · bài làm mới nhất' : 'Chưa có bài làm trong khoảng này';
+        return $total
+            ? number_format($total, 0, ',', '.') . ' học viên · bài làm mới nhất'
+                . ($average !== null ? ' · điểm TB ' . rtrim(rtrim(number_format($average, 1, ',', ''), '0'), ',') . '%' : '')
+            : 'Chưa có bài làm trong khoảng này';
     }
 
     protected function getType(): string
@@ -47,7 +50,7 @@ class PlacementLevelChart extends StudentActivityChart
             'datasets' => [[
                 'label' => 'Học viên',
                 'data' => array_column($rows, 'count'),
-                'backgroundColor' => array_map(fn ($r) => self::RANK_COLORS[min($r['rank'], count(self::RANK_COLORS)) - 1], $rows),
+                'backgroundColor' => array_map(fn ($r) => $r['rank'] >= 99 ? '#94a3b8' : self::RANK_COLORS[min($r['rank'], count(self::RANK_COLORS)) - 1], $rows),
                 'borderWidth' => 0,
                 'borderRadius' => 4,
                 'maxBarThickness' => 28,

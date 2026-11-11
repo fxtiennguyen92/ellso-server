@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PlacementTests\Pages;
 
 use App\Filament\Resources\PlacementTests\Pages\Concerns\SimulatesPlacementTest;
+use App\Filament\Resources\PlacementTests\Pages\Concerns\HandlesPlacementDrafts;
 use App\Filament\Resources\PlacementTests\PlacementTestResource;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -10,7 +11,7 @@ use Filament\Support\Icons\Heroicon;
 
 class EditPlacementTest extends EditRecord
 {
-    use SimulatesPlacementTest;
+    use HandlesPlacementDrafts, SimulatesPlacementTest;
 
     protected static string $resource = PlacementTestResource::class;
 
@@ -22,12 +23,13 @@ class EditPlacementTest extends EditRecord
 
     public function getSubheading(): ?string
     {
-        return $this->getRecord()->title;
+        return $this->draftNotice() . $this->getRecord()->title;
     }
 
     protected function getHeaderActions(): array
     {
         return [
+            ...$this->draftActions(),
             $this->simulateAction(),
             DeleteAction::make(),
         ];

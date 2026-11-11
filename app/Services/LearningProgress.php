@@ -6,10 +6,12 @@ use App\Enums\EnrollmentSource;
 use App\Enums\UnlockMode;
 use App\Models\Course;
 use App\Models\CourseEnrollment;
+use App\Models\ExamAttempt;
 use App\Models\LearningPath;
 use App\Models\Lesson;
 use App\Models\LessonProgress;
 use App\Models\LessonQuizAnswer;
+use App\Models\PathChapter;
 use App\Models\PathLesson;
 use App\Models\User;
 use App\Support\LessonContent;
@@ -24,6 +26,10 @@ use Illuminate\Support\Collection;
  *  - Trạng thái bài trong lộ trình: completed | available | locked. "Mở khi xong bài trước" khoá đến khi bài liền trước
  *    hoàn thành; "Luôn mở" luôn học được. Chỉ tính bài đã xuất bản (bài chưa xuất bản ẩn trên app).
  *  - % hoàn thành khoá = bài hoàn thành / tổng bài (đã xuất bản) của lộ trình đang học.
+ *  - Coaching (Lesson kind = coaching): mở theo quy tắc mở khoá của nó (bài trước xong), nhưng KHÔNG chặn bài sau
+ *    và KHÔNG tính vào % hoàn thành. Chưa có đặt lịch → chưa bao giờ "completed".
+ *  - Bài thi (PathChapter kind = exam): mở khi mọi bài thông thường đứng trước nó đã hoàn thành; không tính vào %;
+ *    đậu mọi bài thi của lộ trình (+ hoàn thành khoá) mới đủ điều kiện cấp chứng chỉ.
  */
 class LearningProgress
 {
@@ -57,6 +63,7 @@ class LearningProgress
             ->select('path_lessons.*')
             ->join('path_chapters', 'path_chapters.id', '=', 'path_lessons.path_chapter_id')
             ->where('path_lessons.learning_path_id', $path->id)
+            ->where('path_chapters.kind', PathChapter::KIND_CHAPTER)
             ->orderBy('path_chapters.sort_order')
             ->orderBy('path_chapters.id')
             ->orderBy('path_lessons.sort_order')
@@ -92,17 +99,100 @@ class LearningProgress
 
         foreach ($items as $item) {
             $p = $progress[$item->lesson_id] ?? null;
-            $done = $p?->completed_at !== null;
+            $coaching = $item->lesson->isCoaching();
+            $done = ! $coaching && $p?->completed_at !== null;
             $state = match (true) {
                 $done => 'completed',
                 $item->unlock_mode === UnlockMode::Always || $previousDone => 'available',
                 default => 'locked',
             };
             $out[] = ['item' => $item, 'state' => $state, 'progress' => $p];
-            $previousDone = $done;
+            // Coaching không chặn bài sau: bài sau xét theo bài thông thường liền trước
+            if (! $coaching) {
+                $previousDone = $done;
+            }
         }
 
         return $out;
+    }
+
+    /**
+     * Bản đồ lộ trình theo thứ tự: chương (kèm trạng thái bài) và bài thi xen giữa.
+     *
+     * @return list<array{type: 'chapter', chapter: PathChapter, items: list<array>}|array{type: 'exam', chapter: PathChapter, state: string, best: ?ExamAttempt, passed: bool}>
+     */
+    public function outline(User $user, LearningPath $path): array
+    {
+        $states = collect($this->itemStates($user, $path))->groupBy(fn ($s) => $s['item']->path_chapter_id);
+        $chapters = $path->chapters()->with('exam')->orderBy('id')->get()->sortBy('sort_order')->values();
+        $attempts = $this->examAttempts($user, $chapters->filter->isExam()->pluck('id')->all());
+
+        $out = [];
+        $lessonsBeforeDone = true; // mọi bài thông thường đứng trước đã hoàn thành
+        foreach ($chapters as $chapter) {
+            if ($chapter->isExam()) {
+                $mine = $attempts[$chapter->id] ?? collect();
+                $passed = $mine->contains('passed', true);
+                $out[] = [
+                    'type' => 'exam',
+                    'chapter' => $chapter,
+                    'state' => $passed ? 'passed' : ($lessonsBeforeDone ? 'available' : 'locked'),
+                    'passed' => $passed,
+                    'best' => $mine->sortByDesc('score')->first(),
+                    'attempts' => $mine->count(),
+                ];
+
+                continue;
+            }
+
+            $items = ($states[$chapter->id] ?? collect())->values()->all();
+            foreach ($items as $s) {
+                if (! $s['item']->lesson->isCoaching() && $s['state'] !== 'completed') {
+                    $lessonsBeforeDone = false;
+                }
+            }
+            $out[] = ['type' => 'chapter', 'chapter' => $chapter, 'items' => $items];
+        }
+
+        return $out;
+    }
+
+    /** Lần làm đã nộp của học viên theo bài thi trong lộ trình. @return array<int, Collection<int, ExamAttempt>> */
+    public function examAttempts(User $user, array $chapterIds): array
+    {
+        if ($chapterIds === []) {
+            return [];
+        }
+
+        return ExamAttempt::query()
+            ->where('user_id', $user->id)
+            ->whereIn('path_chapter_id', $chapterIds)
+            ->whereNotNull('submitted_at')
+            ->get()
+            ->groupBy('path_chapter_id')
+            ->all();
+    }
+
+    /**
+     * Đủ điều kiện cấp chứng chỉ: hoàn thành khoá (mọi bài thông thường) + đậu mọi bài thi của lộ trình đang học.
+     *
+     * @return array{eligible: bool, exams_total: int, exams_passed: int}
+     */
+    public function certificateStatus(CourseEnrollment $enrollment): array
+    {
+        $path = $enrollment->learningPath;
+        if (! $path) {
+            return ['eligible' => false, 'exams_total' => 0, 'exams_passed' => 0];
+        }
+
+        $exams = collect($this->outline($enrollment->user, $path))->where('type', 'exam');
+        $passed = $exams->where('passed', true)->count();
+
+        return [
+            'eligible' => $enrollment->completed_at !== null && $passed === $exams->count(),
+            'exams_total' => $exams->count(),
+            'exams_passed' => $passed,
+        ];
     }
 
     /**
@@ -117,7 +207,8 @@ class LearningProgress
             return ['total' => 0, 'completed' => 0, 'percent' => null, 'next' => null];
         }
 
-        $states = $this->itemStates($enrollment->user, $path);
+        // Coaching không tính vào %
+        $states = array_values(array_filter($this->itemStates($enrollment->user, $path), fn ($s) => ! $s['item']->lesson->isCoaching()));
         $total = count($states);
         $completed = count(array_filter($states, fn ($s) => $s['state'] === 'completed'));
         $next = collect($states)->first(fn ($s) => $s['state'] === 'available')['item'] ?? null;
@@ -161,7 +252,7 @@ class LearningProgress
             $locked = true;
         }
 
-        $preview = PathLesson::query()
+        $preview = ! $lesson->isCoaching() && PathLesson::query()
             ->where('lesson_id', $lesson->id)
             ->where('is_preview', true)
             ->whereHas('learningPath.course', fn ($q) => $q->where('status', 'published'))

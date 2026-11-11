@@ -13,7 +13,8 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\WidgetConfiguration;
 
 /**
- * Thống kê › Kiểm tra đầu vào: lượt làm bài + phân bố mức độ theo từng phân loại.
+ * Thống kê › Kiểm tra đầu vào: lượt làm bài + phân bố mức độ theo từng năng lực.
+ * Chọn theo BÀI: số liệu gộp mọi phiên bản của bài (bản nháp đã dùng thay bản cũ vẫn tính chung).
  */
 class PlacementTestStatisticsPage extends StatisticsPage
 {
@@ -35,10 +36,9 @@ class PlacementTestStatisticsPage extends StatisticsPage
     protected function extraFilterFields(): array
     {
         return [
-            Select::make('test_id')
+            Select::make('test_key')
                 ->label('Bài kiểm tra')
-                ->options(fn () => PlacementTest::latest('id')->get()
-                    ->mapWithKeys(fn (PlacementTest $t) => [$t->id => $t->title . ($t->is_active ? ' (đang dùng)' : '')]))
+                ->options(fn () => PlacementTest::keyOptions())
                 ->required()
                 ->columnSpan(['default' => 1, 'md' => 2, 'xl' => 5]),
         ];
@@ -47,13 +47,13 @@ class PlacementTestStatisticsPage extends StatisticsPage
     /** @return list<class-string|WidgetConfiguration> */
     protected function getFooterWidgets(): array
     {
-        $test = PlacementStatistics::resolveTest($this->filters['test_id'] ?? null);
+        $test = PlacementStatistics::resolveTest($this->filters['test_key'] ?? null);
 
         return [
             PlacementStatsOverview::class,
             PlacementAttemptsChart::class,
-            ...($test?->dimensions()->pluck('id') ?? collect())
-                ->map(fn (int $id) => PlacementLevelChart::make(['dimensionId' => $id]))
+            ...($test?->dimensions()->pluck('key') ?? collect())
+                ->map(fn (string $key) => PlacementLevelChart::make(['dimensionKey' => $key]))
                 ->all(),
         ];
     }

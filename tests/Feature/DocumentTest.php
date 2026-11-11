@@ -27,6 +27,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use App\Support\VideoChapters;
 use Tests\TestCase;
 
 /** Tài liệu: điều kiện xem (miễn phí / gói thành viên / khoá học / bài học / mua sách), API app, CMS. */
@@ -89,6 +90,10 @@ class DocumentTest extends TestCase
         $open = $this->api()->postJson("/v1/documents/{$free->id}/open")->assertOk()->json('data');
         $this->assertNotEmpty($open['url']);
         $this->assertNull($open['download_url']); // PDF không cho tải
+        // PDF cũng mở bằng trình đọc của server (pdf.js); file đi qua link có chữ ký
+        $this->assertStringContainsString('format=pdf', $open['reader_url']);
+        parse_str(parse_url($open['reader_url'], PHP_URL_QUERY), $q);
+        $this->get($q['file'])->assertOk();
 
         // Mở gói thành viên + vào khoá học → mở được
         app(MembershipService::class)->grant($this->student, MembershipSource::Admin, 0);
@@ -176,6 +181,93 @@ class DocumentTest extends TestCase
             ->assertHasNoFormErrors();
         $this->assertNull($book->fresh()->price);
         $this->assertTrue($book->fresh()->is_free);
+    }
+
+    /** EPUB / PDF: nhận theo đuôi + nội dung thật, không phụ thuộc MIME (EPUB hay bị nhận là zip / octet-stream). */
+    public function test_book_file_validated_by_content_not_mime(): void
+    {
+        Queue::fake();
+        $this->actingAs($this->admin);
+
+        $epub = function (bool $mimetypeFirst = true, bool $container = true): string {
+            $path = tempnam(sys_get_temp_dir(), 'ep');
+            $zip = new \ZipArchive;
+            $zip->open($path, \ZipArchive::OVERWRITE);
+            if (! $mimetypeFirst) {
+                $zip->addFromString('OEBPS/a.xhtml', '<html/>');
+            }
+            $zip->addFromString('mimetype', 'application/epub+zip');
+            if ($container) {
+                $zip->addFromString('META-INF/container.xml', '<container/>');
+            }
+            $zip->close();
+
+            return (string) file_get_contents($path);
+        };
+        $create = fn (string $title, UploadedFile $file) => Livewire::test(CreateDocument::class)
+            ->fillForm(['type' => 'book', 'title' => $title, 'is_free' => true, 'status' => 'draft', 'preview_enabled' => false, 'file_path' => $file])
+            ->call('create');
+
+        // EPUB không chuẩn thứ tự (server nhận là application/zip) vẫn được nhận
+        $create('Sách EPUB', UploadedFile::fake()->createWithContent('sach.epub', $epub(mimetypeFirst: false)))->assertHasNoFormErrors();
+        $this->assertSame('epub', Document::where('title', 'Sách EPUB')->sole()->file_format);
+
+        // Đổi đuôi / file hỏng → báo rõ
+        $create('Giả 1', UploadedFile::fake()->createWithContent('sach.epub', 'không phải zip'))->assertHasFormErrors(['file_path']);
+        $create('Giả 2', UploadedFile::fake()->createWithContent('sach.epub', $epub(container: false)))->assertHasFormErrors(['file_path']);
+        $create('Giả 3', UploadedFile::fake()->createWithContent('sach.pdf', 'hello'))->assertHasFormErrors(['file_path']);
+        $create('Giả 4', UploadedFile::fake()->createWithContent('sach.zip', $epub()))->assertHasFormErrors(['file_path']);
+        $this->assertSame(0, Document::where('title', 'like', 'Giả%')->count());
+    }
+
+    public function test_video_chapters(): void
+    {
+        // Parser: mm:ss / h:mm:ss, ngăn cách tuỳ ý, tự sắp xếp, báo lỗi theo dòng
+        $parsed = VideoChapters::parse("10:40 - Thực hành\n\n00:00 Giới thiệu\n1:05:00 – Tổng kết\n02:15: Cài đặt");
+        $this->assertSame([], $parsed['errors']);
+        $this->assertSame([0, 135, 640, 3900], array_column($parsed['chapters'], 'start'));
+        $this->assertSame(['Giới thiệu', 'Cài đặt', 'Thực hành', 'Tổng kết'], array_column($parsed['chapters'], 'title'));
+        $this->assertSame("00:00 Giới thiệu\n02:15 Cài đặt\n10:40 Thực hành\n1:05:00 Tổng kết", VideoChapters::format($parsed['chapters']));
+
+        $bad = VideoChapters::parse("Giới thiệu\n01:75 Sai giây\n00:10 A\n00:10 B\n20:00 Quá dài", 600);
+        $this->assertCount(4, $bad['errors']);
+        $this->assertStringContainsString('Dòng 1', $bad['errors'][0]);
+        $this->assertStringContainsString('vượt quá độ dài video (10:00)', implode(' ', $bad['errors']));
+        $this->assertStringContainsString('Mốc 00:10 bị trùng', implode(' ', $bad['errors']));
+
+        // CMS: nhập văn bản → lưu dạng mốc; mở lại form → văn bản đã sắp
+        Queue::fake();
+        $this->actingAs($this->admin);
+        $video = Document::create(['type' => DocumentType::Video, 'title' => 'Video', 'is_free' => true, 'status' => 'published',
+            'video_status' => VideoStatus::Ready, 'hls_path' => 'videos/1/x', 'duration_seconds' => 900]);
+
+        Livewire::test(EditDocument::class, ['record' => $video->getRouteKey()])
+            ->fillForm(['video_chapters_text' => "05:00 Phần 2\n00:00 Mở đầu"])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertSame([['start' => 0, 'title' => 'Mở đầu'], ['start' => 300, 'title' => 'Phần 2']], $video->fresh()->video_chapters);
+
+        Livewire::test(EditDocument::class, ['record' => $video->getRouteKey()])
+            ->assertFormSet(['video_chapters_text' => "00:00 Mở đầu\n05:00 Phần 2"])
+            ->fillForm(['video_chapters_text' => '20:00 Quá độ dài'])
+            ->call('save')
+            ->assertHasFormErrors(['video_chapters_text']);
+
+        Livewire::test(EditDocument::class, ['record' => $video->getRouteKey()])
+            ->fillForm(['video_chapters_text' => ''])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertNull($video->fresh()->video_chapters);
+
+        // API
+        $video->update(['video_chapters' => [['start' => 0, 'title' => 'Mở đầu'], ['start' => 3725, 'title' => 'Cuối']]]);
+        $this->api()->getJson("/v1/documents/{$video->id}")->assertOk()
+            ->assertJsonPath('data.chapters', [
+                ['start' => 0, 'time' => '00:00', 'title' => 'Mở đầu'],
+                ['start' => 3725, 'time' => '1:02:05', 'title' => 'Cuối'],
+            ]);
+        $this->api()->postJson("/v1/documents/{$video->id}/play")->assertOk()->assertJsonPath('data.chapters.1.start', 3725);
+        $this->api()->getJson("/v1/documents/{$this->pdf(['is_free' => true])->id}")->assertJsonPath('data.chapters', []);
     }
 
     public function test_grant_book_in_student_profile(): void

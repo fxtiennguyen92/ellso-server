@@ -11,7 +11,7 @@ use Filament\Support\Icons\Heroicon;
 use UnitEnum;
 
 /**
- * Đào tạo › Bài làm đầu vào (ngay dưới Bài kiểm tra đầu vào): bài làm của mọi bài kiểm tra, mới nhất trước.
+ * Học viên › Bài làm đầu vào (dưới Tài khoản): bài làm của mọi bài kiểm tra, mới nhất trước.
  * Số đỏ trên menu = số bài làm mới mà admin đang đăng nhập chưa xem (mở danh sách là tính đã xem).
  */
 class PlacementAttemptResource extends Resource
@@ -20,9 +20,9 @@ class PlacementAttemptResource extends Resource
 
     protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedInboxStack;
 
-    protected static string | UnitEnum | null $navigationGroup = 'Đào tạo';
+    protected static string | UnitEnum | null $navigationGroup = 'Học viên';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $navigationLabel = 'Bài làm đầu vào';
 

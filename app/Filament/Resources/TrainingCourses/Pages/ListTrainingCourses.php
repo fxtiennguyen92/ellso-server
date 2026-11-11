@@ -13,14 +13,14 @@ class ListTrainingCourses extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Khoá học offline: mỗi khoá là một buổi, mở vào nhiều ngày ở các địa điểm khác nhau. Giá tính theo khoá.';
+        return 'Chương trình offline: mỗi chương trình gồm nhiều buổi (buổi 1 … buổi n), học viên đăng ký cả chương trình. Cần gói thành viên còn hạn; phí 0 = không thu thêm. Muốn mở lại lần nữa: Nhân bản rồi đặt lịch mới.';
     }
 
     protected function getHeaderActions(): array
     {
         return [
             CreateAction::make()
-                ->label('Tạo khoá huấn luyện')
+                ->label('Tạo chương trình')
                 ->icon(Heroicon::Plus)
                 ->color('primary'),
         ];

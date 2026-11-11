@@ -47,8 +47,11 @@
         .dark .le-editor .tc-table { background: transparent; color: inherit; border-color: var(--gray-700); }
     </style>
 
-    {{-- Component Alpine "lessonEditor" nạp bất đồng bộ (FilamentAsset → resources/js/dist/components/lesson-editor.js) --}}
+    {{-- Component Alpine "lessonEditor" nạp bất đồng bộ (FilamentAsset → resources/js/dist/components/lesson-editor.js).
+         wire:ignore.self: x-data chứa bản nháp lúc mở trang — không để Livewire cập nhật thuộc tính này sau mỗi lần
+         lưu / tải file, nếu không Alpine khởi tạo lại và Editor.js dựng lại từ bản nháp cũ (mất khối vừa thêm). --}}
     <div
+        wire:ignore.self
         x-load
         x-load-src="{{ FilamentAsset::getAlpineComponentSrc('lesson-editor') }}"
         x-data="lessonEditor({

@@ -58,6 +58,11 @@ class AppServiceProvider extends ServiceProvider
                 ->response($tooMany),
         ]);
 
+        // Đổi mật khẩu trong app: chặn dò mật khẩu hiện tại
+        RateLimiter::for('change-password', fn (Request $request) => Limit::perMinute(5)
+            ->by('change-password:' . ($request->user()?->getKey() ?? $request->ip()))
+            ->response($tooMany));
+
         RateLimiter::for('app-session-ping', fn (Request $request) => Limit::perMinute(30)
             ->by('app-ping:' . ($request->user()?->getKey() ?? $request->ip()))
             ->response($tooMany));

@@ -31,6 +31,6 @@ class PlacementDimension extends Model
     /** Mức độ, từ cao xuống thấp theo điểm sàn. */
     public function levels(): HasMany
     {
-        return $this->hasMany(PlacementLevel::class)->orderByDesc('min_score')->orderBy('id');
+        return $this->hasMany(PlacementLevel::class)->orderByDesc('min_percent')->orderBy('id');
     }
 }

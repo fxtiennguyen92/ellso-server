@@ -7,9 +7,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * Mục ngang cấp trong lộ trình: chương (kind = chapter, chứa bài) hoặc bài thi (kind = exam, trỏ tới đề trong
+ * ngân hàng đề). Chương và bài thi dùng chung thứ tự kéo thả (sort_order).
+ */
 class PathChapter extends Model
 {
-    protected $fillable = ['learning_path_id', 'title', 'color', 'sort_order'];
+    public const KIND_CHAPTER = 'chapter';
+
+    public const KIND_EXAM = 'exam';
+
+    protected $fillable = ['learning_path_id', 'kind', 'exam_id', 'title', 'color', 'sort_order'];
+
+    protected $attributes = ['kind' => self::KIND_CHAPTER];
 
     protected function casts(): array
     {
@@ -34,5 +44,15 @@ class PathChapter extends Model
     public function pathLessons(): HasMany
     {
         return $this->hasMany(PathLesson::class)->orderBy('sort_order');
+    }
+
+    public function exam(): BelongsTo
+    {
+        return $this->belongsTo(Exam::class);
+    }
+
+    public function isExam(): bool
+    {
+        return $this->kind === self::KIND_EXAM;
     }
 }

@@ -41,8 +41,21 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        if (app()->isLocal()) {
-            $this->call(DemoCourseSeeder::class);
+        // Local: luôn có dữ liệu demo. Production: chỉ khi bật ALLOW_DEMO_SEED=true (giai đoạn test trước launch).
+        if (app()->isLocal() || config('ellso.allow_demo_seed')) {
+            // Dữ liệu demo đầy đủ cho app: khoá học + lộ trình + bài thi, bài đánh giá năng lực, khuyến mãi,
+            // chương trình huấn luyện, workshop, sách
+            $this->call([
+                DemoCourseSeeder::class,
+                DemoCatalogSeeder::class,
+                DemoPlacementTestSeeder::class,
+                DemoCampaignSeeder::class,
+                DemoTrainingSeeder::class,
+                DemoWorkshopSeeder::class,
+                DemoBookSeeder::class,
+                DemoPdfSeeder::class,
+                DemoMyLearningSeeder::class,
+            ]);
         }
     }
 }

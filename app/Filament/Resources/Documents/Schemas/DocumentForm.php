@@ -8,7 +8,9 @@ use App\Enums\UserRole;
 use App\Enums\VideoStatus;
 use App\Models\Document;
 use App\Models\DocumentTopic;
+use App\Rules\DocumentFile;
 use App\Support\DocumentStorage;
+use App\Support\VideoChapters;
 use Closure;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -103,6 +105,19 @@ class DocumentForm
                             ->required(fn (Get $get, ?Document $record) => self::type($get) === DocumentType::Video && ! $record?->hls_path)
                             ->helperText('MP4 / MOV / MKV / WebM, tối đa ' . config('ellso.documents.video_max_upload_mb') . ' MB. Sau khi lưu, hệ thống tự cắt thành HLS 480p + 720p (mã hoá) và đẩy lên kho lưu trữ — mất vài phút tuỳ độ dài video.')
                             ->visible(fn (Get $get) => self::type($get) === DocumentType::Video),
+                        Textarea::make('video_chapters_text')
+                            ->label('Mốc thời gian')
+                            ->rows(6)
+                            ->placeholder("00:00 Giới thiệu\n02:15 Cài đặt công cụ\n10:40 Thực hành\n1:05:00 Tổng kết")
+                            ->helperText('Mỗi dòng một mốc: "mm:ss Nội dung" (video dài hơn 1 giờ dùng "h:mm:ss"). Thứ tự tự sắp theo thời gian. Trên app, bấm vào mốc sẽ tua video tới đó.')
+                            ->afterStateHydrated(fn (Textarea $component, ?Document $record) => $component->state(VideoChapters::format($record?->video_chapters)))
+                            ->rule(fn (?Document $record) => function (string $attribute, $value, Closure $fail) use ($record) {
+                                foreach (VideoChapters::parse($value, $record?->duration_seconds)['errors'] as $error) {
+                                    $fail($error);
+                                }
+                            })
+                            ->dehydrateStateUsing(fn (?string $state) => $state)
+                            ->visible(fn (Get $get) => self::type($get) === DocumentType::Video),
 
                         // PDF / Sách
                         FileUpload::make('file_path')
@@ -111,9 +126,14 @@ class DocumentForm
                             ->directory(fn (Get $get) => 'files/' . (self::type($get)?->value ?? 'pdf'))
                             ->visibility('private')
                             ->moveFiles()
+                            // Hộp chọn file chỉ hiện PDF / EPUB; nhận diện theo đuôi file (mimeTypeMap) chứ không tin MIME trình duyệt gửi.
+                            // MIME phía server của EPUB thất thường (zip / octet-stream) nên nhận cả các loại đó,
+                            // rồi DocumentFile kiểm tra đuôi + nội dung thật (PDF bắt đầu %PDF-, EPUB là zip có container.xml).
                             ->acceptedFileTypes(fn (Get $get) => self::type($get) === DocumentType::Book
-                                ? ['application/pdf', 'application/epub+zip']
-                                : ['application/pdf'])
+                                ? ['application/pdf', 'application/epub+zip', 'application/zip', 'application/x-zip-compressed', 'application/octet-stream']
+                                : ['application/pdf', 'application/octet-stream'])
+                            ->mimeTypeMap(['pdf' => 'application/pdf', 'epub' => 'application/epub+zip'])
+                            ->rule(fn (Get $get) => new DocumentFile(self::type($get) === DocumentType::Book ? ['pdf', 'epub'] : ['pdf']))
                             ->maxSize((int) config('ellso.documents.file_max_upload_mb') * 1024)
                             ->storeFileNamesIn('file_name')
                             ->previewable(false)
@@ -125,6 +145,41 @@ class DocumentForm
                             ->helperText('Học viên có quyền xem thì tải được file sách về máy.')
                             ->default(true)
                             ->visible(fn (Get $get) => self::type($get) === DocumentType::Book),
+
+                        // Sách: đọc thử vài trang / chương đầu (file riêng, ai đăng nhập cũng mở được)
+                        Toggle::make('preview_enabled')
+                            ->label('Cho đọc thử')
+                            ->helperText('Hệ thống cắt phần đầu sách thành một file riêng. Học viên chưa mua vẫn đọc được phần này.')
+                            ->default(true)
+                            ->live()
+                            ->visible(fn (Get $get) => self::type($get) === DocumentType::Book),
+                        Grid::make(2)
+                            ->visible(fn (Get $get) => self::type($get) === DocumentType::Book && $get('preview_enabled'))
+                            ->schema([
+                                TextInput::make('preview_pages')
+                                    ->label('Số trang đọc thử tối đa (PDF)')
+                                    ->helperText('Thực tế lấy số nhỏ hơn giữa số này và 20% số trang của sách (ít nhất 1 trang). VD sách 20 trang, nhập 10 → đọc thử 4 trang.')
+                                    ->integer()
+                                    ->minValue(1)
+                                    ->maxValue(200)
+                                    ->default((int) config('ellso.documents.preview_pages'))
+                                    ->suffix('trang')
+                                    ->required()
+                                    ->visible(fn (?Document $record) => $record?->file_format !== 'epub'),
+                                TextInput::make('preview_chapters')
+                                    ->label('Số chương đọc thử tối đa (EPUB)')
+                                    ->integer()
+                                    ->minValue(1)
+                                    ->maxValue(50)
+                                    ->default((int) config('ellso.documents.preview_chapters'))
+                                    ->suffix('chương')
+                                    ->required()
+                                    ->helperText('Thực tế lấy số nhỏ hơn giữa số này và 20% số chương của sách (ít nhất 1 chương). Chương = mục trong danh sách đọc của file EPUB; trang bìa / mục lục cũng có thể tính là một chương.')
+                                    ->visible(fn (?Document $record) => $record?->file_format !== 'pdf'),
+                            ]),
+                        Callout::make(fn (?Document $record) => self::previewStatus($record))
+                            ->visible(fn (Get $get, ?Document $record) => self::type($get) === DocumentType::Book && $get('preview_enabled') && $record?->preview_status)
+                            ->color(fn (?Document $record) => self::previewColor($record)),
                     ]),
 
                 Section::make('Ai được xem')
@@ -156,7 +211,7 @@ class DocumentForm
                                     ->helperText('Học viên đã được mở khoá học này.'),
                                 Select::make('lessons')
                                     ->label('Theo bài học')
-                                    ->relationship('lessons', 'title')
+                                    ->relationship('lessons', 'title', fn ($query) => $query->library())
                                     ->multiple()
                                     ->searchable()
                                     ->helperText('Bài học đang mở với học viên (theo lộ trình) — không cần học xong.'),
@@ -223,6 +278,31 @@ class DocumentForm
         $type = $get('type');
 
         return $type instanceof DocumentType ? $type : DocumentType::tryFrom((string) $type);
+    }
+
+    /** Trạng thái bản đọc thử: sẵn sàng (N / tổng trang · chương), đang xử lý, lỗi. */
+    private static function previewStatus(?Document $record): HtmlString | string
+    {
+        if (! $record?->preview_status) {
+            return '';
+        }
+        $unit = $record->file_format === 'epub' ? 'chương' : 'trang';
+        $wanted = $record->file_format === 'epub' ? $record->preview_chapters : $record->preview_pages;
+
+        return match ($record->preview_status) {
+            VideoStatus::Ready => 'Bản đọc thử sẵn sàng · ' . $record->preview_count . ' ' . $unit . ' đầu'
+                . ($record->source_count ? ' / ' . $record->source_count . ' ' . $unit : '')
+                . ($record->preview_count !== null && $record->preview_count < $wanted
+                    ? ' (giới hạn 20% cuốn sách)'
+                    : ''),
+            VideoStatus::Failed => new HtmlString('Lỗi tạo bản đọc thử: ' . e((string) $record->preview_error) . '<br>Bấm "Tạo lại bản đọc thử" hoặc tải lại file sách.'),
+            default => 'Bản đọc thử: ' . mb_strtolower($record->preview_status->getLabel()) . '… (tải lại trang để xem).',
+        };
+    }
+
+    private static function previewColor(?Document $record): string
+    {
+        return $record?->preview_status?->getColor() ?? 'gray';
     }
 
     private static function videoStatus(?Document $record): HtmlString | string

@@ -21,23 +21,23 @@ use Filament\Tables\Table;
 use UnitEnum;
 
 /**
- * Tài khoản › Học viên: như Hệ thống › Người dùng (cùng cột, bộ lọc, thao tác) nhưng chỉ học viên,
+ * Học viên › Tài khoản: như Hệ thống › Người dùng (cùng cột, bộ lọc, thao tác) nhưng chỉ học viên,
  * thêm trang **Học bạ** — tổng quan một học viên: khoá học + tiến độ, mở khoá học, kết quả bài kiểm tra
  * đầu vào (năng lực), gói thành viên, lượt dùng app, nhật ký đăng nhập.
  */
 class StudentResource extends UserResource
 {
-    protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedAcademicCap;
+    protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedUser;
 
-    protected static string | UnitEnum | null $navigationGroup = 'Tài khoản';
+    protected static string | UnitEnum | null $navigationGroup = 'Học viên';
 
     protected static ?int $navigationSort = 1;
 
-    protected static ?string $navigationLabel = 'Học viên';
+    protected static ?string $navigationLabel = 'Tài khoản';
 
     protected static ?string $modelLabel = 'học viên';
 
-    protected static ?string $pluralModelLabel = 'Học viên';
+    protected static ?string $pluralModelLabel = 'Tài khoản học viên';
 
     protected static ?string $slug = 'students';
 

@@ -96,7 +96,8 @@ class AuthTest extends TestCase
         $this->withToken($set->json('token'))->getJson('/v1/me')
             ->assertOk()
             ->assertJsonPath('user', null)
-            ->assertJsonPath('data.referrer.name', 'Chị Lan');
+            ->assertJsonPath('data.referrer.name', 'Chị Lan')
+            ->assertJsonPath('data.coins', 0);
 
         $user->refresh();
         $this->assertNotNull($user->password_changed_at);

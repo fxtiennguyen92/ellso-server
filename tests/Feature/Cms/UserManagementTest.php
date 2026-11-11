@@ -6,7 +6,7 @@ use App\Enums\UserLogEvent;
 use App\Enums\UserRole;
 use App\Filament\Resources\Students\Pages\ManageStudentLogs as ManageUserLogs;
 use App\Filament\Resources\Students\Pages\ManageStudents as ManageUsers;
-use App\Filament\Resources\SystemSettings\Pages\ManageSystemSettings; // học viên quản lý ở Tài khoản › Học viên
+use App\Filament\Resources\SystemSettings\Pages\ManageSystemSettings; // học viên quản lý ở Học viên › Tài khoản
 use App\Mail\TempPasswordMail;
 use App\Models\EmailTemplate;
 use App\Models\SystemSetting;

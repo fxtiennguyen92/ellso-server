@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\TrainingCourses\Pages;
 
+use App\Filament\Resources\TrainingCourses\Schemas\TrainingCourseForm;
 use App\Filament\Resources\TrainingCourses\TrainingCourseResource;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
@@ -19,5 +20,10 @@ class EditTrainingCourse extends EditRecord
     protected function getHeaderActions(): array
     {
         return [DeleteAction::make()];
+    }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        return TrainingCourseForm::normalizeTrailer($data, $this->data['trailer_type'] ?? 'none');
     }
 }
