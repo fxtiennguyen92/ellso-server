@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Enums\CourseStatus;
 use App\Enums\CourseType;
+use App\Enums\DiscountType;
 use App\Enums\DocumentType;
 use App\Enums\UserRole;
 use App\Models\Category;
@@ -11,7 +12,6 @@ use App\Models\Course;
 use App\Models\Document;
 use App\Models\PlacementTest;
 use App\Models\PromoCode;
-use App\Enums\DiscountType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -33,7 +33,7 @@ class CartAndCatalogTest extends TestCase
     private function course(array $attrs = []): Course
     {
         return Course::create([
-            'title' => 'Khoá ' . uniqid(),
+            'title' => 'Khoá '.uniqid(),
             'category_id' => $attrs['category_id'] ?? Category::firstOrCreate(['name' => 'Chung'])->id,
             'instructor_id' => User::query()->where('role', UserRole::Instructor)->value('id')
                 ?? User::factory()->create(['role' => UserRole::Instructor])->id,
@@ -48,7 +48,7 @@ class CartAndCatalogTest extends TestCase
     {
         return Document::create([
             'type' => DocumentType::Book,
-            'title' => 'Sách ' . uniqid(),
+            'title' => 'Sách '.uniqid(),
             'author_name' => 'Tác giả',
             'price' => 120000,
             'status' => 'published',
@@ -73,7 +73,7 @@ class CartAndCatalogTest extends TestCase
             ->assertJsonPath('meta.has_more', true)
             ->assertJsonPath('meta.total', 13);
         $this->getJson('/v1/courses?page=2')->assertJsonCount(3, 'data')->assertJsonPath('meta.has_more', false);
-        $this->getJson('/v1/courses?category_id=' . $a->id)->assertJsonCount(1, 'data');
+        $this->getJson('/v1/courses?category_id='.$a->id)->assertJsonCount(1, 'data');
 
         $names = collect($this->getJson('/v1/courses/categories')->json('data'))->pluck('name')->all();
         $this->assertEqualsCanonicalizing(['A con', 'B'], $names);
@@ -168,5 +168,28 @@ class CartAndCatalogTest extends TestCase
         $this->postJson("/v1/courses/{$free->id}/enroll")->assertCreated()->assertJsonPath('data.enrolled', true)->assertJsonPath('data.started', false);
         $this->postJson("/v1/courses/{$free->id}/enroll")->assertOk();
         $this->assertDatabaseHas('course_enrollments', ['user_id' => $this->student->id, 'course_id' => $free->id, 'source' => 'free']);
+    }
+
+    public function test_search_courses_and_documents_in_pages(): void
+    {
+        foreach (range(1, 9) as $i) {
+            $this->course(['title' => "Giao tiếp phần {$i}"]);
+        }
+        $this->course(['title' => 'Marketing', 'short_description' => 'Kỹ năng giao tiếp với khách hàng']);
+        $this->course(['title' => 'Excel nâng cao']);
+
+        $this->getJson('/v1/courses?q=giao tiếp&per_page=7')->assertOk()
+            ->assertJsonCount(7, 'data')->assertJsonPath('meta.has_more', true)->assertJsonPath('meta.total', 10);
+        $this->getJson('/v1/courses?q=giao tiếp&per_page=7&page=2')->assertJsonCount(3, 'data')->assertJsonPath('meta.has_more', false);
+
+        foreach (range(1, 8) as $i) {
+            $this->book(['title' => "Sổ tay giao tiếp {$i}"]);
+        }
+        $this->book(['title' => 'Khác hẳn']);
+        $this->getJson('/v1/documents?q=giao tiếp&page=1&per_page=7')->assertOk()
+            ->assertJsonCount(7, 'data')->assertJsonPath('meta.has_more', true)->assertJsonPath('meta.total', 8);
+        $this->getJson('/v1/documents?q=giao tiếp&page=2&per_page=7')->assertJsonCount(1, 'data');
+        // Không có page → như cũ (danh sách, không meta)
+        $this->getJson('/v1/documents')->assertJsonMissingPath('meta')->assertJsonCount(9, 'data');
     }
 }

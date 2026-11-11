@@ -18,7 +18,7 @@ use Illuminate\Http\Request;
 
 /**
  * Tài liệu cho app (đăng nhập). Server tính sẵn `unlocked` cho học viên; app chỉ hiển thị.
- * - GET    /documents?type=video|pdf|book&topic_id=&teacher_id=&q=   danh sách (mới nhất trước)
+ * - GET    /documents?type=video|pdf|book&topic_id=&teacher_id=&q=   danh sách (mới nhất trước); thêm &page=&per_page= → từng đợt + meta
  * - GET    /documents/topics                           chủ đề để lọc
  * - GET    /documents/{id}                             chi tiết + điều kiện mở
  * - POST   /documents/{id}/play                        video: link HLS (5 phút)
@@ -38,20 +38,31 @@ class DocumentController extends Controller
             'topic_id' => ['nullable', 'integer'],
             'teacher_id' => ['nullable', 'integer'],
             'q' => ['nullable', 'string', 'max:100'],
+            // Có `page` → trả từng đợt `per_page` (mặc định 20) kèm meta {page, has_more, total} (màn Tìm kiếm của app)
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:30'],
         ]);
 
-        $docs = Document::query()
+        $query = Document::query()
             ->published()
             ->when($data['type'] ?? null, fn ($q, $type) => $q->where('type', $type))
             ->when($data['topic_id'] ?? null, fn ($q, $topic) => $q->where('document_topic_id', $topic))
             ->when($data['teacher_id'] ?? null, fn ($q, $teacher) => $q->where('author_id', $teacher))
             ->when($data['q'] ?? null, fn ($q, $term) => $q->where(fn ($w) => $w->where('title', 'like', "%{$term}%")->orWhere(fn ($a) => $a->whereAuthorLike($term))))
             ->latest('published_at')
-            ->with(['authorUser', 'links.course', 'links.lesson'])
-            ->limit(200)
-            ->get();
+            ->latest('id')
+            ->with(['authorUser', 'links.course', 'links.lesson']);
 
-        return response()->json(['data' => $this->present($docs, $request->user())]);
+        if (isset($data['page'])) {
+            $page = $query->paginate($data['per_page'] ?? 20);
+
+            return response()->json([
+                'data' => $this->present(new Collection($page->items()), $request->user()),
+                'meta' => ['page' => $page->currentPage(), 'has_more' => $page->hasMorePages(), 'total' => $page->total()],
+            ]);
+        }
+
+        return response()->json(['data' => $this->present($query->limit(200)->get(), $request->user())]);
     }
 
     public function topics(): JsonResponse

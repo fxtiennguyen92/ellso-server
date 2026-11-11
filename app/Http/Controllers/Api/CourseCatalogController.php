@@ -20,6 +20,7 @@ use Illuminate\Support\Collection;
 /**
  * Khám phá khoá học (app, đã đăng nhập).
  * - GET /courses?category_id=&page=   khoá đã xuất bản, mới nhất trước, 10 khoá / trang (app tải thêm khi cuộn)
+ * - GET /courses?q=&page=&per_page=   tìm kiếm (tên khoá / mô tả ngắn / người hướng dẫn), tải từng đợt
  * - GET /courses/categories           danh mục có khoá đã xuất bản (để lọc)
  * - GET /courses/{id}                  trang giới thiệu khoá (khoá đã xuất bản, hoặc khoá học viên đã ghi danh)
  * - POST /courses/{id}/enroll          ghi danh khoá MIỄN PHÍ (nút "Bắt đầu học"); đã ghi danh → giữ nguyên
@@ -38,7 +39,11 @@ class CourseCatalogController extends Controller
         $data = $request->validate([
             'category_id' => ['nullable', 'integer'],
             'page' => ['nullable', 'integer', 'min:1'],
+            // Tìm kiếm (màn Tìm kiếm của app): theo tên khoá, mô tả ngắn, tên người hướng dẫn; per_page để tải từng đợt
+            'q' => ['nullable', 'string', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:30'],
         ]);
+        $term = trim((string) ($data['q'] ?? ''));
 
         $page = Course::query()
             ->where('status', CourseStatus::Published)
@@ -46,10 +51,14 @@ class CourseCatalogController extends Controller
                 $ids = Category::query()->where('parent_id', $categoryId)->pluck('id')->push((int) $categoryId);
                 $q->whereIn('category_id', $ids);
             })
+            ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w
+                ->where('title', 'like', "%{$term}%")
+                ->orWhere('short_description', 'like', "%{$term}%")
+                ->orWhereHas('instructor', fn ($i) => $i->where('name', 'like', "%{$term}%"))))
             ->with(['category', 'instructor'])
             ->latest('published_at')
             ->latest('id')
-            ->paginate(self::PER_PAGE);
+            ->paginate($data['per_page'] ?? self::PER_PAGE);
 
         return response()->json([
             'data' => self::present(collect($page->items()), $request->user()),
