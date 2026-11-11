@@ -176,7 +176,8 @@ class CartAndCatalogTest extends TestCase
             $this->course(['title' => "Giao tiếp phần {$i}"]);
         }
         $this->course(['title' => 'Marketing', 'short_description' => 'Kỹ năng giao tiếp với khách hàng']);
-        $this->course(['title' => 'Excel nâng cao']);
+        $this->course(['title' => 'Excel nâng cao', 'category_id' => Category::create(['name' => 'Tin học văn phòng', 'is_active' => true])->id]);
+        $this->getJson('/v1/courses?q=văn phòng')->assertJsonPath('data.0.title', 'Excel nâng cao');
 
         $this->getJson('/v1/courses?q=giao tiếp&per_page=7')->assertOk()
             ->assertJsonCount(7, 'data')->assertJsonPath('meta.has_more', true)->assertJsonPath('meta.total', 10);
