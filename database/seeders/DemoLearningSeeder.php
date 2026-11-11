@@ -72,7 +72,7 @@ class DemoLearningSeeder extends Seeder
             }
         }
 
-        $this->command?->info('Đã tạo câu hỏi mẫu + ghi danh / tiến độ cho ' . $students->count() . ' học viên demo.');
+        $this->command?->info('Đã tạo câu hỏi mẫu + ghi danh / tiến độ cho '.$students->count().' học viên demo.');
     }
 
     private function learn(LearningProgress $progress, User $student, Lesson $lesson, CourseEnrollment $enrollment): void

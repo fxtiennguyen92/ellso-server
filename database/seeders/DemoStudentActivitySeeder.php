@@ -68,7 +68,7 @@ class DemoStudentActivitySeeder extends Seeder
 
                     $rows[] = [
                         'user_id' => $student->id,
-                        'device_id' => 'demo-' . $student->id,
+                        'device_id' => 'demo-'.$student->id,
                         'device_name' => $devices[$platform],
                         'platform' => $platform,
                         'started_at' => $start,
@@ -95,7 +95,7 @@ class DemoStudentActivitySeeder extends Seeder
     }
 
     /** @param  array<int|string, int>  $weights */
-    private function weighted(array $weights): int | string
+    private function weighted(array $weights): int|string
     {
         $pick = random_int(1, array_sum($weights));
         foreach ($weights as $key => $weight) {

@@ -10,6 +10,7 @@ use App\Models\Document;
 use App\Models\DocumentTopic;
 use App\Models\User;
 use App\Support\DocumentStorage;
+use App\Support\MediaStorage;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -105,6 +106,7 @@ class DemoBookSeeder extends Seeder
                 'description' => $b['description'],
                 'document_topic_id' => $topic->id,
                 'cover_color' => $b['color'],
+                'cover_image' => $this->cover('books/demo/cover-'.Str::slug($b['title']).'.png', $b['color'], $i),
                 'is_free' => $b['access'] === 'free',
                 'requires_membership' => $b['access'] === 'membership',
                 'price' => $b['price'] ?? null,
@@ -124,6 +126,65 @@ class DemoBookSeeder extends Seeder
                 (new GenerateBookPreview($doc->id))->handle();
             }
         }
+    }
+
+    /** Màu bìa (base, edge) theo bảng màu chương của app (src/theme/tokens.ts › chapterPalette). */
+    private const COVER_RGB = [
+        'sage' => [[78, 122, 92], [55, 85, 64]],
+        'teal' => [[46, 110, 112], [32, 77, 78]],
+        'indigo' => [[74, 86, 160], [52, 60, 112]],
+        'plum' => [[118, 80, 138], [83, 56, 97]],
+        'terracotta' => [[169, 85, 58], [118, 59, 41]],
+        'ochre' => [[148, 102, 30], [104, 71, 21]],
+    ];
+
+    /** Ảnh bìa mẫu 600×900 (vẽ bằng GD: nền chuyển màu + hình khối, mỗi cuốn một kiểu), lưu vào ổ ảnh. */
+    private function cover(string $path, ChapterColor $color, int $variant): string
+    {
+        [$base, $edge] = self::COVER_RGB[$color->value] ?? self::COVER_RGB['sage'];
+        $w = 600;
+        $h = 900;
+        $img = imagecreatetruecolor($w, $h);
+        for ($y = 0; $y < $h; $y++) {
+            $t = $y / $h;
+            $c = array_map(fn ($a, $b) => (int) round($a + ($b - $a) * $t), $base, $edge);
+            imageline($img, 0, $y, $w, $y, imagecolorallocate($img, ...$c));
+        }
+        $soft = imagecolorallocatealpha($img, 255, 255, 255, 105);
+        $softer = imagecolorallocatealpha($img, 255, 255, 255, 116);
+        $accent = imagecolorallocatealpha($img, 255, 214, 102, 40);
+        imagesetthickness($img, 3);
+        switch ($variant % 3) {
+            case 0: // vòng tròn đồng tâm
+                foreach ([120, 200, 280] as $r) {
+                    imageellipse($img, 470, 220, $r * 2, $r * 2, $soft);
+                }
+                imagefilledellipse($img, 470, 220, 90, 90, $accent);
+                break;
+            case 1: // sóng các dải
+                for ($k = 0; $k < 6; $k++) {
+                    imagefilledrectangle($img, 0, 140 + $k * 70, $w, 160 + $k * 70, $softer);
+                }
+                imagefilledellipse($img, 140, 300, 120, 120, $accent);
+                break;
+            default: // lưới chấm + khối vuông
+                for ($x = 0; $x < 6; $x++) {
+                    for ($y = 0; $y < 6; $y++) {
+                        imagefilledellipse($img, 70 + $x * 50, 120 + $y * 50, 10, 10, $soft);
+                    }
+                }
+                imagefilledrectangle($img, 360, 360, 520, 520, $accent);
+        }
+        // gáy sách + vạch tiêu đề (không có chữ: font tiếng Việt không chắc có trên máy chạy seeder)
+        imagefilledrectangle($img, 0, 0, 18, $h, imagecolorallocatealpha($img, 0, 0, 0, 95));
+        imagefilledrectangle($img, 70, 640, 470, 660, imagecolorallocatealpha($img, 255, 255, 255, 30));
+        imagefilledrectangle($img, 70, 690, 330, 704, imagecolorallocatealpha($img, 255, 255, 255, 70));
+        imagefilledrectangle($img, 70, 790, 210, 800, imagecolorallocatealpha($img, 255, 255, 255, 85));
+        ob_start();
+        imagepng($img);
+        MediaStorage::disk()->put($path, ob_get_clean());
+
+        return $path;
     }
 
     /** Tạo file EPUB 3 (kèm toc.ncx cho trình đọc cũ) lên ổ tài liệu riêng tư. Trả kích thước file. */

@@ -76,7 +76,7 @@ class DemoPartnerEventSeeder extends Seeder
             ]);
         }
 
-        $this->command?->info('Đã tạo ' . count($events) . ' sự kiện ngoài lề mẫu.');
+        $this->command?->info('Đã tạo '.count($events).' sự kiện ngoài lề mẫu.');
     }
 
     /** Ảnh 1280 × 720 đơn giản theo màu. */

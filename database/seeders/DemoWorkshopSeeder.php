@@ -31,7 +31,7 @@ class DemoWorkshopSeeder extends Seeder
         $titles = ['Giao tiếp tự tin khi thuyết trình', 'Viết email công việc chuyên nghiệp'];
         Workshop::whereIn('title', $titles)->get()->each->forceDelete();
         $trainerId = User::where('role', UserRole::Instructor)->value('id');
-        $at = fn (int $days, string $time) => CarbonImmutable::parse(now('Asia/Ho_Chi_Minh')->addDays($days)->toDateString() . ' ' . $time, 'Asia/Ho_Chi_Minh')->utc();
+        $at = fn (int $days, string $time) => CarbonImmutable::parse(now('Asia/Ho_Chi_Minh')->addDays($days)->toDateString().' '.$time, 'Asia/Ho_Chi_Minh')->utc();
 
         $speaking = Workshop::create([
             'title' => $titles[0],
@@ -75,7 +75,7 @@ class DemoWorkshopSeeder extends Seeder
             $first->registrations()->create(['user_id' => $member->id, 'source' => RegistrationSource::App]);
         }
 
-        $this->command?->info('Đã tạo 2 workshop mẫu (' . $members->count() . ' người đăng ký demo).');
+        $this->command?->info('Đã tạo 2 workshop mẫu ('.$members->count().' người đăng ký demo).');
     }
 
     /** Banner 1280 × 720 đơn giản (màu Ellso). */

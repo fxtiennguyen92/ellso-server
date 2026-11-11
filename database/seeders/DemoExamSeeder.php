@@ -2,12 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Enums\UnlockMode;
 use App\Models\Course;
 use App\Models\Exam;
 use App\Models\Lesson;
 use App\Models\PathChapter;
 use App\Models\PathLesson;
-use App\Enums\UnlockMode;
 use Illuminate\Database\Seeder;
 use RuntimeException;
 
@@ -71,7 +71,7 @@ class DemoExamSeeder extends Seeder
             }
         }
 
-        $this->command?->info('Đã tạo 2 đề thi mẫu và đặt vào lộ trình của ' . Course::count() . ' khoá (kèm 1 bài coaching mỗi lộ trình).');
+        $this->command?->info('Đã tạo 2 đề thi mẫu và đặt vào lộ trình của '.Course::count().' khoá (kèm 1 bài coaching mỗi lộ trình).');
     }
 
     private function exam(string $title, string $intro, int $draw, ?int $minutes, int $count): Exam

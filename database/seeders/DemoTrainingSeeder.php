@@ -40,7 +40,7 @@ class DemoTrainingSeeder extends Seeder
         $titles = ['Kỹ năng quản lý đội nhóm', 'Tư duy phản biện cho người đi làm'];
         TrainingCourse::whereIn('title', $titles)->get()->each->forceDelete();
         $trainerId = User::where('role', UserRole::Instructor)->value('id');
-        $at = fn (int $days, string $time) => CarbonImmutable::parse(now('Asia/Ho_Chi_Minh')->addDays($days)->toDateString() . ' ' . $time, 'Asia/Ho_Chi_Minh')->utc();
+        $at = fn (int $days, string $time) => CarbonImmutable::parse(now('Asia/Ho_Chi_Minh')->addDays($days)->toDateString().' '.$time, 'Asia/Ho_Chi_Minh')->utc();
 
         $team = TrainingCourse::create([
             'title' => $titles[0],

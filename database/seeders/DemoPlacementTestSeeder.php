@@ -35,7 +35,7 @@ class DemoPlacementTestSeeder extends Seeder
 
         $this->learningTest();
         $this->thinkingTest();
-        $this->command?->info('Đã tạo 2 bài mẫu (đang dùng): "' . self::TITLE . '", "' . self::TITLE_2 . '" + bài làm demo.');
+        $this->command?->info('Đã tạo 2 bài mẫu (đang dùng): "'.self::TITLE.'", "'.self::TITLE_2.'" + bài làm demo.');
     }
 
     /** Bài 1: Tiếp thu / Kỷ luật / Kinh nghiệm — 6 câu, làm hết. */

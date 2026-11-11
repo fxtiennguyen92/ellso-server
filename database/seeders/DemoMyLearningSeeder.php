@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\EnrollmentSource;
 use App\Models\Course;
+use App\Models\Document;
 use App\Models\LessonProgress;
 use App\Models\User;
 use App\Services\LearningProgress;
@@ -16,6 +17,7 @@ use RuntimeException;
  * - 1 khoá có phí được admin mở, chưa học bài nào (vẫn hiện — đã sở hữu)
  * - 1 khoá miễn phí đã học 1 bài (hiện)
  * - 1 khoá miễn phí mới bấm vào, chưa học (KHÔNG hiện)
+ * Kèm vài tài liệu đã lưu (mục "Tài liệu của tôi").
  * Chạy tay:  php artisan db:seed --class=DemoMyLearningSeeder
  */
 class DemoMyLearningSeeder extends Seeder
@@ -61,5 +63,11 @@ class DemoMyLearningSeeder extends Seeder
                 $enrollment->forceFill(['last_activity_at' => now()->subDays($daysAgo)])->save();
             }
         }
+
+        // Tài liệu đã lưu: 1 PDF miễn phí, 1 PDF gói thành viên (đang khoá), 2 sách
+        $saved = Document::query()->published()->whereIn('title', [
+            'Checklist 12 câu hỏi phản biện', 'Mẫu kế hoạch họp 1-1 với nhân viên', 'Giao tiếp không áp lực', 'Thuyết trình tự tin',
+        ])->pluck('id')->mapWithKeys(fn ($id) => [$id => ['created_at' => now()]]);
+        $student->savedDocuments()->syncWithoutDetaching($saved->all());
     }
 }
