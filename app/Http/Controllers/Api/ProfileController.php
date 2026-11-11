@@ -11,8 +11,8 @@ use App\Models\UserLog;
 use App\Support\MediaStorage;
 use App\Support\ReferralCode;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
@@ -68,7 +68,7 @@ class ProfileController extends Controller
         $ext = strtolower($file->guessExtension() ?: 'jpg');
         // Tên ngẫu nhiên mỗi lần đổi → link mới, không dính cache ảnh cũ (CDN cache lâu)
         // S3 (BizFly): quyền đọc công khai theo ACL cấu hình sẵn của ổ media; local: cần visibility public
-        $path = MediaStorage::disk()->putFileAs("avatars/{$user->id}", $file, Str::random(24) . ".{$ext}", MediaStorage::isS3() ? [] : ['visibility' => 'public']);
+        $path = MediaStorage::disk()->putFileAs("avatars/{$user->id}", $file, Str::random(24).".{$ext}", MediaStorage::isS3() ? [] : ['visibility' => 'public']);
         if (! $path) {
             abort(500, 'Không lưu được ảnh, vui lòng thử lại.');
         }

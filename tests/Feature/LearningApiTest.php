@@ -110,6 +110,8 @@ class LearningApiTest extends TestCase
 
         // Chưa có lộ trình → câu hỏi phân loại
         $api()->getJson('/v1/my/courses')->assertOk()
+            ->assertJsonPath('data.0.source', 'admin')
+            ->assertJsonPath('data.0.started', false)
             ->assertJsonPath('data.0.needs_path', true)
             ->assertJsonPath('data.0.progress.percent', null);
         $api()->getJson("/v1/my/courses/{$this->course->id}")->assertOk()

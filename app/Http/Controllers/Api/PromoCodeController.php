@@ -61,7 +61,7 @@ class PromoCodeController extends Controller
             'total' => $result['total'],
             'eligible_course_ids' => $result['eligible_course_ids'],
             'ends_at' => $promo->ends_at?->toIso8601String(),
-            'message' => 'Áp dụng mã thành công: giảm ' . number_format($result['discount'], 0, ',', '.') . ' ₫.',
+            'message' => 'Áp dụng mã thành công: giảm '.number_format($result['discount'], 0, ',', '.').' ₫.',
         ]);
     }
 }

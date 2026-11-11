@@ -55,7 +55,8 @@ class ReaderController extends Controller
     /** GET /reader/file/{id}/{kind} (có chữ ký, hạn ngắn) — stream file đọc thử / cả cuốn. */
     public function file(int $id, string $kind): StreamedResponse
     {
-        $doc = Document::query()->whereKey($id)->where('type', DocumentType::Book)->firstOrFail();
+        $doc = Document::query()->whereKey($id)->whereIn('type', [DocumentType::Book, DocumentType::Pdf])->firstOrFail();
+        abort_if($doc->type === DocumentType::Pdf && $kind !== self::KIND_FULL, 404);
         $path = $kind === self::KIND_FULL ? $doc->file_path : $doc->preview_path;
         abort_unless($path && DocumentStorage::disk()->exists($path), 404);
 

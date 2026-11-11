@@ -52,6 +52,8 @@ class DatabaseSeeder extends Seeder
                 DemoTrainingSeeder::class,
                 DemoWorkshopSeeder::class,
                 DemoBookSeeder::class,
+                DemoPdfSeeder::class,
+                DemoMyLearningSeeder::class,
             ]);
         }
     }

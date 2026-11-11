@@ -13,6 +13,7 @@ use App\Support\DocumentStorage;
 use App\Support\LessonContent;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 
 /**
@@ -127,9 +128,9 @@ class HlsController extends Controller
         $lines = [];
         foreach (preg_split('/\r?\n/', trim($content)) as $line) {
             if (str_starts_with($line, '#EXT-X-KEY')) {
-                $line = preg_replace('/URI="[^"]*"/', 'URI="' . $keyUrl . '"', $line);
+                $line = preg_replace('/URI="[^"]*"/', 'URI="'.$keyUrl.'"', $line);
             } elseif ($line !== '' && ! str_starts_with($line, '#')) {
-                $line = DocumentStorage::url("{$dir}/" . basename($line), $minutes);
+                $line = DocumentStorage::url("{$dir}/".basename($line), $minutes);
             }
             $lines[] = $line;
         }
@@ -166,14 +167,14 @@ class HlsController extends Controller
      *
      * @param  Document|LessonVideo  $source
      */
-    private function innerExpiry($source): \Illuminate\Support\Carbon
+    private function innerExpiry($source): Carbon
     {
         return now()->addMinutes(max(60, (int) ceil(($source->duration_seconds ?? 0) / 60) + 30));
     }
 
     private function playlist(array $lines): Response
     {
-        return response(implode("\n", $lines) . "\n", 200, [
+        return response(implode("\n", $lines)."\n", 200, [
             'Content-Type' => 'application/vnd.apple.mpegurl',
             'Cache-Control' => 'no-store, private',
         ]);

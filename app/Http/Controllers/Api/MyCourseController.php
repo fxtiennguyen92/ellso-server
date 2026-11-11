@@ -9,10 +9,10 @@ use App\Models\CourseEnrollment;
 use App\Models\PlacementTest;
 use App\Models\User;
 use App\Services\LearningProgress;
+use App\Support\MediaStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
-use App\Support\MediaStorage;
 
 /**
  * Khoá học của tôi (học viên đã đăng nhập).
@@ -115,7 +115,7 @@ class MyCourseController extends Controller
                 $classification->options->pluck('id')->all(),
             ));
             if ($ids === []) {
-                throw ValidationException::withMessages(["answers.{$classification->id}" => 'Vui lòng trả lời: ' . ($classification->question ?: $classification->name)]);
+                throw ValidationException::withMessages(["answers.{$classification->id}" => 'Vui lòng trả lời: '.($classification->question ?: $classification->name)]);
             }
             $answers[$classification->id] = $ids;
         }
@@ -159,6 +159,10 @@ class MyCourseController extends Controller
             ...self::placementData($course, $user),
             'progress' => ['total' => $s['total'], 'completed' => $s['completed'], 'percent' => $s['percent']],
             'next_lesson' => $s['next'] ? ['id' => $s['next']->lesson->id, 'title' => $s['next']->lesson->title] : null,
+            // Nguồn ghi danh (admin | purchase | free | code) + đã học chưa (≥ 1 bài xong hoặc có hoạt động):
+            // app đưa lên mục "Tiếp tục khoá học" mọi khoá đã mua / được cấp, và khoá miễn phí đã học ít nhất 1 bài
+            'source' => $e->source->value,
+            'started' => $s['completed'] > 0 || $e->last_activity_at !== null,
             'enrolled_at' => $e->enrolled_at->toIso8601String(),
             'last_activity_at' => $e->last_activity_at?->toIso8601String(),
             'completed_at' => $e->completed_at?->toIso8601String(),

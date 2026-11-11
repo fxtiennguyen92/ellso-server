@@ -87,7 +87,7 @@ class AuthController extends Controller
 
         $email = $request->input('email');
         $password = (string) $request->input('password');
-        $throttleKey = 'login:' . $email . '|' . $request->ip();
+        $throttleKey = 'login:'.$email.'|'.$request->ip();
         $maxAttempts = config('ellso.auth.login_max_attempts_per_minute');
 
         if (RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
@@ -268,7 +268,7 @@ class AuthController extends Controller
     private function issueThrottled(User $user, TempPasswordReason $reason, Request $request): void
     {
         $cooldown = config('ellso.auth.forgot_password.cooldown_seconds');
-        $dailyKey = 'forgot-password:day:' . $user->getKey();
+        $dailyKey = 'forgot-password:day:'.$user->getKey();
         $inCooldown = $user->temp_password_sent_at?->gt(now()->subSeconds($cooldown)) ?? false;
         $overDaily = RateLimiter::tooManyAttempts($dailyKey, config('ellso.auth.forgot_password.max_per_email_per_day'));
 

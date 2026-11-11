@@ -107,7 +107,8 @@ class DocumentController extends Controller
             'format' => $doc->file_format,
             'file_name' => $doc->file_name,
             'download_url' => $doc->allow_download ? DocumentStorage::downloadUrl($doc->file_path, $doc->file_name ?: basename($doc->file_path), $ttl) : null,
-            'reader_url' => $doc->type === DocumentType::Book ? ReaderController::readerUrl($doc, ReaderController::KIND_FULL, $ttl) : null,
+            // Sách và PDF: trang đọc của server (pdf.js / epub.js) — app mở trong WebView / iframe
+            'reader_url' => ReaderController::readerUrl($doc, ReaderController::KIND_FULL, $ttl),
             'expires_at' => now()->addMinutes($ttl)->toIso8601String(),
         ]]);
     }

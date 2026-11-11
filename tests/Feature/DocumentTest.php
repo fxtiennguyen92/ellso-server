@@ -90,6 +90,10 @@ class DocumentTest extends TestCase
         $open = $this->api()->postJson("/v1/documents/{$free->id}/open")->assertOk()->json('data');
         $this->assertNotEmpty($open['url']);
         $this->assertNull($open['download_url']); // PDF không cho tải
+        // PDF cũng mở bằng trình đọc của server (pdf.js); file đi qua link có chữ ký
+        $this->assertStringContainsString('format=pdf', $open['reader_url']);
+        parse_str(parse_url($open['reader_url'], PHP_URL_QUERY), $q);
+        $this->get($q['file'])->assertOk();
 
         // Mở gói thành viên + vào khoá học → mở được
         app(MembershipService::class)->grant($this->student, MembershipSource::Admin, 0);

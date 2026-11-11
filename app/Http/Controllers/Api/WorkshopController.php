@@ -118,8 +118,8 @@ class WorkshopController extends Controller
             ->filter(fn (WorkshopRegistration $r) => $r->session?->workshop !== null)
             // Buổi chưa kết thúc trước (gần nhất trước), rồi buổi đã qua (mới nhất trước)
             ->sortBy(fn (WorkshopRegistration $r) => $r->session->ends_at->isFuture()
-                ? '0' . $r->session->starts_at->format('YmdHis')
-                : '1' . (99999999999999 - (int) $r->session->starts_at->format('YmdHis')))
+                ? '0'.$r->session->starts_at->format('YmdHis')
+                : '1'.(99999999999999 - (int) $r->session->starts_at->format('YmdHis')))
             ->values();
         $ids = $registrations->pluck('workshop_session_id')->all();
 

@@ -38,7 +38,7 @@ class CartController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'type' => ['required', 'in:' . CartItem::TYPE_COURSE . ',' . CartItem::TYPE_DOCUMENT],
+            'type' => ['required', 'in:'.CartItem::TYPE_COURSE.','.CartItem::TYPE_DOCUMENT],
             'id' => ['required', 'integer'],
         ]);
         $user = $request->user();
