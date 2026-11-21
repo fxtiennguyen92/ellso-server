@@ -2,10 +2,13 @@
 
 namespace Database\Seeders;
 
+use App\Enums\RegistrationSource;
 use App\Enums\TrainingCourseStatus;
 use App\Enums\UserRole;
+use App\Models\TrainingAttendance;
 use App\Models\TrainingCourse;
 use App\Models\TrainingLocation;
+use App\Models\TrainingRegistration;
 use App\Models\TrainingSession;
 use App\Models\User;
 use App\Support\MediaStorage;
@@ -64,7 +67,7 @@ class DemoTrainingSeeder extends Seeder
 
         $critical = TrainingCourse::create([
             'title' => $titles[1],
-            'summary' => '2 buổi tối thực hành đặt câu hỏi, đánh giá lập luận và ra quyết định dựa trên dữ kiện.',
+            'summary' => '3 buổi tối thực hành đặt câu hỏi, đánh giá lập luận và ra quyết định dựa trên dữ kiện.',
             'banner_path' => $this->banner('trainings/banners/demo-tu-duy.png', [99, 102, 241]),
             'price' => 0,
             'capacity' => 12,
@@ -75,8 +78,19 @@ class DemoTrainingSeeder extends Seeder
                 ['type' => 'bullets', 'data' => ['title' => 'Bạn sẽ học được', 'items' => ['Nhận ra lỗi lập luận thường gặp', 'Đặt câu hỏi đúng trước khi quyết định']]],
             ],
         ]);
-        foreach ([12, 19] as $day) {
+        // Đang diễn ra: buổi 1 đã học (3 ngày trước), buổi 2 hôm nay → mã QR điểm danh có hiệu lực hôm nay
+        foreach ([-3, 0, 7] as $day) {
             TrainingSession::create(['training_course_id' => $critical->id, 'training_location_id' => $cafeA->id, 'starts_at' => $at($day, '19:00'), 'ends_at' => $at($day, '21:00')]);
+        }
+        // Học viên demo đã đăng ký (có vé) + đã có mặt buổi 1
+        if ($student = User::where('email', 'hocvien@ellso.test')->first()) {
+            $reg = TrainingRegistration::create(['training_course_id' => $critical->id, 'user_id' => $student->id, 'source' => RegistrationSource::Admin]);
+            TrainingAttendance::create([
+                'training_registration_id' => $reg->id,
+                'training_session_id' => $critical->activeSessions()->first()->id,
+                'checked_in_at' => $at(-3, '18:52'),
+                'method' => TrainingAttendance::STAFF_SCAN,
+            ]);
         }
 
         $this->command?->info('Đã tạo 2 chương trình huấn luyện mẫu + 2 địa điểm.');

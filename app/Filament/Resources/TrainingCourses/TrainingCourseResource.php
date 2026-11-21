@@ -6,10 +6,12 @@ use App\Enums\TrainingCourseStatus;
 use App\Filament\Resources\TrainingCourses\Pages\CreateTrainingCourse;
 use App\Filament\Resources\TrainingCourses\Pages\EditTrainingCourse;
 use App\Filament\Resources\TrainingCourses\Pages\ListTrainingCourses;
+use App\Filament\Resources\TrainingCourses\Pages\ManageTrainingAttendance;
 use App\Filament\Resources\TrainingCourses\Pages\ManageTrainingRegistrations;
 use App\Filament\Resources\TrainingCourses\Pages\ManageTrainingSessions;
 use App\Filament\Resources\TrainingCourses\Schemas\TrainingCourseForm;
 use App\Models\TrainingCourse;
+use App\Support\MediaStorage;
 use App\Support\Vnd;
 use BackedEnum;
 use Filament\Actions\ActionGroup;
@@ -27,7 +29,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
-use App\Support\MediaStorage;
 
 /**
  * Đào tạo › Chương trình huấn luyện (offline). Tab: Thông tin · Lịch các buổi · Người đăng ký.
@@ -38,9 +39,9 @@ class TrainingCourseResource extends Resource
 {
     protected static ?string $model = TrainingCourse::class;
 
-    protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedUserGroup;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
 
-    protected static string | UnitEnum | null $navigationGroup = 'Đào tạo';
+    protected static string|UnitEnum|null $navigationGroup = 'Đào tạo';
 
     protected static ?int $navigationSort = 4;
 
@@ -82,7 +83,7 @@ class TrainingCourseResource extends Resource
                 TextColumn::make('title')
                     ->label('Chương trình')
                     ->weight('medium')
-                    ->description(fn (TrainingCourse $record) => $record->trainer ? 'Hướng dẫn: ' . $record->trainer->name : $record->summary)
+                    ->description(fn (TrainingCourse $record) => $record->trainer ? 'Hướng dẫn: '.$record->trainer->name : $record->summary)
                     ->searchable()
                     ->wrap(),
                 TextColumn::make('price')
@@ -95,15 +96,15 @@ class TrainingCourseResource extends Resource
                     ->state(function (TrainingCourse $record) {
                         $first = $record->activeSessions->first();
 
-                        return $first ? $record->active_sessions_count . ' buổi · từ ' . $first->dateLabel() : 'Chưa có lịch';
+                        return $first ? $record->active_sessions_count.' buổi · từ '.$first->dateLabel() : 'Chưa có lịch';
                     })
                     ->description(fn (TrainingCourse $record) => ($first = $record->activeSessions->first())
-                        ? 'Buổi 1 · ' . $first->location?->label
+                        ? 'Buổi 1 · '.$first->location?->label
                         : null)
                     ->color(fn (TrainingCourse $record) => $record->active_sessions_count ? null : 'gray'),
                 TextColumn::make('registrations_count')
                     ->label('Đăng ký')
-                    ->formatStateUsing(fn (int $state, TrainingCourse $record) => $state . ' / ' . $record->capacity)
+                    ->formatStateUsing(fn (int $state, TrainingCourse $record) => $state.' / '.$record->capacity)
                     ->color(fn (int $state, TrainingCourse $record) => $state >= $record->capacity ? 'danger' : null)
                     ->url(fn (TrainingCourse $record) => ManageTrainingRegistrations::getUrl(['record' => $record]))
                     ->alignCenter(),
@@ -122,7 +123,7 @@ class TrainingCourseResource extends Resource
                         ->excludeAttributes(['active_sessions_count', 'registrations_count'])
                         ->modalDescription('Tạo bản sao (nháp) với cùng thông tin, banner, trailer và nội dung — chưa có lịch các buổi và người đăng ký. Dùng khi muốn mở lại chương trình lần nữa.')
                         ->beforeReplicaSaved(function (TrainingCourse $replica) {
-                            $replica->title = $replica->title . ' (bản sao)';
+                            $replica->title = $replica->title.' (bản sao)';
                             $replica->status = TrainingCourseStatus::Draft;
                             $replica->created_by_id = auth()->id();
                         })
@@ -148,6 +149,7 @@ class TrainingCourseResource extends Resource
             EditTrainingCourse::class,
             ManageTrainingSessions::class,
             ManageTrainingRegistrations::class,
+            ManageTrainingAttendance::class,
         ]);
     }
 
@@ -159,6 +161,7 @@ class TrainingCourseResource extends Resource
             'edit' => EditTrainingCourse::route('/{record}/edit'),
             'sessions' => ManageTrainingSessions::route('/{record}/sessions'),
             'registrations' => ManageTrainingRegistrations::route('/{record}/registrations'),
+            'attendance' => ManageTrainingAttendance::route('/{record}/attendance'),
         ];
     }
 }

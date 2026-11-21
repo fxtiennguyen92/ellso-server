@@ -31,7 +31,8 @@ class PromoCodeController extends Controller
         $courses = Course::query()
             ->whereKey($data['course_ids'])
             ->where('status', CourseStatus::Published)
-            ->get(['id', 'title', 'price', 'category_id']);
+            ->with('categories')
+            ->get(['id', 'title', 'price']);
 
         if ($courses->count() !== count($data['course_ids'])) {
             throw ValidationException::withMessages(['course_ids' => 'Khoá học không tồn tại hoặc chưa mở bán.']);

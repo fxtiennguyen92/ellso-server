@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\DiscountType;
 use App\Enums\PromoCodeStatus;
 use App\Support\ReferralCode;
+use App\Support\Vnd;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -155,15 +156,16 @@ class PromoCode extends Model
             return true;
         }
 
-        if (! $course->category_id) {
+        // Khoá thuộc nhiều danh mục: áp dụng nếu một trong các danh mục (hoặc danh mục cha của nó) được chọn
+        $course->loadMissing('categories');
+        if ($course->categories->isEmpty()) {
             return false;
         }
 
         $categoryIds = $this->categories->pluck('id');
-        $course->loadMissing('category');
 
-        return $categoryIds->contains($course->category_id)
-            || ($course->category?->parent_id && $categoryIds->contains($course->category->parent_id));
+        return $course->categories->contains(fn (Category $c) => $categoryIds->contains($c->id)
+            || ($c->parent_id && $categoryIds->contains($c->parent_id)));
     }
 
     /** Tóm tắt mức giảm: "5% · tối đa 500.000 ₫" / "200.000 ₫". */
@@ -172,7 +174,7 @@ class PromoCode extends Model
         if ($this->discount_type === DiscountType::Percent) {
             $pct = rtrim(rtrim(number_format((float) $this->discount_value, 2, ',', '.'), '0'), ',');
 
-            return $pct . '%' . ($this->max_discount ? ' · tối đa ' . self::money($this->max_discount) : '');
+            return $pct.'%'.($this->max_discount ? ' · tối đa '.self::money($this->max_discount) : '');
         }
 
         return self::money((int) $this->discount_value);
@@ -180,6 +182,6 @@ class PromoCode extends Model
 
     public static function money(int $amount): string
     {
-        return \App\Support\Vnd::full($amount);
+        return Vnd::full($amount);
     }
 }

@@ -6,11 +6,13 @@ use App\Enums\TrainingCourseStatus;
 use App\Models\Concerns\CleansUpFiles;
 use App\Support\MediaStorage;
 use App\Support\YouTube;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 /**
  * Chương trình huấn luyện offline: một chương trình diễn ra qua nhiều buổi (sessions: buổi 1 … buổi n, theo ngày).
@@ -50,6 +52,14 @@ class TrainingCourse extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::replicating(fn (self $copy) => $copy->checkin_token = null); // bản sao có mã QR riêng
+        static::creating(function (TrainingCourse $c) {
+            $c->checkin_token ??= Str::random(32);
+        });
+    }
+
     public function sessions(): HasMany
     {
         return $this->hasMany(TrainingSession::class)->orderBy('starts_at')->orderBy('id');
@@ -82,10 +92,44 @@ class TrainingCourse extends Model
         return $this->belongsTo(User::class, 'created_by_id');
     }
 
-    /** Hiện trên app: đang mở và còn ít nhất một buổi sắp diễn ra (chưa huỷ). */
+    /**
+     * Hiện trên app: đang mở và còn ít nhất một buổi CHƯA KẾT THÚC (chưa huỷ) — tức là hiện cho đến khi qua hết buổi cuối,
+     * kể cả lúc chương trình đang diễn ra.
+     */
     public function scopeListed(Builder $query): void
     {
-        $query->where('status', TrainingCourseStatus::Published)->whereHas('sessions', fn ($q) => $q->upcoming());
+        $query->where('status', TrainingCourseStatus::Published)->whereHas('sessions', fn ($q) => $q->notEnded());
+    }
+
+    /** Đang diễn ra: buổi 1 đã bắt đầu và buổi cuối chưa kết thúc. */
+    public function isOngoing(): bool
+    {
+        $sessions = $this->relationLoaded('activeSessions') ? $this->activeSessions : $this->activeSessions()->get();
+        $first = $sessions->first();
+        $last = $sessions->last();
+
+        return $first !== null && $first->starts_at->isPast() && $last->ends_at->isFuture();
+    }
+
+    /** Nội dung QR điểm danh của chương trình (học viên tự quét bằng app; chỉ dùng được trong ngày có buổi học). */
+    public const CHECKIN_PREFIX = 'ELLSO-CHECKIN:';
+
+    public function checkinQrValue(): string
+    {
+        if (! $this->checkin_token) {
+            $this->forceFill(['checkin_token' => Str::random(32)])->save();
+        }
+
+        return self::CHECKIN_PREFIX.$this->checkin_token;
+    }
+
+    /** Buổi (chưa huỷ) diễn ra trong ngày $day theo giờ Việt Nam — buổi mà QR điểm danh đang có hiệu lực. */
+    public function sessionOn(?CarbonInterface $day = null): ?TrainingSession
+    {
+        $date = ($day ?? now())->copy()->timezone(TrainingSession::TZ)->toDateString();
+
+        return $this->activeSessions()->get()
+            ->first(fn (TrainingSession $s) => $s->starts_at->copy()->timezone(TrainingSession::TZ)->toDateString() === $date);
     }
 
     /** Số thứ tự buổi (chỉ tính buổi chưa huỷ): [session_id => n]. */

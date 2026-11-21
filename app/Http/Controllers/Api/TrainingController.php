@@ -6,7 +6,9 @@ use App\Enums\RegistrationSource;
 use App\Enums\TrainingCourseStatus;
 use App\Exceptions\RegistrationRefused;
 use App\Http\Controllers\Controller;
+use App\Models\TrainingAttendance;
 use App\Models\TrainingCourse;
+use App\Models\TrainingRegistration;
 use App\Models\TrainingSession;
 use App\Models\User;
 use App\Services\EventRegistration;
@@ -17,12 +19,15 @@ use Illuminate\Http\Request;
 /**
  * Chương trình huấn luyện offline (nhiều buổi) cho app.
  * Public (token không bắt buộc; có token app thì trả thêm "registered"):
- * - GET /trainings       : chương trình đang mở còn buổi sắp diễn ra, buổi sắp tới gần nhất trước; kèm lịch gọn (schedule).
+ * - GET /trainings       : chương trình đang mở còn buổi CHƯA KẾT THÚC (hiện đến khi qua hết buổi cuối; `ongoing` = đang diễn ra),
+ *                          buổi kế tiếp gần nhất trước; kèm lịch gọn (schedule).
  * - GET /trainings/{id}  : chi tiết + khối nội dung + mọi buổi (buổi 1 … n, địa điểm).
  * Cần đăng nhập:
  * - POST   /trainings/{id}/register : đăng ký cả chương trình (cần gói thành viên; phí > 0 → payment_required).
  * - DELETE /trainings/{id}/register : huỷ (trước buổi 1, chỉ đăng ký tự làm trên app).
  * - GET    /my/trainings            : chương trình đã đăng ký.
+ * - POST   /trainings/checkin       : {code} — học viên quét QR điểm danh của chương trình (chỉ trong ngày có buổi).
+ * Đã đăng ký → chi tiết có `ticket` (mã vé + nội dung QR để nhân viên quét, điểm danh từng buổi).
  */
 class TrainingController extends Controller
 {
@@ -36,7 +41,7 @@ class TrainingController extends Controller
             ->with(['trainer:id,name', 'activeSessions.location'])
             ->withCount('registrations')
             ->get()
-            ->sortBy(fn (TrainingCourse $c) => $c->activeSessions->first(fn ($s) => $s->starts_at->isFuture())?->starts_at)
+            ->sortBy(fn (TrainingCourse $c) => $c->activeSessions->first(fn ($s) => $s->ends_at->isFuture())?->starts_at)
             ->values();
         $registered = $this->registeredIds($user, $courses->pluck('id')->all());
 
@@ -135,7 +140,8 @@ class TrainingController extends Controller
     private function summary(TrainingCourse $c, ?User $user, array $registered): array
     {
         $sessions = $c->activeSessions;
-        $next = $sessions->first(fn (TrainingSession $s) => $s->starts_at->isFuture());
+        // Buổi kế tiếp = buổi chưa kết thúc gần nhất (có thể đang diễn ra)
+        $next = $sessions->first(fn (TrainingSession $s) => $s->ends_at->isFuture());
         $count = (int) ($c->registrations_count ?? $c->registrations()->count());
 
         return [
@@ -158,6 +164,7 @@ class TrainingController extends Controller
             'ends_at' => $sessions->last()?->ends_at->toIso8601String(),
             'next_session' => $next ? $this->session($next, $sessions->search(fn ($s) => $s->id === $next->id) + 1) : null,
             'registration_open' => $c->isRegistrationOpen(),
+            'ongoing' => $c->isOngoing(),
             'registered' => $user ? in_array($c->id, $registered, true) : null,
         ];
     }
@@ -168,7 +175,76 @@ class TrainingController extends Controller
             ...$this->summary($c, $user, $registered),
             ...($withBlocks ? ['blocks' => CampaignContent::resolve($c->content)] : []),
             'sessions' => $c->activeSessions->values()->map(fn (TrainingSession $s, int $i) => $this->session($s, $i + 1))->all(),
+            'ticket' => $user && in_array($c->id, $registered, true) ? $this->ticket($c, $user) : null,
         ];
+    }
+
+    /** Vé của học viên: mã + nội dung QR (nhân viên quét để điểm danh) + điểm danh từng buổi. */
+    private function ticket(TrainingCourse $c, User $user): ?array
+    {
+        $r = TrainingRegistration::query()->where('training_course_id', $c->id)->where('user_id', $user->id)->with('attendances')->first();
+        if (! $r) {
+            return null;
+        }
+        if (! $r->ticket_code) {
+            $r->forceFill(['ticket_code' => TrainingRegistration::newTicketCode()])->save();
+        }
+        $byS = $r->attendances->keyBy('training_session_id');
+
+        return [
+            'code' => $r->ticket_code,
+            'qr' => $r->qrValue(),
+            'holder' => $user->name,
+            'registered_at' => $r->created_at->toIso8601String(),
+            'attendance' => $c->activeSessions->values()->map(fn (TrainingSession $s, int $i) => [
+                'session_id' => $s->id,
+                'number' => $i + 1,
+                'checked_in_at' => $byS->get($s->id)?->checked_in_at?->toIso8601String(),
+                'method' => $byS->get($s->id)?->method,
+            ])->all(),
+        ];
+    }
+
+    /**
+     * Học viên quét QR điểm danh của chương trình (in / chiếu ở lớp). QR chỉ có hiệu lực trong NGÀY có buổi (giờ VN):
+     * ghi giờ đến cho buổi hôm đó. Đã điểm danh rồi → trả lại giờ cũ (already = true).
+     */
+    public function checkin(Request $request): JsonResponse
+    {
+        $data = $request->validate(['code' => ['required', 'string', 'max:200']]);
+        $token = str_starts_with($data['code'], TrainingCourse::CHECKIN_PREFIX)
+            ? substr($data['code'], strlen(TrainingCourse::CHECKIN_PREFIX))
+            : trim($data['code']);
+        $course = TrainingCourse::query()->where('checkin_token', $token)->where('status', TrainingCourseStatus::Published)->first();
+        if (! $course) {
+            return response()->json(['message' => 'Mã QR không đúng. Hãy quét mã điểm danh của chương trình huấn luyện.', 'code' => 'invalid_code'], 422);
+        }
+
+        $user = $request->user();
+        $registration = TrainingRegistration::query()->where('training_course_id', $course->id)->where('user_id', $user->id)->first();
+        if (! $registration) {
+            return response()->json(['message' => 'Bạn chưa đăng ký chương trình "'.$course->title.'".', 'code' => 'not_registered'], 403);
+        }
+
+        $session = $course->sessionOn();
+        if (! $session) {
+            return response()->json(['message' => 'Hôm nay "'.$course->title.'" không có buổi học. Mã điểm danh chỉ dùng được trong ngày có buổi.', 'code' => 'no_session_today'], 422);
+        }
+
+        $attendance = TrainingAttendance::query()->firstOrCreate(
+            ['training_registration_id' => $registration->id, 'training_session_id' => $session->id],
+            ['checked_in_at' => now(), 'method' => TrainingAttendance::SELF_SCAN],
+        );
+        $number = $course->sessionNumbers()[$session->id] ?? null;
+
+        return response()->json(['data' => [
+            'course_id' => $course->id,
+            'course_title' => $course->title,
+            'session_id' => $session->id,
+            'number' => $number,
+            'checked_in_at' => $attendance->checked_in_at->toIso8601String(),
+            'already' => ! $attendance->wasRecentlyCreated,
+        ]], $attendance->wasRecentlyCreated ? 201 : 200);
     }
 
     private function session(TrainingSession $s, int $number): array

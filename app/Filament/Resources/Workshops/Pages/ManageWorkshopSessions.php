@@ -41,7 +41,7 @@ class ManageWorkshopSessions extends ManageRelatedRecords
 
     protected static ?string $navigationLabel = 'Lịch';
 
-    protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedCalendarDays;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
     protected static ?string $title = 'Lịch workshop';
 
@@ -53,9 +53,9 @@ class ManageWorkshopSessions extends ManageRelatedRecords
     {
         $workshop = $this->workshop();
 
-        return $workshop->title . ' · ' . ($workshop->price ? Vnd::full($workshop->price) . ' / buổi' : 'Miễn phí với gói thành viên')
-            . ' · ' . ($workshop->hasCapacity() ? 'Tối đa ' . $workshop->capacity . ' người / buổi' : 'Không giới hạn số người')
-            . ($workshop->trainer ? ' · Hướng dẫn: ' . $workshop->trainer->name : '');
+        return $workshop->title.' · '.($workshop->price ? Vnd::full($workshop->price).' / buổi' : 'Miễn phí với gói thành viên')
+            .' · '.($workshop->hasCapacity() ? 'Tối đa '.$workshop->capacity.' người / buổi' : 'Không giới hạn số người')
+            .($workshop->trainer ? ' · Hướng dẫn: '.$workshop->trainer->name : '');
     }
 
     public function form(Schema $schema): Schema
@@ -90,7 +90,7 @@ class ManageWorkshopSessions extends ManageRelatedRecords
                 ->placeholder('https://zoom.us/j/… hoặc https://meet.google.com/…')
                 ->url()
                 ->maxLength(500)
-                ->helperText('Có thể thêm sau. App chỉ hiện link cho người đã đăng ký, từ ' . WorkshopSession::LINK_OPENS_MINUTES_BEFORE . ' phút trước giờ bắt đầu.')
+                ->helperText('Có thể thêm sau. App chỉ hiện link cho người đã đăng ký, từ '.WorkshopSession::LINK_OPENS_MINUTES_BEFORE.' phút trước giờ bắt đầu.')
                 ->columnSpanFull(),
             TextInput::make('note')
                 ->label('Ghi chú cho buổi này')
@@ -104,7 +104,7 @@ class ManageWorkshopSessions extends ManageRelatedRecords
     {
         return $table
             ->defaultSort('starts_at')
-            ->modifyQueryUsing(fn ($query) => $query->withCount('registrations'))
+            ->modifyQueryUsing(fn ($query) => $query->withCount(['registrations', 'registrations as attended_count' => fn ($q) => $q->whereNotNull('attended_at')]))
             ->emptyStateHeading('Chưa có buổi nào')
             ->emptyStateDescription('Thêm các ngày / khung giờ tổ chức workshop. Mỗi buổi có link họp riêng (hoặc dùng chung một link).')
             ->columns([
@@ -121,12 +121,17 @@ class ManageWorkshopSessions extends ManageRelatedRecords
                     ->copyable()
                     ->placeholder('Chưa có link')
                     ->description(fn (WorkshopSession $record) => $record->link_sent_at
-                        ? 'Đã gửi email ' . $record->link_sent_at->timezone(WorkshopSession::TZ)->format('H:i d/m') . ' · ' . $record->link_sent_count . ' người'
+                        ? 'Đã gửi email '.$record->link_sent_at->timezone(WorkshopSession::TZ)->format('H:i d/m').' · '.$record->link_sent_count.' người'
                         : null),
                 TextColumn::make('registrations_count')
                     ->label('Đăng ký')
-                    ->formatStateUsing(fn (int $state) => $this->workshop()->hasCapacity() ? $state . ' / ' . $this->workshop()->capacity : (string) $state)
+                    ->formatStateUsing(fn (int $state) => $this->workshop()->hasCapacity() ? $state.' / '.$this->workshop()->capacity : (string) $state)
                     ->color(fn (int $state) => $this->workshop()->hasCapacity() && $state >= $this->workshop()->capacity ? 'danger' : null)
+                    ->url(fn (WorkshopSession $record) => ManageWorkshopRegistrations::getUrl(['record' => $this->workshop(), 'session' => $record->id]))
+                    ->alignCenter(),
+                TextColumn::make('attended_count')
+                    ->label('Có mặt')
+                    ->state(fn (WorkshopSession $record) => $record->starts_at->isPast() ? $record->attended_count.' / '.$record->registrations_count : '—')
                     ->url(fn (WorkshopSession $record) => ManageWorkshopRegistrations::getUrl(['record' => $this->workshop(), 'session' => $record->id]))
                     ->alignCenter(),
                 TextColumn::make('state')
@@ -169,15 +174,15 @@ class ManageWorkshopSessions extends ManageRelatedRecords
                     ->disabled(fn (WorkshopSession $record) => ! $record->meeting_url || ! $record->registrations_count || $record->isCancelled())
                     ->requiresConfirmation()
                     ->modalHeading('Gửi link cho người đăng ký')
-                    ->modalDescription(fn (WorkshopSession $record) => 'Gửi email link họp ' . $record->meeting_url . ' tới ' . $record->registrations_count
-                        . ' người đã đăng ký buổi ' . $record->timeLabel() . ', ' . $record->dateLabel() . '.'
-                        . ($record->link_sent_at ? ' (Đã gửi lần trước lúc ' . $record->link_sent_at->timezone(WorkshopSession::TZ)->format('H:i d/m') . '.)' : '')
-                        . ' Nội dung email sửa ở Hệ thống › Mẫu email › "Link tham gia workshop".')
+                    ->modalDescription(fn (WorkshopSession $record) => 'Gửi email link họp '.$record->meeting_url.' tới '.$record->registrations_count
+                        .' người đã đăng ký buổi '.$record->timeLabel().', '.$record->dateLabel().'.'
+                        .($record->link_sent_at ? ' (Đã gửi lần trước lúc '.$record->link_sent_at->timezone(WorkshopSession::TZ)->format('H:i d/m').'.)' : '')
+                        .' Nội dung email sửa ở Hệ thống › Mẫu email › "Link tham gia workshop".')
                     ->modalSubmitActionLabel('Gửi email')
                     ->action(fn (WorkshopSession $record) => $this->sendLink($record)),
                 ActionGroup::make([
                     EditAction::make()
-                        ->modalHeading(fn (WorkshopSession $record) => 'Sửa buổi ' . $record->dateLabel())
+                        ->modalHeading(fn (WorkshopSession $record) => 'Sửa buổi '.$record->dateLabel())
                         ->modalWidth('3xl')
                         ->mutateRecordDataUsing(fn (array $data, WorkshopSession $record) => [...$data, ...self::toForm($record)])
                         ->mutateDataUsing(fn (array $data) => self::toRecord($data)),
@@ -190,16 +195,16 @@ class ManageWorkshopSessions extends ManageRelatedRecords
                         ->label('Thêm buổi tương tự')
                         ->icon(Heroicon::DocumentDuplicate)
                         ->modalHeading('Thêm buổi tương tự')
-                        ->modalDescription(fn (WorkshopSession $record) => 'Cùng giờ (' . $record->timeLabel() . ') và cùng link họp. Chỉ cần chọn ngày — sửa link sau nếu mỗi buổi một link.')
+                        ->modalDescription(fn (WorkshopSession $record) => 'Cùng giờ ('.$record->timeLabel().') và cùng link họp. Chỉ cần chọn ngày — sửa link sau nếu mỗi buổi một link.')
                         ->modalWidth('md')
                         ->schema([
                             DatePicker::make('date')->label('Ngày')->native(false)->displayFormat('d/m/Y')->required(),
                         ])
                         ->action(function (array $data, WorkshopSession $record) {
-                            $copy = $record->replicate(['cancelled_at', 'link_sent_at', 'link_sent_count', 'registrations_count']);
+                            $copy = $record->replicate(['cancelled_at', 'link_sent_at', 'link_sent_count', 'registrations_count', 'attended_count']);
                             $copy->fill(self::toRecord([...self::toForm($record), 'date' => $data['date']]));
                             $copy->save();
-                            Notification::make()->title('Đã thêm buổi ' . $copy->dateLabel())->success()->send();
+                            Notification::make()->title('Đã thêm buổi '.$copy->dateLabel())->success()->send();
                         }),
                     Action::make('cancel')
                         ->authorize('update')
@@ -236,7 +241,7 @@ class ManageWorkshopSessions extends ManageRelatedRecords
         }
 
         $session->update(['link_sent_at' => now(), 'link_sent_count' => $sent]);
-        Notification::make()->title('Đã gửi link cho ' . $sent . ' người')->success()->send();
+        Notification::make()->title('Đã gửi link cho '.$sent.' người')->success()->send();
     }
 
     private function workshop(): Workshop
@@ -274,7 +279,7 @@ class ManageWorkshopSessions extends ManageRelatedRecords
     private static function toRecord(array $data): array
     {
         $date = CarbonImmutable::parse($data['date'], WorkshopSession::TZ)->toDateString();
-        $at = fn (string $time) => CarbonImmutable::parse($date . ' ' . substr($time, 0, 5), WorkshopSession::TZ)->utc();
+        $at = fn (string $time) => CarbonImmutable::parse($date.' '.substr($time, 0, 5), WorkshopSession::TZ)->utc();
 
         return [
             'starts_at' => $at($data['start_time']),
