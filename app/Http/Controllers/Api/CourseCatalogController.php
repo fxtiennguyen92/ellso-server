@@ -49,14 +49,14 @@ class CourseCatalogController extends Controller
             ->where('status', CourseStatus::Published)
             ->when($data['category_id'] ?? null, function ($q, $categoryId) {
                 $ids = Category::query()->where('parent_id', $categoryId)->pluck('id')->push((int) $categoryId);
-                $q->whereIn('category_id', $ids);
+                $q->whereHas('categories', fn ($c) => $c->whereIn('categories.id', $ids));
             })
             ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w
                 ->where('title', 'like', "%{$term}%")
                 ->orWhere('short_description', 'like', "%{$term}%")
                 ->orWhereHas('instructor', fn ($i) => $i->where('name', 'like', "%{$term}%"))
-                ->orWhereHas('category', fn ($c) => $c->where('name', 'like', "%{$term}%"))))
-            ->with(['category', 'instructor'])
+                ->orWhereHas('categories', fn ($c) => $c->where('name', 'like', "%{$term}%"))))
+            ->with(['categories', 'instructor'])
             ->latest('published_at')
             ->latest('id')
             ->paginate($data['per_page'] ?? self::PER_PAGE);
@@ -86,7 +86,7 @@ class CourseCatalogController extends Controller
     public function show(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
-        $course = Course::query()->with(['category', 'instructor', 'defaultPath.chapters.pathLessons.lesson'])->find($id);
+        $course = Course::query()->with(['categories', 'instructor', 'defaultPath.chapters.pathLessons.lesson'])->find($id);
         $enrolled = $course && $user->enrollments()->where('course_id', $course->id)->exists();
         if (! $course || ($course->status !== CourseStatus::Published && ! $enrolled)) {
             return response()->json(['message' => 'Khoá học không tồn tại.', 'code' => 'not_found'], 404);
@@ -146,7 +146,7 @@ class CourseCatalogController extends Controller
             $progress->enroll($user, $course, EnrollmentSource::Free);
         }
 
-        return response()->json(['data' => self::present(collect([$course->load(['category', 'instructor'])]), $user)[0]], $already ? 200 : 201);
+        return response()->json(['data' => self::present(collect([$course->load(['categories', 'instructor'])]), $user)[0]], $already ? 200 : 201);
     }
 
     /** Định dạng giống src/data/courses.ts › CatalogCourse của app. */
@@ -168,7 +168,9 @@ class CourseCatalogController extends Controller
             'id' => $c->id,
             'title' => $c->title,
             'short_description' => $c->short_description,
-            'category' => $c->category ? ['id' => $c->category->id, 'name' => $c->category->name] : null,
+            // Khoá có thể thuộc nhiều danh mục; `category` = danh mục đầu tiên (giữ cho bản app cũ)
+            'categories' => $c->categories->map(fn ($cat) => ['id' => $cat->id, 'name' => $cat->name])->values(),
+            'category' => ($first = $c->categories->first()) ? ['id' => $first->id, 'name' => $first->name] : null,
             'instructor' => $c->instructor ? [
                 'id' => $c->instructor->id,
                 'name' => $c->instructor->name,

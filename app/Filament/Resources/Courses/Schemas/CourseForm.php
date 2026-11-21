@@ -9,6 +9,7 @@ use App\Filament\Resources\Classifications\ClassificationResource;
 use App\Models\Classification;
 use App\Models\Course;
 use App\Models\PlacementTest;
+use App\Support\MediaStorage;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
@@ -26,7 +27,6 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
-use App\Support\MediaStorage;
 
 class CourseForm
 {
@@ -49,9 +49,11 @@ class CourseForm
                                 ->helperText('Để trống để tự sinh từ tên.')
                                 ->unique(ignoreRecord: true)
                                 ->maxLength(255),
-                            Select::make('category_id')
+                            Select::make('categories')
                                 ->label('Danh mục')
-                                ->relationship('category', 'name', fn (Builder $query) => $query->where('is_active', true))
+                                ->helperText('Chọn được nhiều danh mục.')
+                                ->multiple()
+                                ->relationship('categories', 'name', fn (Builder $query) => $query->where('is_active', true))
                                 ->searchable()
                                 ->preload(),
                             Textarea::make('short_description')
@@ -110,7 +112,7 @@ class CourseForm
                                             ->orderBy('sort_order')
                                             ->get()
                                             ->mapWithKeys(fn (Classification $c) => [
-                                                $c->id => $c->isAbility() ? $c->displayName() : $c->name . ($c->isShared() ? '' : ' (riêng của khóa)'),
+                                                $c->id => $c->isAbility() ? $c->displayName() : $c->name.($c->isShared() ? '' : ' (riêng của khóa)'),
                                             ]))
                                         ->live()
                                         ->required()
@@ -211,7 +213,7 @@ class CourseForm
                 ->filter(fn ($versions) => ! $versions->contains('is_active', true))->count();
 
             return 'Học viên chưa làm các bài này phải làm trước khi bắt đầu bài học đầu tiên. Đã làm một phiên bản bất kỳ của bài là đủ.'
-                . ($off ? " {$off} bài đang tắt nên tạm thời không bắt buộc." : '');
+                .($off ? " {$off} bài đang tắt nên tạm thời không bắt buộc." : '');
         }
 
         return self::usesAbility($get)

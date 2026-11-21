@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\HasUniqueSlug;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Category extends Model
@@ -30,8 +31,9 @@ class Category extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
-    public function courses(): HasMany
+    /** Khoá học thuộc danh mục này (một khoá có thể thuộc nhiều danh mục). */
+    public function courses(): BelongsToMany
     {
-        return $this->hasMany(Course::class);
+        return $this->belongsToMany(Course::class);
     }
 }

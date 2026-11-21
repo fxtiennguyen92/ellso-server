@@ -44,13 +44,17 @@ class PromoCodeTest extends TestCase
 
     private function course(int $price, ?Category $category = null, CourseStatus $status = CourseStatus::Published): Course
     {
-        return Course::create([
-            'title' => 'Khoá ' . uniqid(),
+        $course = Course::create([
+            'title' => 'Khoá '.uniqid(),
             'instructor_id' => $this->admin->id,
-            'category_id' => $category?->id,
             'price' => $price,
             'status' => $status,
         ]);
+        if ($category) {
+            $course->categories()->attach($category->id);
+        }
+
+        return $course;
     }
 
     private function promo(array $attributes = []): PromoCode

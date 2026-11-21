@@ -26,7 +26,6 @@ class Course extends Model
     protected string $slugSource = 'title';
 
     protected $fillable = [
-        'category_id',
         'instructor_id',
         'title',
         'slug',
@@ -87,9 +86,10 @@ class Course extends Model
         return $this->price === 0;
     }
 
-    public function category(): BelongsTo
+    /** Danh mục của khoá (một khoá thuộc được nhiều danh mục — bảng category_course). */
+    public function categories(): BelongsToMany
     {
-        return $this->belongsTo(Category::class);
+        return $this->belongsToMany(Category::class)->orderBy('categories.sort_order')->orderBy('categories.name');
     }
 
     public function instructor(): BelongsTo

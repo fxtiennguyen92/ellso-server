@@ -82,7 +82,7 @@ class CartController extends Controller
         }
 
         try {
-            $result = $promoCodes->evaluate($data['code'], $user, Course::query()->whereKey($courseIds)->get(['id', 'title', 'price', 'category_id']));
+            $result = $promoCodes->evaluate($data['code'], $user, Course::query()->whereKey($courseIds)->with('categories')->get(['id', 'title', 'price']));
         } catch (PromoCodeException $e) {
             return response()->json(['valid' => false, 'reason' => $e->reason, 'message' => $e->getMessage()], 422);
         }

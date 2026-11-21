@@ -7,6 +7,7 @@ use App\Enums\CourseType;
 use App\Enums\UserRole;
 use App\Filament\Resources\Courses\CourseResource;
 use App\Models\Course;
+use App\Support\MediaStorage;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -23,7 +24,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use App\Support\MediaStorage;
 
 class CoursesTable
 {
@@ -42,7 +42,7 @@ class CoursesTable
                     ->label('Khóa học')
                     ->searchable()
                     ->sortable()
-                    ->description(fn (Course $record) => $record->category?->name),
+                    ->description(fn (Course $record) => $record->categories->pluck('name')->join(' · ') ?: null),
                 TextColumn::make('instructor.name')
                     ->label('Giảng viên')
                     ->visible($isAdmin),
@@ -50,7 +50,7 @@ class CoursesTable
                 TextColumn::make('status')->label('Trạng thái')->badge(),
                 TextColumn::make('price')
                     ->label('Giá')
-                    ->formatStateUsing(fn (int $state) => $state === 0 ? 'Miễn phí' : number_format($state, 0, ',', '.') . ' đ')
+                    ->formatStateUsing(fn (int $state) => $state === 0 ? 'Miễn phí' : number_format($state, 0, ',', '.').' đ')
                     ->sortable(),
                 TextColumn::make('lessons_total')
                     ->label('Bài học')
@@ -61,7 +61,7 @@ class CoursesTable
             ->filters([
                 SelectFilter::make('status')->label('Trạng thái')->options(CourseStatus::class),
                 SelectFilter::make('type')->label('Dạng')->options(CourseType::class),
-                SelectFilter::make('category')->label('Danh mục')->relationship('category', 'name'),
+                SelectFilter::make('categories')->label('Danh mục')->relationship('categories', 'name')->multiple(),
                 SelectFilter::make('instructor')
                     ->label('Giảng viên')
                     ->relationship('instructor', 'name', fn (Builder $query) => $query->where('role', UserRole::Instructor->value))

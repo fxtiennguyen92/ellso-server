@@ -154,15 +154,17 @@ class DemoCourseSeeder extends Seeder
 
     private function makeCourse(string $title, string $short, int $price): Course
     {
-        return Course::create([
+        $course = Course::create([
             'title' => $title,
             'short_description' => $short,
-            'category_id' => $this->category->id,
             'instructor_id' => $this->instructor->id,
             'type' => CourseType::MultiPath,
             'status' => CourseStatus::Published,
             'price' => $price,
         ]);
+        $course->categories()->sync([$this->category->id]);
+
+        return $course;
     }
 
     /** Tạo bài trong thư viện (thuộc giảng viên demo), nội dung mẫu đã xuất bản. */

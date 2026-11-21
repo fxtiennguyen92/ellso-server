@@ -32,9 +32,11 @@ class CartAndCatalogTest extends TestCase
 
     private function course(array $attrs = []): Course
     {
-        return Course::create([
+        // category_id: một id hoặc mảng id (khoá thuộc nhiều danh mục)
+        $categoryIds = (array) ($attrs['category_id'] ?? Category::firstOrCreate(['name' => 'Chung'])->id);
+        unset($attrs['category_id']);
+        $course = Course::create([
             'title' => 'Khoá '.uniqid(),
-            'category_id' => $attrs['category_id'] ?? Category::firstOrCreate(['name' => 'Chung'])->id,
             'instructor_id' => User::query()->where('role', UserRole::Instructor)->value('id')
                 ?? User::factory()->create(['role' => UserRole::Instructor])->id,
             'type' => CourseType::Single,
@@ -42,6 +44,9 @@ class CartAndCatalogTest extends TestCase
             'price' => 500000,
             ...$attrs,
         ]);
+        $course->categories()->sync($categoryIds);
+
+        return $course;
     }
 
     private function book(array $attrs = []): Document
@@ -75,8 +80,15 @@ class CartAndCatalogTest extends TestCase
         $this->getJson('/v1/courses?page=2')->assertJsonCount(3, 'data')->assertJsonPath('meta.has_more', false);
         $this->getJson('/v1/courses?category_id='.$a->id)->assertJsonCount(1, 'data');
 
+        // Một khoá thuộc nhiều danh mục: hiện ở mọi danh mục của nó, API trả đủ danh sách danh mục
+        $c = Category::create(['name' => 'C', 'is_active' => true]);
+        $multi = $this->course(['category_id' => [$b->id, $c->id], 'title' => 'Hai danh mục']);
+        $this->getJson('/v1/courses?category_id='.$c->id)->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $multi->id)
+            ->assertJsonCount(2, 'data.0.categories');
+        $this->getJson('/v1/courses?category_id='.$b->id.'&per_page=30')->assertJsonCount(13, 'data');
+
         $names = collect($this->getJson('/v1/courses/categories')->json('data'))->pluck('name')->all();
-        $this->assertEqualsCanonicalizing(['A con', 'B'], $names);
+        $this->assertEqualsCanonicalizing(['A con', 'B', 'C'], $names);
     }
 
     public function test_cart_add_list_remove_course_and_book(): void
