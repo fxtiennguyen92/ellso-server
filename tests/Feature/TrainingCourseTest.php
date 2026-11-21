@@ -9,9 +9,12 @@ use App\Enums\UserRole;
 use App\Filament\Resources\TrainingCourses\Pages\CreateTrainingCourse;
 use App\Filament\Resources\TrainingCourses\Pages\EditTrainingCourse;
 use App\Filament\Resources\TrainingCourses\Pages\ListTrainingCourses;
+use App\Filament\Resources\TrainingCourses\Pages\ManageTrainingAttendance;
 use App\Filament\Resources\TrainingCourses\Pages\ManageTrainingRegistrations;
 use App\Filament\Resources\TrainingCourses\Pages\ManageTrainingSessions;
+use App\Filament\Resources\TrainingCourses\TrainingCourseResource;
 use App\Filament\Resources\TrainingLocations\Pages\ManageTrainingLocations;
+use App\Models\Course;
 use App\Models\TrainingCourse;
 use App\Models\TrainingLocation;
 use App\Models\TrainingRegistration;
@@ -475,12 +478,89 @@ class TrainingCourseTest extends TestCase
     public function test_course_cover_kept_in_trash_deleted_on_force_delete(): void
     {
         Storage::disk('public')->put('courses/covers/a.png', 'x');
-        $course = \App\Models\Course::create(['title' => 'Khoá', 'instructor_id' => $this->admin->id, 'price' => 0, 'cover_image' => 'courses/covers/a.png']);
+        $course = Course::create(['title' => 'Khoá', 'instructor_id' => $this->admin->id, 'price' => 0, 'cover_image' => 'courses/covers/a.png']);
 
         $course->delete();
         Storage::disk('public')->assertExists('courses/covers/a.png');
 
         $course->forceDelete();
         Storage::disk('public')->assertMissing('courses/covers/a.png');
+    }
+
+    public function test_ongoing_program_stays_listed_until_last_session_ends(): void
+    {
+        $course = $this->course(['title' => 'Đang chạy']);
+        $this->addSession($course, $this->cafeA, '2026-11-10');
+        $s2 = $this->addSession($course, $this->cafeA, '2026-11-20');
+
+        // Giữa buổi 1 và buổi 2 → vẫn hiện, đang diễn ra, buổi kế tiếp = buổi 2
+        $this->travelTo(CarbonImmutable::parse('2026-11-12 09:00', 'Asia/Ho_Chi_Minh'));
+        $this->getJson('/v1/trainings')->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.ongoing', true)->assertJsonPath('data.0.next_session.id', $s2->id)
+            ->assertJsonPath('data.0.registration_open', false);
+
+        // Đang trong buổi cuối → vẫn hiện
+        $this->travelTo(CarbonImmutable::parse('2026-11-20 19:00', 'Asia/Ho_Chi_Minh'));
+        $this->getJson('/v1/trainings')->assertJsonCount(1, 'data')->assertJsonPath('data.0.next_session.id', $s2->id);
+
+        // Qua hết buổi cuối → ẩn
+        $this->travelTo(CarbonImmutable::parse('2026-11-20 21:30', 'Asia/Ho_Chi_Minh'));
+        $this->getJson('/v1/trainings')->assertJsonCount(0, 'data');
+    }
+
+    public function test_ticket_and_self_checkin_only_on_session_day(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-11-01 09:00', 'Asia/Ho_Chi_Minh'));
+        $course = $this->course(['price' => 0]);
+        $s1 = $this->addSession($course, $this->cafeA, '2026-11-15');
+        $this->addSession($course, $this->cafeA, '2026-11-18');
+        $student = $this->student();
+        $other = $this->student(name: 'Bình');
+
+        $this->api($student)->postJson("/v1/trainings/{$course->id}/register")->assertCreated();
+        $ticket = $this->api($student)->getJson("/v1/trainings/{$course->id}")->assertOk()->json('data.ticket');
+        $this->assertSame(10, strlen($ticket['code']));
+        $this->assertSame('ELLSO-TICKET:'.$ticket['code'], $ticket['qr']);
+        $this->assertCount(2, $ticket['attendance']);
+        $this->assertNull($ticket['attendance'][0]['checked_in_at']);
+        // Chưa đăng ký → không có vé
+        $this->api($other)->getJson("/v1/trainings/{$course->id}")->assertJsonPath('data.ticket', null);
+
+        $qr = $course->refresh()->checkinQrValue();
+        $this->assertStringStartsWith('ELLSO-CHECKIN:', $qr);
+
+        // Chưa tới ngày học → từ chối
+        $this->api($student)->postJson('/v1/trainings/checkin', ['code' => $qr])->assertStatus(422)->assertJsonPath('reason', 'no_session_today');
+        // Mã sai
+        $this->api($student)->postJson('/v1/trainings/checkin', ['code' => 'ELLSO-CHECKIN:sai'])->assertStatus(422)->assertJsonPath('reason', 'invalid_code');
+
+        // Ngày buổi 1 (sáng sớm, trước giờ học vẫn được) → điểm danh buổi 1
+        $this->travelTo(CarbonImmutable::parse('2026-11-15 17:40', 'Asia/Ho_Chi_Minh'));
+        $this->api($other)->postJson('/v1/trainings/checkin', ['code' => $qr])->assertForbidden()->assertJsonPath('reason', 'not_registered');
+        $this->api($student)->postJson('/v1/trainings/checkin', ['code' => $qr])->assertCreated()
+            ->assertJsonPath('data.number', 1)->assertJsonPath('data.session_id', $s1->id)->assertJsonPath('data.already', false);
+        $this->travelTo(CarbonImmutable::parse('2026-11-15 18:30', 'Asia/Ho_Chi_Minh'));
+        $this->api($student)->postJson('/v1/trainings/checkin', ['code' => $qr])->assertOk()
+            ->assertJsonPath('data.already', true)->assertJsonPath('data.checked_in_at', '2026-11-15T10:40:00+00:00');
+
+        $this->api($student)->getJson("/v1/trainings/{$course->id}")
+            ->assertJsonPath('data.ticket.attendance.0.method', 'self_scan')
+            ->assertJsonPath('data.ticket.attendance.1.checked_in_at', null);
+
+        // CMS: giảng viên / admin xem trang Điểm danh, điểm danh tay buổi đang chọn
+        $this->app['auth']->forgetGuards();
+        $this->flushHeaders()->actingAs($this->admin, 'web');
+        $this->get(TrainingCourseResource::getUrl('attendance', ['record' => $course]))
+            ->assertOk()->assertSee('Mã QR điểm danh')->assertSee('Có mặt');
+        // Giảng viên của chương trình cũng xem / điểm danh được
+        $course->update(['trainer_id' => $this->teacher->id]);
+        $this->actingAs($this->teacher, 'web');
+        $this->get(TrainingCourseResource::getUrl('attendance', ['record' => $course]))->assertOk();
+        $reg = TrainingRegistration::where('user_id', $student->id)->sole();
+        Livewire::test(ManageTrainingAttendance::class, ['record' => $course->getRouteKey()])
+            ->filterTable('session', $course->activeSessions()->get()[1]->id)
+            ->callAction(TestAction::make('mark')->table($reg));
+        $this->assertSame(2, $reg->attendances()->count());
+        $this->assertSame('manual', $reg->attendances()->latest('id')->first()->method);
     }
 }

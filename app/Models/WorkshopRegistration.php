@@ -6,14 +6,14 @@ use App\Enums\RegistrationSource;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** Học viên đăng ký một buổi workshop. */
+/** Học viên đăng ký một buổi workshop. attended_at: người hướng dẫn tự điểm danh trong CMS (workshop online). */
 class WorkshopRegistration extends Model
 {
-    protected $fillable = ['workshop_session_id', 'user_id', 'source', 'note', 'created_by_id'];
+    protected $fillable = ['workshop_session_id', 'user_id', 'source', 'note', 'created_by_id', 'attended_at', 'attendance_marked_by_id'];
 
     protected function casts(): array
     {
-        return ['source' => RegistrationSource::class];
+        return ['source' => RegistrationSource::class, 'attended_at' => 'datetime'];
     }
 
     public function session(): BelongsTo
@@ -24,6 +24,11 @@ class WorkshopRegistration extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function attendanceMarkedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'attendance_marked_by_id');
     }
 
     public function createdBy(): BelongsTo

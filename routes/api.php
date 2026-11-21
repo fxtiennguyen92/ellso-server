@@ -139,6 +139,7 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::post('trainings/{id}/register', [TrainingController::class, 'register'])->whereNumber('id')->middleware('throttle:20,1');
     Route::delete('trainings/{id}/register', [TrainingController::class, 'cancel'])->whereNumber('id')->middleware('throttle:20,1');
     Route::get('my/trainings', [TrainingController::class, 'mine']);
+    Route::post('trainings/checkin', [TrainingController::class, 'checkin'])->middleware('throttle:30,1');
     Route::post('workshop-sessions/{id}/register', [WorkshopController::class, 'register'])->whereNumber('id')->middleware('throttle:20,1');
     Route::delete('workshop-sessions/{id}/register', [WorkshopController::class, 'cancel'])->whereNumber('id')->middleware('throttle:20,1');
     Route::get('my/workshops', [WorkshopController::class, 'mine']);

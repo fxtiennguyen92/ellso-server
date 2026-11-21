@@ -366,4 +366,38 @@ class WorkshopTest extends TestCase
             ->assertActionHidden(TestAction::make('addRegistrant')->table())
             ->assertActionHidden(TestAction::make('delete')->table($registration));
     }
+
+    public function test_instructor_marks_attendance_after_session_starts(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-11-10 09:00', 'Asia/Ho_Chi_Minh'));
+        $mine = $this->workshop(['title' => 'Của tôi']);
+        $session = $this->addSession($mine, '2026-11-12');
+        [$a, $b] = [$this->student(true, 'An'), $this->student(true, 'Bình')];
+        $ra = WorkshopRegistration::create(['workshop_session_id' => $session->id, 'user_id' => $a->id, 'source' => RegistrationSource::App]);
+        $rb = WorkshopRegistration::create(['workshop_session_id' => $session->id, 'user_id' => $b->id, 'source' => RegistrationSource::App]);
+
+        $this->actingAs($this->teacher);
+        // Chưa tới giờ học → chưa điểm danh được
+        Livewire::test(ManageWorkshopRegistrations::class, ['record' => $mine->getRouteKey()])
+            ->assertActionHidden(TestAction::make('attend')->table($ra));
+
+        $this->travelTo(CarbonImmutable::parse('2026-11-12 19:20', 'Asia/Ho_Chi_Minh'));
+        Livewire::test(ManageWorkshopRegistrations::class, ['record' => $mine->getRouteKey()])
+            ->callAction(TestAction::make('attend')->table($ra))
+            ->assertActionVisible(TestAction::make('unattend')->table($ra->refresh()));
+        $this->assertNotNull($ra->refresh()->attended_at);
+        $this->assertSame($this->teacher->id, $ra->attendance_marked_by_id);
+        $this->assertNull($rb->refresh()->attended_at);
+
+        Livewire::test(ManageWorkshopRegistrations::class, ['record' => $mine->getRouteKey()])
+            ->callAction(TestAction::make('unattend')->table($ra));
+        $this->assertNull($ra->refresh()->attended_at);
+
+        // Tab Lịch: cột Có mặt x / y
+        Livewire::test(ManageWorkshopRegistrations::class, ['record' => $mine->getRouteKey()])
+            ->callTableBulkAction('markAttended', [$ra, $rb]);
+        $this->assertSame(2, $session->registrations()->whereNotNull('attended_at')->count());
+        Livewire::test(ManageWorkshopSessions::class, ['record' => $mine->getRouteKey()])
+            ->assertTableColumnStateSet('attended_count', '2 / 2', $session);
+    }
 }
