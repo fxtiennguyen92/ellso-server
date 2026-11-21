@@ -8,6 +8,7 @@ use App\Models\TrainingCourse;
 use App\Models\TrainingRegistration;
 use App\Models\TrainingSession;
 use BackedEnum;
+use chillerlan\QRCode\Common\EccLevel;
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
 use Filament\Actions\Action;
@@ -67,6 +68,7 @@ class ManageTrainingAttendance extends ManageRelatedRecords
                 ->modalContent(fn () => new HtmlString(
                     '<div style="display:flex;flex-direction:column;align-items:center;gap:12px">'
                     .'<img alt="Mã QR điểm danh" style="width:320px;height:320px;image-rendering:pixelated" src="'.e($this->qrDataUri($this->course()->checkinQrValue())).'">'
+                    .'<div style="font-size:12px;color:#64748b;text-align:center">Mã nhập tay (khi điện thoại không quét được):<br><code style="user-select:all;word-break:break-all">'.e($this->course()->checkinQrValue()).'</code></div>'
                     .'<div style="font-size:12px;color:#64748b">Mở trang này trên máy chiếu hoặc bấm Ctrl+P để in.</div></div>'
                 ))
                 ->modalSubmitAction(false)
@@ -182,7 +184,7 @@ class ManageTrainingAttendance extends ManageRelatedRecords
 
     private function qrDataUri(string $value): string
     {
-        return (new QRCode(new QROptions(['outputType' => 'svg', 'eccLevel' => 'M', 'scale' => 10, 'addQuietzone' => true])))->render($value);
+        return (new QRCode(new QROptions(['outputType' => 'svg', 'eccLevel' => EccLevel::M, 'scale' => 10, 'addQuietzone' => true])))->render($value);
     }
 
     private function course(): TrainingCourse

@@ -217,18 +217,18 @@ class TrainingController extends Controller
             : trim($data['code']);
         $course = TrainingCourse::query()->where('checkin_token', $token)->where('status', TrainingCourseStatus::Published)->first();
         if (! $course) {
-            return response()->json(['message' => 'Mã QR không đúng. Hãy quét mã điểm danh của chương trình huấn luyện.', 'reason' => 'invalid_code'], 422);
+            return response()->json(['message' => 'Mã QR không đúng. Hãy quét mã điểm danh của chương trình huấn luyện.', 'code' => 'invalid_code'], 422);
         }
 
         $user = $request->user();
         $registration = TrainingRegistration::query()->where('training_course_id', $course->id)->where('user_id', $user->id)->first();
         if (! $registration) {
-            return response()->json(['message' => 'Bạn chưa đăng ký chương trình "'.$course->title.'".', 'reason' => 'not_registered'], 403);
+            return response()->json(['message' => 'Bạn chưa đăng ký chương trình "'.$course->title.'".', 'code' => 'not_registered'], 403);
         }
 
         $session = $course->sessionOn();
         if (! $session) {
-            return response()->json(['message' => 'Hôm nay "'.$course->title.'" không có buổi học. Mã điểm danh chỉ dùng được trong ngày có buổi.', 'reason' => 'no_session_today'], 422);
+            return response()->json(['message' => 'Hôm nay "'.$course->title.'" không có buổi học. Mã điểm danh chỉ dùng được trong ngày có buổi.', 'code' => 'no_session_today'], 422);
         }
 
         $attendance = TrainingAttendance::query()->firstOrCreate(

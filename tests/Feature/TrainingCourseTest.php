@@ -530,13 +530,13 @@ class TrainingCourseTest extends TestCase
         $this->assertStringStartsWith('ELLSO-CHECKIN:', $qr);
 
         // Chưa tới ngày học → từ chối
-        $this->api($student)->postJson('/v1/trainings/checkin', ['code' => $qr])->assertStatus(422)->assertJsonPath('reason', 'no_session_today');
+        $this->api($student)->postJson('/v1/trainings/checkin', ['code' => $qr])->assertStatus(422)->assertJsonPath('code', 'no_session_today');
         // Mã sai
-        $this->api($student)->postJson('/v1/trainings/checkin', ['code' => 'ELLSO-CHECKIN:sai'])->assertStatus(422)->assertJsonPath('reason', 'invalid_code');
+        $this->api($student)->postJson('/v1/trainings/checkin', ['code' => 'ELLSO-CHECKIN:sai'])->assertStatus(422)->assertJsonPath('code', 'invalid_code');
 
         // Ngày buổi 1 (sáng sớm, trước giờ học vẫn được) → điểm danh buổi 1
         $this->travelTo(CarbonImmutable::parse('2026-11-15 17:40', 'Asia/Ho_Chi_Minh'));
-        $this->api($other)->postJson('/v1/trainings/checkin', ['code' => $qr])->assertForbidden()->assertJsonPath('reason', 'not_registered');
+        $this->api($other)->postJson('/v1/trainings/checkin', ['code' => $qr])->assertForbidden()->assertJsonPath('code', 'not_registered');
         $this->api($student)->postJson('/v1/trainings/checkin', ['code' => $qr])->assertCreated()
             ->assertJsonPath('data.number', 1)->assertJsonPath('data.session_id', $s1->id)->assertJsonPath('data.already', false);
         $this->travelTo(CarbonImmutable::parse('2026-11-15 18:30', 'Asia/Ho_Chi_Minh'));
@@ -558,6 +558,7 @@ class TrainingCourseTest extends TestCase
         $this->get(TrainingCourseResource::getUrl('attendance', ['record' => $course]))->assertOk();
         $reg = TrainingRegistration::where('user_id', $student->id)->sole();
         Livewire::test(ManageTrainingAttendance::class, ['record' => $course->getRouteKey()])
+            ->mountAction('qr')->assertActionMounted('qr')->unmountAction()
             ->filterTable('session', $course->activeSessions()->get()[1]->id)
             ->callAction(TestAction::make('mark')->table($reg));
         $this->assertSame(2, $reg->attendances()->count());
