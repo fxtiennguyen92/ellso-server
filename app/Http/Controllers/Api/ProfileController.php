@@ -25,6 +25,8 @@ use Illuminate\Validation\ValidationException;
  * - POST   /me/avatar    : ảnh đại diện (multipart "avatar"; app đã cắt vuông + thu nhỏ ~512px trước khi gửi).
  * - DELETE /me/avatar    : bỏ ảnh, quay về chữ viết tắt.
  * - PUT    /me/avatar/mascot : chọn mascot làm ảnh đại diện {mascot: tho|mam|tia|cuMinh|so} (xoá ảnh đã tải lên).
+ * - POST   /me/tips      : đánh dấu đã xem một hướng dẫn {key} (welcome, tour-home, hint-…).
+ * - DELETE /me/tips      : xem lại hướng dẫn từ đầu (Hồ sơ › Hỗ trợ › Xem lại hướng dẫn).
  * - POST   /me/password  : đổi mật khẩu = mật khẩu hiện tại + mật khẩu mới (cùng quy tắc với đặt mật khẩu);
  *                          đổi xong đăng xuất mọi thiết bị khác, thiết bị này giữ đăng nhập.
  */
@@ -96,6 +98,30 @@ class ProfileController extends Controller
         $old = $user->avatar;
         $user->update(['avatar' => User::MASCOT_PREFIX.$data['mascot']]);
         self::deleteStored($old);
+
+        return new UserResource($user->load('referrer'));
+    }
+
+    public function markTip(Request $request): UserResource
+    {
+        $data = $request->validate(['key' => ['required', 'string', 'max:40', 'regex:/^[a-z0-9-]+$/']]);
+
+        /** @var User $user */
+        $user = $request->user();
+        $seen = $user->tips_seen ?? [];
+        if (! in_array($data['key'], $seen, true) && count($seen) < 100) {
+            $seen[] = $data['key'];
+            $user->forceFill(['tips_seen' => $seen])->save();
+        }
+
+        return new UserResource($user->load('referrer'));
+    }
+
+    public function resetTips(Request $request): UserResource
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $user->forceFill(['tips_seen' => []])->save();
 
         return new UserResource($user->load('referrer'));
     }

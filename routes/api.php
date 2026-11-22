@@ -80,6 +80,8 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::post('me/avatar', [ProfileController::class, 'uploadAvatar'])->middleware('throttle:20,1');
     Route::delete('me/avatar', [ProfileController::class, 'deleteAvatar']);
     Route::put('me/avatar/mascot', [ProfileController::class, 'chooseMascot'])->middleware('throttle:30,1');
+    Route::post('me/tips', [ProfileController::class, 'markTip'])->middleware('throttle:60,1');
+    Route::delete('me/tips', [ProfileController::class, 'resetTips']);
     Route::post('me/password', [ProfileController::class, 'changePassword'])->middleware('throttle:change-password');
     Route::get('me/referrer/preview', [ProfileController::class, 'previewReferrer'])->middleware('throttle:referral-check');
     Route::post('me/referrer', [ProfileController::class, 'setReferrer'])->middleware('throttle:referral-check');

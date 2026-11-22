@@ -20,6 +20,8 @@ class UserResource extends JsonResource
             // Mascot làm ảnh đại diện (tho | mam | tia | cuMinh | so) — app vẽ và cho cử động; khi có thì avatar = null
             'avatar_mascot' => $this->avatarMascot(),
             'role' => $this->role,
+            // Hướng dẫn sử dụng đã xem / bỏ qua (welcome, tour-home, hint-…) — app không hiện lại, kể cả khi đổi máy
+            'tips_seen' => array_values($this->tips_seen ?? []),
             'referral_code' => $this->referral_code,
             // Số xu đang có (số nguyên, không quy đổi tiền trên app)
             'coins' => (int) $this->coin_balance,
