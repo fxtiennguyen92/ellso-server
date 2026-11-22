@@ -17,6 +17,8 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'avatar' => $this->avatarUrl(),
+            // Mascot làm ảnh đại diện (tho | mam | tia | cuMinh | so) — app vẽ và cho cử động; khi có thì avatar = null
+            'avatar_mascot' => $this->avatarMascot(),
             'role' => $this->role,
             'referral_code' => $this->referral_code,
             // Số xu đang có (số nguyên, không quy đổi tiền trên app)

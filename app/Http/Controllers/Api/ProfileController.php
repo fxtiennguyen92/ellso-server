@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -23,6 +24,7 @@ use Illuminate\Validation\ValidationException;
  * - PATCH  /me           : sửa họ tên, số điện thoại (email không đổi ở đây).
  * - POST   /me/avatar    : ảnh đại diện (multipart "avatar"; app đã cắt vuông + thu nhỏ ~512px trước khi gửi).
  * - DELETE /me/avatar    : bỏ ảnh, quay về chữ viết tắt.
+ * - PUT    /me/avatar/mascot : chọn mascot làm ảnh đại diện {mascot: tho|mam|tia|cuMinh|so} (xoá ảnh đã tải lên).
  * - POST   /me/password  : đổi mật khẩu = mật khẩu hiện tại + mật khẩu mới (cùng quy tắc với đặt mật khẩu);
  *                          đổi xong đăng xuất mọi thiết bị khác, thiết bị này giữ đăng nhập.
  */
@@ -75,6 +77,24 @@ class ProfileController extends Controller
 
         $old = $user->avatar;
         $user->update(['avatar' => $path]);
+        self::deleteStored($old);
+
+        return new UserResource($user->load('referrer'));
+    }
+
+    public function chooseMascot(Request $request): UserResource
+    {
+        $data = $request->validate([
+            'mascot' => ['required', 'string', Rule::in(User::AVATAR_MASCOTS)],
+        ], [
+            'mascot.required' => 'Chưa chọn mascot.',
+            'mascot.in' => 'Mascot không hợp lệ.',
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+        $old = $user->avatar;
+        $user->update(['avatar' => User::MASCOT_PREFIX.$data['mascot']]);
         self::deleteStored($old);
 
         return new UserResource($user->load('referrer'));
