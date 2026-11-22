@@ -8,15 +8,17 @@
 
 <x-filament-panels::page>
     <style>
-        .ls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: .75rem; }
-        .ls-tile { padding: 1rem; border-radius: .75rem; border: 1px solid var(--gray-200); background: var(--gray-50); }
-        .dark .ls-tile { border-color: var(--gray-700); background: rgba(255,255,255,.03); }
-        .ls-label { font-size: .8125rem; color: var(--gray-500); }
-        .ls-value { margin-top: .25rem; font-size: 1.5rem; font-weight: 600; }
-        .ls-hint { margin-top: .125rem; font-size: .75rem; color: var(--gray-500); }
+        /* Thẻ số liệu cùng kích thước với thẻ số liệu ở các màn Thống kê */
+        .ls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; }
+        .ls-tile { padding: 1.25rem; border-radius: .75rem; border: 1px solid var(--gray-200); background: #fff; }
+        .dark .ls-tile { border-color: var(--gray-800); background: var(--gray-900); }
+        .ls-label { font-size: .875rem; font-weight: 500; color: var(--gray-600); }
+        .dark .ls-label { color: var(--gray-400); }
+        .ls-value { margin-top: .5rem; font-size: 1.875rem; line-height: 2.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .ls-hint { margin-top: .25rem; font-size: .8125rem; color: var(--gray-500); }
         .ls-bar { height: .5rem; border-radius: 999px; background: var(--gray-200); overflow: hidden; }
         .dark .ls-bar { background: var(--gray-700); }
-        .ls-bar > span { display: block; height: 100%; border-radius: 999px; background: rgb(16 185 129); }
+        .ls-bar > span { display: block; height: 100%; border-radius: 999px; background: #10b981; }
         .ls-row { display: grid; grid-template-columns: 7rem 1fr 3rem; align-items: center; gap: .75rem; font-size: .875rem; padding: .375rem 0; }
         .ls-table { width: 100%; font-size: .875rem; border-collapse: collapse; }
         .ls-table th { text-align: left; font-weight: 500; color: var(--gray-500); padding: .5rem; border-bottom: 1px solid var(--gray-200); }
@@ -24,6 +26,9 @@
         .dark .ls-table th, .dark .ls-table td { border-color: var(--gray-700); }
         .ls-warn { color: rgb(220 38 38); font-weight: 600; }
         .ls-note { font-size: .8125rem; color: var(--gray-500); }
+        .ls-feedback { display: flex; flex-wrap: wrap; gap: 1rem; }
+        .ls-feedback > span { display: inline-flex; align-items: center; gap: .375rem; }
+        .ls-feedback-icon { width: 1rem; height: 1rem; color: var(--gray-500); }
         .ls-chips { display: flex; flex-wrap: wrap; gap: .5rem; }
         .ls-chip { padding: .25rem .625rem; border-radius: 999px; font-size: .8125rem; background: var(--gray-100); }
         .dark .ls-chip { background: var(--gray-800); }
@@ -119,7 +124,10 @@
         @endif
 
         <x-filament::section heading="Đánh giá cuối bài">
-            <p class="ls-note">👍 Hữu ích: {{ $s['feedback']['up'] }} · 👎 Chưa hữu ích: {{ $s['feedback']['down'] }}</p>
+            <p class="ls-note ls-feedback">
+                <span><x-filament::icon icon="heroicon-o-hand-thumb-up" class="ls-feedback-icon" /> Hữu ích: {{ $s['feedback']['up'] }}</span>
+                <span><x-filament::icon icon="heroicon-o-hand-thumb-down" class="ls-feedback-icon" /> Chưa hữu ích: {{ $s['feedback']['down'] }}</span>
+            </p>
             @if ($s['feedback']['reasons'])
                 <div class="ls-chips" style="margin-top: .75rem">
                     @foreach ($s['feedback']['reasons'] as $r)
@@ -132,7 +140,7 @@
                     <tbody>
                         @foreach ($s['feedback']['comments'] as $c)
                             <tr>
-                                <td style="width: 2rem">{{ $c['rating'] > 0 ? '👍' : '👎' }}</td>
+                                <td style="width: 2rem"><x-filament::icon :icon="$c['rating'] > 0 ? 'heroicon-o-hand-thumb-up' : 'heroicon-o-hand-thumb-down'" :label="$c['rating'] > 0 ? 'Hữu ích' : 'Chưa hữu ích'" class="ls-feedback-icon" /></td>
                                 <td>{{ $c['comment'] }}</td>
                                 <td class="ls-note" style="white-space: nowrap">{{ $c['name'] }} · {{ $c['at']->format('d/m/Y') }}</td>
                             </tr>

@@ -28,9 +28,9 @@ class CourseResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
-    protected static ?string $modelLabel = 'khóa học';
+    protected static ?string $modelLabel = 'khoá học';
 
-    protected static ?string $pluralModelLabel = 'Khóa học';
+    protected static ?string $pluralModelLabel = 'Khoá học';
 
     protected static ?string $recordTitleAttribute = 'title';
 
@@ -55,12 +55,12 @@ class CourseResource extends Resource
             'index' => ListCourses::route('/'),
             'create' => CreateCourse::route('/create'),
             'edit' => EditCourse::route('/{record}/edit'),
-            // Trang danh sách lộ trình của khóa; key = tên quan hệ dạng kebab để resource lồng LearningPath tìm thấy
+            // Trang danh sách lộ trình của khoá; key = tên quan hệ dạng kebab để resource lồng LearningPath tìm thấy
             'learning-paths' => ManageCourseLearningPaths::route('/{record}/learning-paths'),
         ];
     }
 
-    /** Giảng viên chỉ thấy khóa học của mình. */
+    /** Giảng viên chỉ thấy khoá học của mình. */
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()
@@ -75,7 +75,7 @@ class CourseResource extends Resource
         return $query;
     }
 
-    /** Giảng viên không thấy khóa học của người khác trong tìm kiếm toàn cục. */
+    /** Giảng viên không thấy khoá học của người khác trong tìm kiếm toàn cục. */
     public static function getGlobalSearchEloquentQuery(): Builder
     {
         return static::getEloquentQuery()->withoutTrashed();

@@ -15,7 +15,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use UnitEnum;
 
-/** Thiết lập › Địa điểm huấn luyện: sổ địa chỉ dùng lại khi xếp lịch khoá huấn luyện. */
+/** Thiết lập › Địa điểm huấn luyện: sổ địa chỉ dùng lại khi xếp lịch chương trình huấn luyện. */
 class TrainingLocationResource extends Resource
 {
     protected static ?string $model = TrainingLocation::class;

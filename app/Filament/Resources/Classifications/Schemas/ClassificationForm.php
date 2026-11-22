@@ -34,7 +34,7 @@ class ClassificationForm
                         TextInput::make('question')
                             ->label('Câu hỏi trên app')
                             ->placeholder('VD: Bạn đang làm nghề gì?')
-                            ->helperText('App hỏi câu này khi học viên bắt đầu khóa học.')
+                            ->helperText('App hỏi câu này khi học viên bắt đầu khoá học.')
                             ->maxLength(255),
 
                         Select::make('course_id')
@@ -44,21 +44,21 @@ class ClassificationForm
 
                                 return $query->when($user?->isInstructor(), fn ($q) => $q->where('instructor_id', $user->id));
                             })
-                            ->placeholder('Dùng chung cho mọi khóa học')
+                            ->placeholder('Dùng chung cho mọi khoá học')
                             ->default(fn () => request()->integer('course') ?: null)
                             ->searchable()
                             ->preload()
-                            // Giảng viên chỉ tạo phân loại riêng cho khóa của mình
+                            // Giảng viên chỉ tạo phân loại riêng cho khoá của mình
                             ->required(fn () => ! auth()->user()?->isAdmin())
                             ->helperText(fn () => auth()->user()?->isAdmin()
-                                ? 'Để trống = dùng chung. Chọn một khóa = phân loại riêng của khóa đó. Có thể đổi riêng → dùng chung bất cứ lúc nào.'
-                                : 'Phân loại riêng chỉ dùng được trong khóa đã chọn.')
+                                ? 'Để trống = dùng chung. Chọn một khoá = phân loại riêng của khoá đó. Có thể đổi riêng → dùng chung bất cứ lúc nào.'
+                                : 'Phân loại riêng chỉ dùng được trong khoá đã chọn.')
                             ->rules([
                                 fn (?Classification $record): Closure => function (string $attribute, $value, Closure $fail) use ($record) {
-                                    // Không chuyển phân loại đang được khóa khác dùng thành phân loại riêng
+                                    // Không chuyển phân loại đang được khoá khác dùng thành phân loại riêng
                                     if ($record && filled($value)
                                         && $record->courses()->where('courses.id', '!=', $value)->exists()) {
-                                        $fail('Phân loại đang được khóa học khác sử dụng, không thể chuyển thành phân loại riêng.');
+                                        $fail('Phân loại đang được khoá học khác sử dụng, không thể chuyển thành phân loại riêng.');
                                     }
                                 },
                             ])

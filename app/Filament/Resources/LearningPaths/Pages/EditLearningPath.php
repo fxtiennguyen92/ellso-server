@@ -20,7 +20,7 @@ class EditLearningPath extends EditRecord
 
     public function getSubheading(): ?string
     {
-        return 'Khóa học: ' . $this->getRecord()->course->title;
+        return 'Khoá học: ' . $this->getRecord()->course->title;
     }
 
     protected function getHeaderActions(): array
@@ -31,7 +31,7 @@ class EditLearningPath extends EditRecord
                 ->icon(Heroicon::RectangleStack)
                 ->url(fn () => LearningPathResource::urlFor('build', $this->getRecord())),
             ActionGroup::make([
-                // Xóa xong tự quay về danh sách lộ trình của khóa
+                // Xóa xong tự quay về danh sách lộ trình của khoá
                 DeleteAction::make(),
             ]),
         ];

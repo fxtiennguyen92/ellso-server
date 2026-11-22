@@ -9,7 +9,7 @@ use App\Models\Course;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 
-/** Tạo lộ trình cho khóa cha (resource lồng: /courses/{course}/learning-paths/create). */
+/** Tạo lộ trình cho khoá cha (resource lồng: /courses/{course}/learning-paths/create). */
 class CreateLearningPath extends CreateRecord
 {
     protected static string $resource = LearningPathResource::class;
@@ -19,18 +19,18 @@ class CreateLearningPath extends CreateRecord
 
     public function getSubheading(): ?string
     {
-        return 'Khóa học: ' . $this->course()->title;
+        return 'Khoá học: ' . $this->course()->title;
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $course = $this->course();
 
-        // Chặn giảng viên tạo lộ trình cho khóa của người khác
+        // Chặn giảng viên tạo lộ trình cho khoá của người khác
         abort_unless(auth()->user()->can('update', $course), 403);
 
         if ($course->type === CourseType::Single && $course->learningPaths()->exists()) {
-            $this->stop('Khóa học chung chỉ có 1 lộ trình', 'Đổi khóa sang "Đa lộ trình" để thêm lộ trình.');
+            $this->stop('Khoá học chung chỉ có 1 lộ trình', 'Đổi khoá sang "Đa lộ trình" để thêm lộ trình.');
         }
 
         $this->conditionOptionIds = LearningPathForm::optionIdsFromState($course->id, $data['conditions'] ?? []);

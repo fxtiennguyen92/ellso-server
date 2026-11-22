@@ -7,7 +7,7 @@ use App\Models\User;
 
 /**
  * Admin: tạo / sửa mọi phân loại (dùng chung và riêng), đổi phạm vi.
- * Giảng viên: chỉ phân loại riêng của khóa mình.
+ * Giảng viên: chỉ phân loại riêng của khoá mình.
  * Phân loại Năng lực không sửa / xoá ở đây (đồng bộ từ Bài kiểm tra đầu vào).
  */
 class ClassificationPolicy

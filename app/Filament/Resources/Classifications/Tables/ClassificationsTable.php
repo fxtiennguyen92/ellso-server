@@ -49,7 +49,7 @@ class ClassificationsTable
                     ->label('Giá trị')
                     ->badge()
                     ->limitList(5),
-                TextColumn::make('courses_count')->label('Số khóa dùng')->counts('courses'),
+                TextColumn::make('courses_count')->label('Số khoá dùng')->counts('courses'),
                 IconColumn::make('is_active')->label('Đang dùng')->boolean(),
             ])
             ->recordUrl(function (Classification $record) {
@@ -67,7 +67,7 @@ class ClassificationsTable
                 TernaryFilter::make('shared')
                     ->label('Phạm vi')
                     ->trueLabel('Dùng chung')
-                    ->falseLabel('Riêng của khóa')
+                    ->falseLabel('Riêng của khoá')
                     ->queries(
                         true: fn (Builder $query) => $query->whereNull('course_id'),
                         false: fn (Builder $query) => $query->whereNotNull('course_id'),

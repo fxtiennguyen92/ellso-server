@@ -36,11 +36,11 @@ class CourseForm
             ->columns(3)
             ->components([
                 Group::make([
-                    Section::make('Thông tin khóa học')
+                    Section::make('Thông tin khoá học')
                         ->columns(2)
                         ->schema([
                             TextInput::make('title')
-                                ->label('Tên khóa học')
+                                ->label('Tên khoá học')
                                 ->required()
                                 ->maxLength(255)
                                 ->columnSpanFull(),
@@ -68,7 +68,7 @@ class CourseForm
                                 ->columnSpanFull(),
                         ]),
 
-                    Section::make('Dạng khóa học')
+                    Section::make('Dạng khoá học')
                         ->schema([
                             ToggleButtons::make('type')
                                 ->hiddenLabel()
@@ -76,16 +76,16 @@ class CourseForm
                                 ->default(CourseType::Single)
                                 ->inline()
                                 ->required()
-                                // Đã có nhiều lộ trình thì không chuyển về "khóa chung" được
+                                // Đã có nhiều lộ trình thì không chuyển về "khoá chung" được
                                 ->disabled(fn (?Course $record) => $record && $record->learningPaths()->count() > 1)
                                 ->helperText(fn (?Course $record) => $record && $record->learningPaths()->count() > 1
-                                    ? 'Khóa đang có nhiều lộ trình. Xóa bớt còn 1 lộ trình nếu muốn chuyển về khóa học chung.'
-                                    : 'Khóa học chung tự có 1 lộ trình mặc định. Đa lộ trình: chia lộ trình theo các phân loại bạn chọn bên dưới.')
+                                    ? 'Khoá đang có nhiều lộ trình. Xóa bớt còn 1 lộ trình nếu muốn chuyển về khoá học chung.'
+                                    : 'Khoá học chung tự có 1 lộ trình mặc định. Đa lộ trình: chia lộ trình theo các phân loại bạn chọn bên dưới.')
                                 ->live(),
                         ]),
 
                     Section::make('Phân loại lộ trình')
-                        ->description('Khóa chia lộ trình theo những phân loại nào. Thứ tự ở đây là thứ tự câu hỏi trên app. Phân loại "Năng lực · …" không hỏi trên app mà lấy từ kết quả bài kiểm tra đầu vào.')
+                        ->description('Khoá chia lộ trình theo những phân loại nào. Thứ tự ở đây là thứ tự câu hỏi trên app. Phân loại "Năng lực · …" không hỏi trên app mà lấy từ kết quả bài kiểm tra đầu vào.')
                         ->visible(fn (Get $get) => self::isMultiPath($get('type')))
                         ->schema([
                             // Dạng bảng: mỗi phân loại 1 hàng, nút kéo thả / xóa nằm cùng hàng
@@ -104,7 +104,7 @@ class CourseForm
                                     Select::make('classification_id')
                                         ->hiddenLabel()
                                         ->placeholder('Chọn phân loại')
-                                        // Trong Repeater, $record là dòng CourseClassification → lấy khóa từ trang
+                                        // Trong Repeater, $record là dòng CourseClassification → lấy khoá từ trang
                                         ->options(fn ($livewire) => Classification::query()
                                             ->availableFor(self::pageCourse($livewire)?->id)
                                             ->where('is_active', true)
@@ -112,18 +112,18 @@ class CourseForm
                                             ->orderBy('sort_order')
                                             ->get()
                                             ->mapWithKeys(fn (Classification $c) => [
-                                                $c->id => $c->isAbility() ? $c->displayName() : $c->name.($c->isShared() ? '' : ' (riêng của khóa)'),
+                                                $c->id => $c->isAbility() ? $c->displayName() : $c->name.($c->isShared() ? '' : ' (riêng của khoá)'),
                                             ]))
                                         ->live()
                                         ->required()
                                         ->distinct()
                                         ->searchable(),
                                 ]),
-                            Text::make('Phân loại riêng của khóa (chỉ khóa này dùng) có thể tạo sau khi lưu khóa học.')
+                            Text::make('Phân loại riêng của khoá (chỉ khoá này dùng) có thể tạo sau khi lưu khoá học.')
                                 ->visible(fn (?Course $record) => $record === null),
                             Actions::make([
                                 Action::make('createOwnClassification')
-                                    ->label('Tạo phân loại riêng cho khóa này')
+                                    ->label('Tạo phân loại riêng cho khoá này')
                                     ->icon(Heroicon::Plus)
                                     ->link()
                                     ->url(fn (?Course $record) => ClassificationResource::getUrl('create', ['course' => $record?->getKey()]))
@@ -195,7 +195,7 @@ class CourseForm
             ]);
     }
 
-    /** Khóa học đang mở trên trang Tạo / Sửa (null khi đang tạo mới). */
+    /** Khoá học đang mở trên trang Tạo / Sửa (null khi đang tạo mới). */
     private static function pageCourse(mixed $livewire): ?Course
     {
         $record = $livewire->record ?? null;

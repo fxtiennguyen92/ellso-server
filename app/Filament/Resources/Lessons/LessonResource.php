@@ -31,7 +31,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use UnitEnum;
 
-/** Thư viện bài học dùng chung cho mọi khóa. */
+/** Thư viện bài học dùng chung cho mọi khoá. */
 class LessonResource extends Resource
 {
     protected static ?string $model = Lesson::class;
@@ -126,7 +126,7 @@ class LessonResource extends Resource
                         ->icon(Heroicon::DocumentDuplicate)
                         ->authorize('replicate')
                         ->requiresConfirmation()
-                        ->modalDescription('Tạo bản sao (tên, icon, bản nháp) để sửa riêng mà không ảnh hưởng các khóa đang dùng bài gốc.')
+                        ->modalDescription('Tạo bản sao (tên, icon, bản nháp) để sửa riêng mà không ảnh hưởng các khoá đang dùng bài gốc.')
                         ->action(function (Lesson $record) {
                             $copy = $record->duplicate();
                             Notification::make()->title("Đã tạo \"{$copy->title}\"")->success()->send();
@@ -146,7 +146,7 @@ class LessonResource extends Resource
 
         return $courses->isEmpty()
             ? null
-            : 'Bài này đang dùng ở '.$courses->count().' khóa: '.$courses->pluck('title')->join(', ').'. Thay đổi sẽ áp dụng cho tất cả.';
+            : 'Bài này đang dùng ở '.$courses->count().' khoá: '.$courses->pluck('title')->join(', ').'. Thay đổi sẽ áp dụng cho tất cả.';
     }
 
     public static function getPages(): array

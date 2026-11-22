@@ -13,7 +13,7 @@ class ListPartnerEvents extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Tin về sự kiện của đối tác bên ngoài để học viên biết thêm thông tin (không đăng ký trong app). App hiện theo thứ tự trong danh sách — bấm "Sắp xếp" rồi kéo thả để đổi thứ tự.';
+        return 'Tin sự kiện của đối tác, chỉ để học viên biết, không đăng ký trong app. Bấm "Sắp xếp" rồi kéo thả để đổi thứ tự trên app.';
     }
 
     protected function getHeaderActions(): array

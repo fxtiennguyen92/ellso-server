@@ -36,7 +36,7 @@ class CategoryResource extends Resource
 
     protected static ?string $modelLabel = 'danh mục';
 
-    protected static ?string $pluralModelLabel = 'Danh mục khóa học';
+    protected static ?string $pluralModelLabel = 'Danh mục khoá học';
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -85,7 +85,7 @@ class CategoryResource extends Resource
             ->columns([
                 TextColumn::make('name')->label('Tên')->searchable(),
                 TextColumn::make('parent.name')->label('Danh mục cha')->placeholder('—'),
-                TextColumn::make('courses_count')->label('Số khóa học')->counts('courses'),
+                TextColumn::make('courses_count')->label('Số khoá học')->counts('courses'),
                 IconColumn::make('is_active')->label('Hiển thị')->boolean(),
             ])
             ->filters([

@@ -41,7 +41,7 @@ class LearningPathForm
                     ]),
 
                 Section::make('Áp dụng cho')
-                    ->description('Chọn giá trị cho từng phân loại của khóa. Để trống một phân loại = áp dụng cho mọi giá trị. Có thể chọn nhiều giá trị.')
+                    ->description('Chọn giá trị cho từng phân loại của khoá. Để trống một phân loại = áp dụng cho mọi giá trị. Có thể chọn nhiều giá trị.')
                     ->visible(fn ($livewire) => self::pageCourse($livewire)?->type === CourseType::MultiPath)
                     ->columns(2)
                     ->schema(fn ($livewire) => self::conditionFields(self::pageCourse($livewire))),
@@ -49,8 +49,8 @@ class LearningPathForm
     }
 
     /**
-     * Khóa học của trang hiện tại. Lộ trình là resource lồng trong Khóa học:
-     * trang Tạo lấy khóa từ bản ghi cha, trang Sửa lấy từ chính lộ trình.
+     * Khoá học của trang hiện tại. Lộ trình là resource lồng trong Khoá học:
+     * trang Tạo lấy khoá từ bản ghi cha, trang Sửa lấy từ chính lộ trình.
      */
     public static function pageCourse(mixed $livewire): ?Course
     {
@@ -66,7 +66,7 @@ class LearningPathForm
     }
 
     /**
-     * Một ô chọn (nhiều giá trị) cho mỗi phân loại khóa đang dùng.
+     * Một ô chọn (nhiều giá trị) cho mỗi phân loại khoá đang dùng.
      * State: conditions.{classification_id} = [option_id, …]
      */
     private static function conditionFields(?Course $course): array
@@ -79,7 +79,7 @@ class LearningPathForm
 
         if ($classifications->isEmpty()) {
             return [
-                Text::make('Khóa chưa chọn phân loại nào. Vào trang sửa khóa học › mục "Phân loại lộ trình" để thêm.'),
+                Text::make('Khoá chưa chọn phân loại nào. Vào trang sửa khoá học › mục "Phân loại lộ trình" để thêm.'),
             ];
         }
 
@@ -96,7 +96,7 @@ class LearningPathForm
     }
 
     /**
-     * Tìm lộ trình khác trong cùng khóa có đúng bộ điều kiện này (trùng lặp).
+     * Tìm lộ trình khác trong cùng khoá có đúng bộ điều kiện này (trùng lặp).
      *
      * @param  array<int>  $optionIds
      */
@@ -113,7 +113,7 @@ class LearningPathForm
     }
 
     /**
-     * Lấy danh sách option_id hợp lệ từ state "conditions" (chỉ phân loại khóa đang dùng).
+     * Lấy danh sách option_id hợp lệ từ state "conditions" (chỉ phân loại khoá đang dùng).
      *
      * @return array<int>
      */

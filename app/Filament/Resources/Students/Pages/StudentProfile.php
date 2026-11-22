@@ -94,7 +94,7 @@ class StudentProfile extends ViewRecord
                                 $record->wasInvited() => 'Đã mời, chưa đăng nhập',
                                 default => 'Chưa đăng nhập',
                             })
-                            ->color(fn (User $record) => $record->hasActivatedPassword() ? 'success' : 'warning'),
+                            ->color(fn (User $record) => $record->hasActivatedPassword() ? 'gray' : 'warning'),
                         TextEntry::make('last_login_at')->label('Đăng nhập cuối')->dateTime('H:i d/m/Y', self::TZ)->placeholder('Chưa đăng nhập'),
                         TextEntry::make('referral_code')->label('Mã giới thiệu')->fontFamily('mono')->copyable(),
                         TextEntry::make('referrer.name')->label('Người giới thiệu')->placeholder('Không có'),

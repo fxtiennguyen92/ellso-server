@@ -14,7 +14,7 @@ class CreateCourse extends CreateRecord
     {
         $user = auth()->user();
 
-        // Giảng viên: khóa luôn thuộc về mình, chỉ được nháp / chờ duyệt
+        // Giảng viên: khoá luôn thuộc về mình, chỉ được nháp / chờ duyệt
         if (! $user->isAdmin()) {
             $data['instructor_id'] = $user->id;
 
@@ -26,7 +26,7 @@ class CreateCourse extends CreateRecord
         return $data;
     }
 
-    /** Tạo xong → sang trang Lộ trình học của khóa. */
+    /** Tạo xong → sang trang Lộ trình học của khoá. */
     protected function getRedirectUrl(): string
     {
         return $this->getResource()::getUrl('learning-paths', ['record' => $this->getRecord()]);

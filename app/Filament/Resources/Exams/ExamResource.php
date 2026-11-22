@@ -114,7 +114,7 @@ class ExamResource extends Resource
                     ->label('Đề thi')
                     ->searchable()
                     ->weight('medium')
-                    ->description(fn (Exam $record) => ($p = $record->problems()) ? '⚠ ' . $p[0] : null),
+                    ->description(fn (Exam $record) => ($p = $record->problems()) ? 'Cần sửa: ' . $p[0] : null),
                 TextColumn::make('questions_count')
                     ->label('Câu hỏi')
                     ->alignCenter()

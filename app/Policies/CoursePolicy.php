@@ -7,8 +7,8 @@ use App\Models\Course;
 use App\Models\User;
 
 /**
- * Admin: toàn quyền. Giảng viên: chỉ khóa học của mình,
- * không tự xuất bản/ẩn, không xóa khóa đã xuất bản.
+ * Admin: toàn quyền. Giảng viên: chỉ khoá học của mình,
+ * không tự xuất bản/ẩn, không xóa khoá đã xuất bản.
  */
 class CoursePolicy
 {
@@ -66,7 +66,7 @@ class CoursePolicy
         return $user->isAdmin();
     }
 
-    /** Duyệt / xuất bản / ẩn khóa học */
+    /** Duyệt / xuất bản / ẩn khoá học */
     public function publish(User $user, Course $course): bool
     {
         return $user->isAdmin();

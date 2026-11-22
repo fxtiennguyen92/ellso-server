@@ -13,7 +13,7 @@ class ListWorkshops extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Workshop online: mỗi workshop là một buổi, mở lại vào nhiều ngày / khung giờ; học viên đăng ký từng buổi. Cần gói thành viên còn hạn; phí 0 = không thu thêm. Link họp (Zoom / Meet) dán ở tab Lịch.';
+        return 'Workshop online một buổi, mở lại vào nhiều ngày; học viên có gói thành viên còn hạn đăng ký từng buổi. Link họp dán ở tab Lịch.';
     }
 
     protected function getHeaderActions(): array

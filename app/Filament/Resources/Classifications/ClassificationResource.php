@@ -51,7 +51,7 @@ class ClassificationResource extends Resource
         ];
     }
 
-    /** Giảng viên chỉ thấy phân loại riêng của khóa mình. */
+    /** Giảng viên chỉ thấy phân loại riêng của khoá mình. */
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();
