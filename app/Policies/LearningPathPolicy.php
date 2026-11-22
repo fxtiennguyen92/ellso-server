@@ -6,7 +6,7 @@ use App\Enums\CourseType;
 use App\Models\LearningPath;
 use App\Models\User;
 
-/** Lộ trình theo quyền trên khóa học chứa nó. */
+/** Lộ trình theo quyền trên khoá học chứa nó. */
 class LearningPathPolicy
 {
     public function viewAny(User $user): bool
@@ -29,7 +29,7 @@ class LearningPathPolicy
         return $user->can('update', $path->course);
     }
 
-    /** Khóa học chung phải giữ lại lộ trình duy nhất của nó. */
+    /** Khoá học chung phải giữ lại lộ trình duy nhất của nó. */
     public function delete(User $user, LearningPath $path): bool
     {
         if ($path->course->type === CourseType::Single) {

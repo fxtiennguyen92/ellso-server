@@ -65,7 +65,7 @@ class MembershipSettingsPage extends Page
             ->statePath('data')
             ->components([
                 Section::make('Giá gói')
-                    ->description('Gói thành viên luôn có thời hạn 1 năm: xem tài liệu và tham gia các khoá huấn luyện. Đang có gói còn hạn mà mua / được tặng thêm thì cộng nối 1 năm.')
+                    ->description('Gói thành viên luôn có thời hạn 1 năm: xem tài liệu và tham gia chương trình huấn luyện, workshop. Đang có gói còn hạn mà mua hoặc được tặng thêm thì cộng nối 1 năm.')
                     ->schema([
                         TextInput::make('price')
                             ->label('Giá gói 1 năm')
@@ -88,7 +88,7 @@ class MembershipSettingsPage extends Page
                             ->searchable()
                             ->preload()
                             ->options(fn () => Course::query()->orderBy('title')->pluck('title', 'id')->all()),
-                        Text::make('Tài liệu (sách, PDF, video): thêm được khi module tài liệu có trên server.'),
+                        Text::make('Hiện chỉ áp dụng cho khoá học, chưa áp dụng cho tài liệu (sách, PDF, video)'),
                     ]),
             ]);
     }

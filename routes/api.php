@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\CourseCatalogController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\HlsController;
+use App\Http\Controllers\Api\LegalController;
 use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\LessonTrackingController;
 use App\Http\Controllers\Api\MyCourseController;
@@ -48,6 +49,7 @@ Route::get('campaigns/{id}', [CampaignController::class, 'show'])->whereNumber('
 
 // Sự kiện ngoài lề: tin về sự kiện của đối tác bên ngoài (không đăng ký trong app)
 Route::get('partner-events', [PartnerEventController::class, 'index']);
+Route::get('legal/{slug}', [LegalController::class, 'show'])->whereIn('slug', ['terms', 'privacy']);
 Route::get('partner-events/{id}', [PartnerEventController::class, 'show'])->whereNumber('id');
 
 // Chương trình huấn luyện offline (nhiều buổi) + workshop online: danh sách + chi tiết.
@@ -77,6 +79,7 @@ Route::middleware(['auth:sanctum', 'abilities:app'])->group(function () {
     Route::patch('me', [ProfileController::class, 'update']);
     Route::post('me/avatar', [ProfileController::class, 'uploadAvatar'])->middleware('throttle:20,1');
     Route::delete('me/avatar', [ProfileController::class, 'deleteAvatar']);
+    Route::put('me/avatar/mascot', [ProfileController::class, 'chooseMascot'])->middleware('throttle:30,1');
     Route::post('me/password', [ProfileController::class, 'changePassword'])->middleware('throttle:change-password');
     Route::get('me/referrer/preview', [ProfileController::class, 'previewReferrer'])->middleware('throttle:referral-check');
     Route::post('me/referrer', [ProfileController::class, 'setReferrer'])->middleware('throttle:referral-check');

@@ -75,7 +75,7 @@ class DocumentResource extends Resource
                     ->label('Tài liệu')
                     ->weight('medium')
                     ->description(fn (Document $record) => implode(' · ', array_filter([
-                        $record->author_id ? '🎓 ' . $record->authorUser?->name : $record->author,
+                        $record->author_id ? $record->authorUser?->name . ' (giảng viên)' : $record->author,
                         $record->topic?->name,
                     ])))
                     ->searchable(query: fn ($query, string $search) => $query->where(fn ($w) => $w->where('title', 'like', "%{$search}%")->orWhere(fn ($a) => $a->whereAuthorLike($search))))

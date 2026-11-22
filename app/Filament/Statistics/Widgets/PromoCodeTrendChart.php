@@ -28,7 +28,7 @@ class PromoCodeTrendChart extends ChartWidget
 
     private const USAGE_COLOR = '#10b981';   // emerald-500
 
-    private const REVENUE_COLOR = '#f59e0b'; // spark-500
+    private const REVENUE_COLOR = '#64748b'; // slate-500: đường phụ trung tính, cột giữ màu emerald (một màu nhấn mỗi biểu đồ)
 
     public function getHeading(): string
     {

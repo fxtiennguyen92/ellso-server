@@ -28,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
         // "3 ngày trước" thay vì "3 days ago" (cột since(), diffForHumans())
         \Illuminate\Support\Carbon::setLocale('vi');
 
+        // Tiêu đề CMS viết hoa chữ đầu câu ("Tài khoản học viên"), không viết hoa mọi chữ đầu
+        \Filament\Resources\Resource::titleCaseModelLabel(false);
+
         // Alpine component nạp bất đồng bộ cho CMS (build bằng: node bin/build.js, rồi php artisan filament:assets)
         FilamentAsset::register([
             AlpineComponent::make('lesson-editor', __DIR__ . '/../../resources/js/dist/components/lesson-editor.js'),

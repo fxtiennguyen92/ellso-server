@@ -13,7 +13,7 @@ class ListExams extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Đề thi trắc nghiệm dùng chung cho nhiều lộ trình (thi giữa kỳ, cuối kỳ…). Học viên đậu khi đúng ≥ 70%; đậu mọi bài thi của lộ trình mới được cấp chứng chỉ. Thêm đề vào lộ trình ở trang Bài học của lộ trình.';
+        return 'Đề trắc nghiệm dùng chung cho nhiều lộ trình, đậu khi đúng từ 70%. Thêm đề vào lộ trình bằng nút Thêm bài thi ở trang Bài học của lộ trình.';
     }
 
     protected function getHeaderActions(): array

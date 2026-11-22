@@ -12,7 +12,7 @@ enum CourseType: string implements HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::Single => 'Khóa học chung',
+            self::Single => 'Khoá học chung',
             self::MultiPath => 'Đa lộ trình',
         };
     }

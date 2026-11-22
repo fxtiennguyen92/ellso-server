@@ -13,7 +13,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-/** Danh sách lộ trình của MỘT khóa học (trang Khóa học › Lộ trình học). */
+/** Danh sách lộ trình của MỘT khoá học (trang Khoá học › Lộ trình học). */
 class LearningPathsTable
 {
     public static function configure(Table $table): Table
@@ -46,6 +46,6 @@ class LearningPathsTable
                 ]),
             ])
             ->emptyStateHeading('Chưa có lộ trình')
-            ->emptyStateDescription('Khóa đa lộ trình: tạo một lộ trình cho mỗi nhóm học viên theo các phân loại của khóa.');
+            ->emptyStateDescription('Khoá đa lộ trình: tạo một lộ trình cho mỗi nhóm học viên theo các phân loại của khoá.');
     }
 }

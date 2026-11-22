@@ -14,7 +14,7 @@ class AppOpensChart extends StudentActivityChart
 
     protected ?string $maxHeight = '300px';
 
-    private const SIGNUP_COLOR = '#db2777'; // khác hẳn màu cột và màu nền tảng trên cùng trang
+    private const SIGNUP_COLOR = '#64748b'; // slate-500: đường phụ trung tính, cột lượt mở app giữ màu emerald (một màu nhấn mỗi biểu đồ)
 
     public function getHeading(): string
     {

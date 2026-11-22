@@ -11,6 +11,6 @@ class ManageStudents extends ManageUsers
 
     public function getSubheading(): ?string
     {
-        return 'Bấm vào học viên để mở Học bạ: khoá học & tiến độ, kết quả bài kiểm tra đầu vào, gói thành viên, hoạt động.';
+        return 'Bấm vào học viên để mở Học bạ: khoá học, bài kiểm tra đầu vào, gói thành viên và hoạt động';
     }
 }

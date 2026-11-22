@@ -39,14 +39,14 @@ class CoursesTable
                     ->disk(MediaStorage::diskName())
                     ->imageHeight(40),
                 TextColumn::make('title')
-                    ->label('Khóa học')
+                    ->label('Khoá học')
                     ->searchable()
                     ->sortable()
                     ->description(fn (Course $record) => $record->categories->pluck('name')->join(' · ') ?: null),
                 TextColumn::make('instructor.name')
                     ->label('Giảng viên')
                     ->visible($isAdmin),
-                TextColumn::make('type')->label('Dạng')->badge()->color('gray'),
+                TextColumn::make('type')->label('Dạng')->color('gray'),
                 TextColumn::make('status')->label('Trạng thái')->badge(),
                 TextColumn::make('price')
                     ->label('Giá')
@@ -69,7 +69,7 @@ class CoursesTable
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                // Bấm vào hàng = sửa khóa học; nút trên hàng mở danh sách lộ trình của khóa
+                // Bấm vào hàng = sửa khoá học; nút trên hàng mở danh sách lộ trình của khoá
                 Action::make('learningPaths')
                     ->label('Lộ trình học')
                     ->icon(Heroicon::Map)
@@ -86,11 +86,11 @@ class CoursesTable
                         ->visible(fn (Course $record) => $record->status !== CourseStatus::Published && ! $record->trashed())
                         ->action(function (Course $record) {
                             $record->update(['status' => CourseStatus::Published]);
-                            Notification::make()->title('Đã xuất bản khóa học')->success()->send();
+                            Notification::make()->title('Đã xuất bản khoá học')->success()->send();
                         }),
-                    // Admin ẩn khóa học
+                    // Admin ẩn khoá học
                     Action::make('hide')
-                        ->label('Ẩn khóa học')
+                        ->label('Ẩn khoá học')
                         ->icon(Heroicon::EyeSlash)
                         ->color('danger')
                         ->requiresConfirmation()

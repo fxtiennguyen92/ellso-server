@@ -1,5 +1,6 @@
 @php
     use App\Enums\ChapterColor;
+    use App\Enums\ContentStatus;
     use App\Enums\UnlockMode;
 
     $chapters = $this->getChapters();
@@ -41,11 +42,15 @@
         .eb-map-btn img, .eb-map-btn .fi-icon { width: 1.5rem; height: 1.5rem; color: #fff; }
         .eb-map-hidden { opacity: .35; outline: 2px dashed var(--gray-400); outline-offset: 3px; box-shadow: none; }
         .eb-ghost { opacity: .3; }
-        .eb-exam { border: 2px dashed color-mix(in oklab, var(--warning-500) 55%, transparent); border-radius: .75rem; padding: .75rem 1rem; display: flex; align-items: center; gap: .75rem; background: color-mix(in oklab, var(--warning-500) 6%, transparent); }
-        .eb-exam-icon { width: 2.5rem; height: 2.5rem; border-radius: .75rem; display: flex; align-items: center; justify-content: center; background: var(--warning-500); color: #fff; flex: none; }
-        .eb-exam-icon .fi-icon { width: 1.375rem; height: 1.375rem; color: #fff; }
+        /* Bài thi: khối ngang cấp chương, viền đứt mảnh để phân biệt với chương, không tô màu */
+        .eb-exam { border: 1px dashed var(--gray-300); border-radius: .75rem; padding: .75rem 1rem; display: flex; align-items: center; gap: .75rem; background: #fff; }
+        .dark .eb-exam { border-color: var(--gray-700); background: var(--gray-900); }
+        .eb-exam-icon { width: 2.5rem; height: 2.5rem; border-radius: .75rem; display: flex; align-items: center; justify-content: center; background: var(--gray-100); flex: none; }
+        .dark .eb-exam-icon { background: var(--gray-800); }
+        .eb-exam-icon .fi-icon { width: 1.25rem; height: 1.25rem; color: var(--gray-600); }
+        .dark .eb-exam-icon .fi-icon { color: var(--gray-300); }
         .eb-exam-body { flex: 1; min-width: 0; }
-        .eb-exam-title { font-weight: 600; font-size: .9375rem; }
+        .eb-exam-title { font-weight: 500; font-size: .9375rem; }
         .eb-exam-sub { font-size: .8125rem; opacity: .7; margin-top: .125rem; }
         .eb-map-exam { margin: .875rem .75rem; padding: .625rem .75rem; border-radius: .75rem; border: 2px dashed var(--warning-500); text-align: center; font-size: .8125rem; font-weight: 600; }
     </style>
@@ -102,7 +107,7 @@
                                         @endif
                                     </div>
                                     <div class="eb-meta">
-                                        <x-filament::badge size="sm" color="warning" icon="heroicon-m-lock-closed">Mở khi xong các bài trước</x-filament::badge>
+                                        <x-filament::badge size="sm" color="gray" icon="heroicon-m-lock-closed">Mở khi xong các bài trước</x-filament::badge>
                                         @if ($chapter->exam && (int) $chapter->exam->questions_count === 0)
                                             <x-filament::badge size="sm" color="danger">Đề chưa có câu hỏi</x-filament::badge>
                                         @endif
@@ -237,19 +242,20 @@
                                                     <x-filament::badge size="sm" color="info" icon="heroicon-m-chat-bubble-left-right" tooltip="Trao đổi 1-1 với giáo viên — không chặn bài sau, không tính vào % hoàn thành">
                                                         Coaching
                                                     </x-filament::badge>
-                                                @elseif ($status)
+                                                @elseif ($status && $status !== ContentStatus::Published)
+                                                    {{-- Bài đã xuất bản là trạng thái bình thường nên không gắn nhãn; chỉ báo bài cần xử lý --}}
                                                     <x-filament::badge size="sm" :color="$status->getColor()">
                                                         {{ $status->getLabel() }}
                                                     </x-filament::badge>
                                                 @endif
 
-                                                {{-- Bấm để đổi quy tắc mở khóa --}}
+                                                {{-- Bấm để đổi quy tắc mở khoá --}}
                                                 <x-filament::badge
                                                     tag="button"
                                                     size="sm"
                                                     :color="$unlock === UnlockMode::Always ? 'info' : 'gray'"
                                                     :icon="$unlock === UnlockMode::Always ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed'"
-                                                    tooltip="Bấm để đổi quy tắc mở khóa"
+                                                    tooltip="Bấm để đổi quy tắc mở khoá"
                                                     wire:click="toggleUnlock({{ $item->id }})"
                                                 >
                                                     {{ $unlock->shortLabel() }}

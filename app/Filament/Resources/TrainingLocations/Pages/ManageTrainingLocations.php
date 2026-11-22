@@ -13,7 +13,7 @@ class ManageTrainingLocations extends ManageRecords
 
     public function getSubheading(): ?string
     {
-        return 'Lưu địa điểm một lần (kèm nhãn dễ nhớ) để chọn lại khi xếp lịch khoá huấn luyện. Cũng có thể lưu địa điểm mới ngay khi thêm ngày tổ chức.';
+        return 'Lưu địa điểm một lần để chọn lại khi xếp lịch chương trình huấn luyện. Cũng có thể thêm địa điểm mới ngay lúc thêm buổi.';
     }
 
     protected function getHeaderActions(): array

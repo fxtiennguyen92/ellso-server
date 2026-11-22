@@ -12,7 +12,7 @@ class CreateClassification extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Giảng viên chỉ tạo phân loại riêng cho khóa của mình
+        // Giảng viên chỉ tạo phân loại riêng cho khoá của mình
         if (! auth()->user()->isAdmin()) {
             $course = Course::findOrFail($data['course_id'] ?? 0);
             abort_unless(auth()->user()->can('update', $course), 403);

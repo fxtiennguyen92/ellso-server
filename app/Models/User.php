@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
-use App\Support\MediaStorage;
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\UserLogEvent;
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\UserRole;
+use App\Services\MembershipService;
+use App\Support\MediaStorage;
 use App\Support\ReferralCode;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
@@ -63,7 +65,7 @@ class User extends Authenticatable implements FilamentUser
     {
         // Học viên mới tạo trong thời gian chiến dịch tặng gói → tặng gói thành viên 1 năm
         static::created(function (User $user) {
-            app(\App\Services\MembershipService::class)->grantForSignup($user);
+            app(MembershipService::class)->grantForSignup($user);
         });
 
         static::creating(function (User $user) {
@@ -118,11 +120,28 @@ class User extends Authenticatable implements FilamentUser
         ])->save();
     }
 
-    /** Link ảnh đại diện: ảnh app tải lên (đường dẫn trên ổ media) hoặc link ngoài có sẵn; null = dùng chữ viết tắt. */
+    /** Mascot có thể chọn làm ảnh đại diện (tài liệu claude/ellso-mascots.md). Lưu vào cột avatar dạng "mascot:tho". */
+    public const AVATAR_MASCOTS = ['tho', 'mam', 'tia', 'cuMinh', 'so'];
+
+    public const MASCOT_PREFIX = 'mascot:';
+
+    /** Mascot đang dùng làm ảnh đại diện (app tự vẽ + cử động), null nếu là ảnh / chữ viết tắt. */
+    public function avatarMascot(): ?string
+    {
+        $a = $this->avatar;
+        if (! is_string($a) || ! str_starts_with($a, self::MASCOT_PREFIX)) {
+            return null;
+        }
+        $name = substr($a, strlen(self::MASCOT_PREFIX));
+
+        return in_array($name, self::AVATAR_MASCOTS, true) ? $name : null;
+    }
+
+    /** Link ảnh đại diện: ảnh app tải lên (đường dẫn trên ổ media) hoặc link ngoài có sẵn; null = dùng chữ viết tắt (hoặc mascot). */
     public function avatarUrl(): ?string
     {
         $a = $this->avatar;
-        if (! is_string($a) || $a === '') {
+        if (! is_string($a) || $a === '' || str_starts_with($a, self::MASCOT_PREFIX)) {
             return null;
         }
 
@@ -185,7 +204,7 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(CartItem::class);
     }
 
-    public function savedDocuments(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function savedDocuments(): BelongsToMany
     {
         return $this->belongsToMany(Document::class, 'document_saves')->withPivot('created_at');
     }
@@ -226,18 +245,18 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /** Ngày hết hạn xa nhất của các gói còn hạn (gói nối tiếp tính cả), null nếu không có. */
-    public function membershipEndsAt(): ?\Illuminate\Support\Carbon
+    public function membershipEndsAt(): ?Carbon
     {
         $end = $this->memberships()->where('ends_at', '>', now())->max('ends_at');
 
-        return $end ? \Illuminate\Support\Carbon::parse($end) : null;
+        return $end ? Carbon::parse($end) : null;
     }
 
     /**
      * Ngày bắt đầu chuỗi gói thành viên đang còn hạn: gói đang dùng, lùi về các gói liền trước nối tiếp
      * (gia hạn khi còn hạn → gói mới bắt đầu đúng ngày gói cũ hết). null nếu không có gói còn hạn.
      */
-    public function membershipStartedAt(): ?\Illuminate\Support\Carbon
+    public function membershipStartedAt(): ?Carbon
     {
         $rows = $this->memberships()->where('starts_at', '<=', now())->orderByDesc('starts_at')->get(['starts_at', 'ends_at']);
         $current = $rows->first(fn (StudentMembership $m) => $m->ends_at->isFuture());

@@ -15,9 +15,9 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Lộ trình học — resource LỒNG trong Khóa học (không có mục riêng trên menu trái).
+ * Lộ trình học — resource LỒNG trong Khoá học (không có mục riêng trên menu trái).
  * URL: /courses/{course}/learning-paths/{record}/edit | /build
- * Danh sách lộ trình của một khóa: CourseResource › trang "Lộ trình học".
+ * Danh sách lộ trình của một khoá: CourseResource › trang "Lộ trình học".
  */
 class LearningPathResource extends Resource
 {
@@ -52,13 +52,13 @@ class LearningPathResource extends Resource
         ];
     }
 
-    /** URL các trang của lộ trình (cần cả khóa cha). */
+    /** URL các trang của lộ trình (cần cả khoá cha). */
     public static function urlFor(string $page, LearningPath $path): string
     {
         return static::getUrl($page, ['course' => $path->course_id, 'record' => $path]);
     }
 
-    /** Giảng viên chỉ thấy lộ trình thuộc khóa học của mình. */
+    /** Giảng viên chỉ thấy lộ trình thuộc khoá học của mình. */
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();

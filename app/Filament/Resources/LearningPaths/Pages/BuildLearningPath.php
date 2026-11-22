@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Xây dựng lộ trình: chương (tên, màu), bài trong chương (thêm từ thư viện / tạo mới / coaching,
- * quy tắc mở khóa, học thử, kéo thả), bài thi ngang cấp chương (chọn đề từ ngân hàng đề thi)
+ * quy tắc mở khoá, học thử, kéo thả), bài thi ngang cấp chương (chọn đề từ ngân hàng đề thi)
  * + xem trước bản đồ kiểu Duolingo.
  */
 class BuildLearningPath extends Page
@@ -53,7 +53,7 @@ class BuildLearningPath extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Khóa học: ' . $this->path()->course->title;
+        return 'Khoá học: ' . $this->path()->course->title;
     }
 
     public function getBreadcrumb(): ?string
@@ -210,7 +210,8 @@ class BuildLearningPath extends Page
         return Action::make('addLesson')
             ->label('Thêm bài')
             ->icon(Heroicon::Plus)
-            ->color('primary')
+            ->color('gray') // nút chính của màn là "Thêm chương"; nút trong từng chương để xám
+            ->outlined()
             ->size('sm')
             ->modalHeading('Thêm bài vào chương')
             ->modalWidth('lg')
@@ -264,7 +265,7 @@ class BuildLearningPath extends Page
                     ->visible(fn (Get $get) => $get('mode') === 'coaching'),
 
                 Select::make('unlock_mode')
-                    ->label('Mở khóa')
+                    ->label('Mở khoá')
                     ->options(UnlockMode::class)
                     ->default(UnlockMode::AfterPrevious)
                     ->required(),

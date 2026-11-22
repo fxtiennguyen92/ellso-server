@@ -185,12 +185,18 @@ class UserResource extends Resource
                         $record->wasInvited() => 'Đã mời',
                         default => 'Chưa đăng nhập',
                     })
-                    ->color(fn (User $record) => $record->hasActivatedPassword() ? 'success' : 'warning')
+                    // Đã kích hoạt là trạng thái bình thường → nhãn xám; chỉ tài khoản chưa kích hoạt mới tô màu
+                    ->color(fn (User $record) => $record->hasActivatedPassword() ? 'gray' : 'warning')
                     ->tooltip(fn (User $record) => ! $record->hasActivatedPassword() && $record->temp_password_sent_at
                         ? ($record->wasInvited() ? 'Gửi lời mời lúc ' : 'Gửi mật khẩu tạm lúc ')
                             . $record->temp_password_sent_at->timezone('Asia/Ho_Chi_Minh')->format('H:i d/m/Y')
                         : null),
-                IconColumn::make('is_active')->label('Hoạt động')->boolean(),
+                // Chỉ hiện icon khi tài khoản bị khoá; tài khoản đang hoạt động để trống cho bảng đỡ rối
+                IconColumn::make('is_active')
+                    ->label('Hoạt động')
+                    ->icon(fn (bool $state) => $state ? null : Heroicon::NoSymbol)
+                    ->color('danger')
+                    ->tooltip(fn (bool $state) => $state ? null : 'Đang bị khoá'),
                 TextColumn::make('last_login_at')
                     ->label('Đăng nhập cuối')
                     ->since()
@@ -306,7 +312,7 @@ class UserResource extends Resource
                     . " phút) tới {$record->email}, giống chức năng Quên mật khẩu. Mật khẩu hiện tại của học viên vẫn dùng được.")
                 ->action(fn (User $record) => self::sendTempPassword($record, TempPasswordReason::AdminReset)),
             Action::make('toggleActive')
-                ->label(fn (User $record) => $record->is_active ? 'Khóa' : 'Mở khóa')
+                ->label(fn (User $record) => $record->is_active ? 'Khoá' : 'Mở khoá')
                 ->icon(fn (User $record) => $record->is_active ? Heroicon::LockClosed : Heroicon::LockOpen)
                 ->color(fn (User $record) => $record->is_active ? 'danger' : 'success')
                 ->requiresConfirmation()
@@ -314,7 +320,7 @@ class UserResource extends Resource
                 ->action(function (User $record) {
                     $record->update(['is_active' => ! $record->is_active]);
 
-                    // Khóa tài khoản → thu hồi token API của app
+                    // Khoá tài khoản → thu hồi token API của app
                     if (! $record->is_active) {
                         $record->tokens()->delete();
                     }

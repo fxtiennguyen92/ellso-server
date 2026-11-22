@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Api;
 
-use App\Enums\UserRole;
 use App\Enums\CoinSource;
 use App\Enums\MembershipSource;
+use App\Enums\UserRole;
 use App\Models\StudentMembership;
 use App\Models\User;
 use App\Services\CoinLedger;
@@ -73,6 +73,29 @@ class ProfileApiTest extends TestCase
         Storage::disk(MediaStorage::diskName())->assertMissing($path2);
     }
 
+    public function test_choose_mascot_avatar_replaces_photo(): void
+    {
+        Storage::fake(MediaStorage::diskName());
+        $this->withToken($this->token)->post('/v1/me/avatar', ['avatar' => UploadedFile::fake()->image('a.jpg', 512, 512)], ['Accept' => 'application/json'])->assertOk();
+        $photo = $this->user->fresh()->avatar;
+
+        // Chọn mascot → ảnh cũ bị xoá, avatar = null, avatar_mascot = tên
+        $this->withToken($this->token)->putJson('/v1/me/avatar/mascot', ['mascot' => 'cuMinh'])
+            ->assertOk()->assertJsonPath('data.avatar', null)->assertJsonPath('data.avatar_mascot', 'cuMinh');
+        Storage::disk(MediaStorage::diskName())->assertMissing($photo);
+        $this->assertSame('mascot:cuMinh', $this->user->fresh()->avatar);
+        $this->assertNull($this->user->fresh()->avatarUrl());
+
+        $this->withToken($this->token)->putJson('/v1/me/avatar/mascot', ['mascot' => 'rong'])->assertUnprocessable()->assertJsonValidationErrors('mascot');
+        $this->withToken($this->token)->getJson('/v1/me')->assertJsonPath('data.avatar_mascot', 'cuMinh');
+
+        // Tải ảnh mới → bỏ mascot; xoá ảnh → chữ viết tắt
+        $this->withToken($this->token)->post('/v1/me/avatar', ['avatar' => UploadedFile::fake()->image('b.jpg', 300, 300)], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('data.avatar_mascot', null);
+        $this->withToken($this->token)->putJson('/v1/me/avatar/mascot', ['mascot' => 'tho'])->assertOk();
+        $this->withToken($this->token)->deleteJson('/v1/me/avatar')->assertOk()->assertJsonPath('data.avatar_mascot', null)->assertJsonPath('data.avatar', null);
+    }
+
     public function test_change_password_requires_current_and_rules_and_logs_out_other_devices(): void
     {
         $other = $this->user->createToken('app', ['app'])->plainTextToken;
@@ -99,7 +122,7 @@ class ProfileApiTest extends TestCase
     {
         $ref = User::factory()->create(['role' => UserRole::Student, 'is_active' => true, 'name' => 'Người GT', 'email' => 'gt@ellso.test']);
 
-        $this->withToken($this->token)->getJson('/v1/me/referrer/preview?code=' . strtolower($ref->referral_code))
+        $this->withToken($this->token)->getJson('/v1/me/referrer/preview?code='.strtolower($ref->referral_code))
             ->assertOk()
             ->assertJsonPath('data.name', 'Người GT')
             ->assertJsonPath('data.email', 'gt@ellso.test');
@@ -158,8 +181,8 @@ class ProfileApiTest extends TestCase
         $this->assertSame('ios', $list[0]['platform']);
         $this->assertSame('Chrome', $list[1]['name']);
 
-        $this->withToken($phone)->deleteJson('/v1/me/devices/' . $list[0]['id'])->assertStatus(422)->assertJsonPath('code', 'current_device');
-        $this->withToken($phone)->deleteJson('/v1/me/devices/' . $list[1]['id'])->assertOk();
+        $this->withToken($phone)->deleteJson('/v1/me/devices/'.$list[0]['id'])->assertStatus(422)->assertJsonPath('code', 'current_device');
+        $this->withToken($phone)->deleteJson('/v1/me/devices/'.$list[1]['id'])->assertOk();
         $this->assertSame(1, $u->tokens()->count());
 
         // token của máy đã bị đăng xuất không dùng được nữa; không xoá được token của người khác
@@ -167,7 +190,7 @@ class ProfileApiTest extends TestCase
         $this->withToken($web)->getJson('/v1/me')->assertUnauthorized();
         $otherId = $this->user->tokens()->first()->getKey();
         $this->app['auth']->forgetGuards();
-        $this->withToken($phone)->deleteJson('/v1/me/devices/' . $otherId)->assertNotFound();
+        $this->withToken($phone)->deleteJson('/v1/me/devices/'.$otherId)->assertNotFound();
     }
 
     public function test_coin_history_paginates_and_ledger_keeps_balance(): void
@@ -194,7 +217,7 @@ class ProfileApiTest extends TestCase
             ->assertJsonCount(20, 'data');
         $next = $first->json('next_cursor');
         $this->assertNotNull($next);
-        $this->withToken($this->token)->getJson('/v1/me/coins?cursor=' . $next)->assertOk()
+        $this->withToken($this->token)->getJson('/v1/me/coins?cursor='.$next)->assertOk()
             ->assertJsonCount(6, 'data')
             ->assertJsonPath('next_cursor', null)
             ->assertJsonPath('data.5.description', 'Bài 1');

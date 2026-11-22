@@ -13,7 +13,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 
-/** Khóa học › Lộ trình học: danh sách lộ trình của riêng một khóa. */
+/** Khoá học › Lộ trình học: danh sách lộ trình của riêng một khoá. */
 class ManageCourseLearningPaths extends ManageRelatedRecords
 {
     protected static string $resource = CourseResource::class;
@@ -28,7 +28,7 @@ class ManageCourseLearningPaths extends ManageRelatedRecords
 
     public function getSubheading(): string | Htmlable | null
     {
-        return 'Khóa học: ' . $this->getOwnerRecord()->title;
+        return 'Khoá học: ' . $this->getOwnerRecord()->title;
     }
 
     public function table(Table $table): Table

@@ -55,7 +55,7 @@ class ManagePlacementDimensions extends ManageRelatedRecords
 
     public function getSubheading(): ?string
     {
-        return $this->draftNotice() . $this->test()->title . ' — mỗi năng lực có nhiều mức độ. Ngưỡng tính theo %: 0% = điểm thấp nhất, 100% = điểm cao nhất có thể đạt với các câu học viên nhận được; học viên đạt mức có ngưỡng cao nhất mà % của họ chạm tới.';
+        return $this->draftNotice() . $this->test()->title . ' — mỗi năng lực có nhiều mức độ. Ngưỡng tính theo %: 0% là điểm thấp nhất, 100% là điểm cao nhất của bộ câu học viên nhận được.';
     }
 
     protected function getHeaderActions(): array

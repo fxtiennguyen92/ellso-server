@@ -128,7 +128,7 @@ class ManageExamQuestions extends ManageRelatedRecords
                     ->label('Câu hỏi')
                     ->wrap()
                     ->limit(160)
-                    ->description(fn (ExamQuestion $record) => ($p = $record->problems()) ? '⚠ ' . implode(' ', $p) : null),
+                    ->description(fn (ExamQuestion $record) => ($p = $record->problems()) ? 'Cần sửa: ' . implode(' ', $p) : null),
                 TextColumn::make('options_summary')
                     ->label('Đáp án')
                     ->state(fn (ExamQuestion $record) => new HtmlString($record->options->map(fn ($o) => $o->is_correct
