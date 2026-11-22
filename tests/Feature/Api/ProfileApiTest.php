@@ -96,6 +96,16 @@ class ProfileApiTest extends TestCase
         $this->withToken($this->token)->deleteJson('/v1/me/avatar')->assertOk()->assertJsonPath('data.avatar_mascot', null)->assertJsonPath('data.avatar', null);
     }
 
+    public function test_tips_seen_mark_and_reset(): void
+    {
+        $this->withToken($this->token)->getJson('/v1/me')->assertJsonPath('data.tips_seen', []);
+        $this->withToken($this->token)->postJson('/v1/me/tips', ['key' => 'welcome'])->assertOk()->assertJsonPath('data.tips_seen', ['welcome']);
+        $this->withToken($this->token)->postJson('/v1/me/tips', ['key' => 'welcome'])->assertOk()->assertJsonPath('data.tips_seen', ['welcome']);
+        $this->withToken($this->token)->postJson('/v1/me/tips', ['key' => 'hint-workshop'])->assertJsonPath('data.tips_seen', ['welcome', 'hint-workshop']);
+        $this->withToken($this->token)->postJson('/v1/me/tips', ['key' => 'Sai Khoá!'])->assertUnprocessable();
+        $this->withToken($this->token)->deleteJson('/v1/me/tips')->assertOk()->assertJsonPath('data.tips_seen', []);
+    }
+
     public function test_change_password_requires_current_and_rules_and_logs_out_other_devices(): void
     {
         $other = $this->user->createToken('app', ['app'])->plainTextToken;

@@ -58,6 +58,7 @@ class User extends Authenticatable implements FilamentUser
             'last_login_at' => 'datetime',
             'role' => UserRole::class,
             'is_active' => 'boolean',
+            'tips_seen' => 'array',
         ];
     }
 
